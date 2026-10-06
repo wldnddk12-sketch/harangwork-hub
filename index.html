@@ -1,0 +1,897 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>하랑 업무 허브</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F4F6F8; --surface:#FFFFFF; --ink:#18252F; --muted:#5B6B79; --line:#D9E0E6;
+  --brand:#1D4A6E; --brand-soft:#E3ECF4; --vis:#F2B705; --vis-soft:#FFF4CC; --vis-ink:#4A3800;
+  --ok:#0E7660; --ok-soft:#DDF2EC; --late:#B42318; --late-soft:#FDE7E5;
+  --font:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#0F161D; --surface:#17212A; --ink:#E5ECF1; --muted:#97A6B3; --line:#283642;
+    --brand:#8DB8E0; --brand-soft:#1E2F3E; --vis:#F2B705; --vis-soft:#3A3010; --vis-ink:#FFE38A;
+    --ok:#4CC3A5; --ok-soft:#163029; --late:#F2867B; --late-soft:#3A1E1C;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0F161D; --surface:#17212A; --ink:#E5ECF1; --muted:#97A6B3; --line:#283642;
+  --brand:#8DB8E0; --brand-soft:#1E2F3E; --vis:#F2B705; --vis-soft:#3A3010; --vis-ink:#FFE38A;
+  --ok:#4CC3A5; --ok-soft:#163029; --late:#F2867B; --late-soft:#3A1E1C;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--brand)}
+.wrap{max-width:1100px;margin:0 auto;padding:0 20px}
+header.top{background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:14px}
+.logo{font-weight:700;font-size:18px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
+.logo i{display:inline-block;width:10px;height:22px;background:var(--vis);border-radius:2px}
+.who{font-size:13px;color:var(--muted)}
+nav.tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;margin-top:6px}
+nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs button{background:none;border:0;padding:10px 12px 12px;white-space:nowrap;cursor:pointer;color:var(--muted);font-weight:500;border-bottom:3px solid transparent;display:flex;align-items:center;gap:6px}
+nav.tabs button[aria-current="page"]{color:var(--ink);border-bottom-color:var(--vis)}
+.count{background:var(--vis);color:#3A2C00;font-size:11px;font-weight:700;border-radius:10px;padding:0 7px;line-height:18px}
+main{padding:28px 0 60px}
+.banner{background:var(--vis-soft);color:var(--vis-ink);border-radius:8px;padding:10px 14px;margin-bottom:18px;font-size:14px}
+h1.hero{font-size:clamp(26px,5vw,40px);line-height:1.25;letter-spacing:-.03em;margin:0 0 6px;font-weight:700}
+.mark{background:linear-gradient(transparent 58%,var(--vis) 58%);padding:0 4px}
+.sub{color:var(--muted);margin:0 0 26px}
+.stats{display:flex;flex-wrap:wrap;gap:28px;padding:16px 0 22px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-bottom:28px}
+.stat b{display:block;font-size:26px;font-weight:600;letter-spacing:-.02em}
+.stat span{font-size:13px;color:var(--muted)}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:28px}
+h2{font-size:17px;margin:0 0 12px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sectionhead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.sectionhead h1{font-size:24px;margin:0;letter-spacing:-.02em}
+.list{display:flex;flex-direction:column;gap:8px}
+.item{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;cursor:pointer;text-align:left;width:100%;display:block}
+.item:hover{border-color:var(--brand)}
+.item.pending{border-left:4px solid var(--vis)}
+.item .t{font-weight:600;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.item .m{font-size:13px;color:var(--muted);margin-top:2px}
+.item .x{font-size:14px;margin-top:6px;color:var(--ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-line}
+.chip{font-size:12px;font-weight:600;border-radius:4px;padding:1px 7px;background:var(--brand-soft);color:var(--brand);white-space:nowrap}
+.chip.vis{background:var(--vis-soft);color:var(--vis-ink)}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.late{background:var(--late-soft);color:var(--late)}
+.chip.mute{background:transparent;border:1px solid var(--line);color:var(--muted)}
+.empty{color:var(--muted);font-size:14px;padding:18px;border:1px dashed var(--line);border-radius:8px;text-align:center}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:500}
+.btn:hover{border-color:var(--brand)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:var(--surface)}
+.btn.vis{background:var(--vis);border-color:var(--vis);color:#3A2C00;font-weight:600}
+.btn.danger{color:var(--late)}
+.btn:focus-visible,.item:focus-visible,nav.tabs button:focus-visible,.seg button:focus-visible{outline:3px solid var(--vis);outline-offset:2px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;padding:6px 12px;cursor:pointer;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--brand-soft);color:var(--brand);font-weight:600}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+label.chk{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--muted)}
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;min-width:720px;font-size:14px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-weight:600;color:var(--muted);font-size:13px;background:var(--paper)}
+tbody tr{cursor:pointer}
+tbody tr:hover td{background:var(--brand-soft)}
+tbody tr:last-child td{border-bottom:0}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.board{display:grid;grid-template-columns:repeat(3,minmax(240px,1fr));gap:16px;overflow-x:auto}
+.board .col{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px;min-height:160px}
+.board .col h3{font-size:14px;margin:0 0 10px;color:var(--muted);font-weight:600}
+.board .item{background:var(--paper)}
+.overlay{position:fixed;inset:0;background:rgba(10,18,26,.55);display:flex;align-items:flex-start;justify-content:center;padding:max(40px,env(safe-area-inset-top,0px)) 14px 40px;overflow-y:auto;z-index:20}
+.modal{background:var(--surface);border-radius:10px;width:100%;max-width:560px;padding:22px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.modal h2{font-size:19px;margin-bottom:16px}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.field>span{font-size:13px;font-weight:600;color:var(--muted)}
+.field input,.field select,.field textarea{border:1px solid var(--line);border-radius:6px;padding:8px 10px;background:var(--paper);width:100%}
+.field textarea{min-height:84px;resize:vertical}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px}
+.actions .spacer{flex:1}
+.block{margin-bottom:14px}
+.block b{display:block;font-size:13px;color:var(--muted);font-weight:600;margin-bottom:2px}
+.block p{margin:0;white-space:pre-line}
+.ceo{background:var(--vis-soft);border-radius:8px;padding:12px 14px;margin-top:6px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:28px}
+.panel h2{flex-wrap:wrap}
+.missrow{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;padding:6px 0}
+.missrow>b{font-size:14px;min-width:190px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.md h3{font-size:18px;margin:4px 0 10px}.md h4{font-size:15px;margin:16px 0 6px;color:var(--brand)}
+.md p{margin:0 0 8px}.md ul{margin:0 0 8px;padding-left:20px}.md li{margin:2px 0}
+.md .tablewrap{margin:4px 0 10px}
+table.mdt{min-width:0}table.mdt td,table.mdt th{white-space:normal}table.mdt tbody tr{cursor:auto}table.mdt tbody tr:hover td{background:none}
+.modal.wide{max-width:780px}
+.digestbox{border:1px solid var(--line);border-radius:8px;padding:14px;max-height:60vh;overflow-y:auto;background:var(--paper)}
+.bars{display:flex;flex-direction:column;gap:8px}
+.bar{display:grid;grid-template-columns:minmax(70px,120px) 1fr auto;gap:10px;align-items:center;font-size:14px}
+.bar .track{height:10px;background:var(--brand-soft);border-radius:5px;overflow:hidden}
+.bar .fill{height:100%;background:var(--brand);border-radius:5px}
+.bar .v{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px;white-space:nowrap}
+.grid7 td,.grid7 th{text-align:right}.grid7 td:first-child,.grid7 th:first-child{text-align:left}
+.grid7 td.miss{color:var(--late);font-weight:600}.grid7 td.off{color:var(--muted)}
+.grid7 td.warn{background:var(--vis-soft)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.kpi b{display:block;font-size:22px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi span{font-size:13px;color:var(--muted)}
+.upfile{border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:10px;background:var(--paper)}
+.upfile table{min-width:0;font-size:13px}
+.drop{border:2px dashed var(--line);border-radius:8px;padding:22px;text-align:center;color:var(--muted);cursor:pointer;display:block}
+.drop:hover,.drop.on{border-color:var(--brand);color:var(--brand)}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:8px;font-size:14px;z-index:30}
+@media (max-width:600px){.row2{grid-template-columns:1fr}.wrap{padding:0 14px}main{padding-top:20px}}
+@media (prefers-reduced-motion:no-preference){.modal{animation:pop .16s ease-out}@keyframes pop{from{transform:translateY(8px);opacity:0}}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="topbar"><div class="logo"><i></i>하랑 업무 허브</div><div class="who" id="who"></div></div>
+    <nav class="tabs" id="tabs"></nav>
+  </div>
+</header>
+<main class="wrap" id="main"><p class="sub">불러오는 중…</p></main>
+<div id="modalRoot"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+const S={db:null,user:null,me:null,isOwner:false,canWrite:true,people:[],names:{},
+  reports:[],clients:[],tasks:[],notices:[],profiles:[],blocked:false,digests:[],adDays:[],branches:[],af:{period:"month",branch:""},sample:null,abort:null,staffDraw:null,loaded:{},tab:"home",
+  rf:{type:"all",pending:false},status:null};
+const TABS=[["home","홈"],["ads","광고 보고"],["reports","업무 보고"],["clients","현장·거래처"],["tasks","업무 지시"],["notices","공지·자료"]];
+
+/* ---------- helpers ---------- */
+function h(tag,attrs,...kids){const el=document.createElement(tag);
+  for(const[k,v]of Object.entries(attrs||{})){if(v==null||v===false)continue;
+    if(k==="class")el.className=v;else if(k.startsWith("on"))el.addEventListener(k.slice(2),v);
+    else if(k==="value")el.value=v;else el.setAttribute(k,v===true?"":v);}
+  for(const c of kids.flat()){if(c==null||c===false)continue;el.append(c.nodeType?c:document.createTextNode(String(c)));}
+  return el;}
+const pad=n=>String(n).padStart(2,"0");
+const ymd=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const today=()=>ymd(new Date());
+const monday=()=>{const d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));return ymd(d);};
+const addDays=(s,n)=>{const d=new Date(s+"T00:00:00");d.setDate(d.getDate()+n);return ymd(d);};
+const weekLabel=s=>{const d=new Date(s+"T00:00:00");return `${d.getMonth()+1}월 ${Math.ceil(d.getDate()/7)}주차`;};
+const md=s=>{if(!s)return"";const[,m,d]=s.split("-");return `${+m}/${+d}`;};
+const daysUntil=s=>{if(!s)return null;const a=new Date(s+"T00:00:00"),b=new Date(today()+"T00:00:00");return Math.round((a-b)/864e5);};
+const nameOf=id=>{if(!id)return"미지정";if(S.names[id])return S.names[id];if(S.me&&id===S.me.id)return S.me.name||"나";return"이름 없음";};
+const clientName=id=>{const c=S.clients.find(x=>x.id===id);return c?c.name:"";};
+function toast(msg){const t=h("div",{class:"toast",role:"status"},msg);document.body.append(t);setTimeout(()=>t.remove(),2400);}
+async function save(fn,ok="저장됨"){
+  try{await fn();toast(ok);return true;}
+  catch(e){const m=String(e&&(e.message||e)||"");
+    if(/row-level security|permission denied/i.test(m))toast("권한이 없습니다. 대표에게 문의하세요.");
+    else if(/JWT|session/i.test(m))toast("로그인이 만료되었습니다. 새로고침 후 다시 로그인하세요.");
+    else toast("저장하지 못했습니다: "+m.slice(0,80));
+    return false;}}
+
+/* ---------- modal ---------- */
+function closeModal(){if(S.abort){S.abort.abort();S.abort=null;}S.staffDraw=null;document.getElementById("modalRoot").replaceChildren();}
+function openModal(title,body,actions,wide){
+  const m=h("div",{class:"modal"+(wide?" wide":""),role:"dialog","aria-modal":"true","aria-label":title},h("h2",{},title),body,h("div",{class:"actions"},actions));
+  const o=h("div",{class:"overlay",onclick:e=>{if(e.target===o)closeModal();}},m);
+  document.getElementById("modalRoot").replaceChildren(o);
+  const f=m.querySelector("input,textarea,select");if(f)f.focus();}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal();});
+const field=(label,input)=>h("label",{class:"field"},h("span",{},label),input);
+const sel=(opts,val)=>h("select",{},opts.map(([v,t])=>h("option",{value:v,selected:v===val},t)));
+const block=(label,text)=>text?h("div",{class:"block"},h("b",{},label),h("p",{},text)):null;
+
+/* ---------- render ---------- */
+let rq=0;function render(){cancelAnimationFrame(rq);rq=requestAnimationFrame(draw);}
+function draw(){
+  const who=document.getElementById("who"),main0=document.getElementById("main");
+  if(!S.me){document.getElementById("tabs").replaceChildren();who.replaceChildren();
+    main0.replaceChildren(S.blocked?h("div",{class:"modal",style:"margin:40px auto;max-width:420px"},h("h2",{},"접속 권한이 없습니다"),
+      h("p",{class:"sub"},"사용이 중지된 계정이거나 아직 등록되지 않은 계정입니다. 대표에게 문의하세요."),h("div",{class:"actions"},h("button",{class:"btn",onclick:logout},"로그아웃")))
+      :(sb?loginView():h("p",{class:"sub"},"불러오는 중…")));return;}
+  const pend=S.reports.filter(r=>!r.checked).length;
+  document.getElementById("tabs").replaceChildren(...TABS.map(([k,t])=>h("button",{"aria-current":S.tab===k?"page":null,onclick:()=>{S.tab=k;render();window.scrollTo(0,0);}},t,
+    k==="reports"&&S.isOwner&&pend?h("span",{class:"count"},pend):null)));
+  who.replaceChildren(h("span",{},(S.me.name||"")+(S.isOwner?" (대표)":"")),h("button",{class:"btn",style:"padding:3px 10px;font-size:12px;margin-left:8px",onclick:passwordModal},"비밀번호"),h("button",{class:"btn",style:"padding:3px 10px;font-size:12px;margin-left:4px",onclick:logout},"로그아웃"));
+  const main=document.getElementById("main");
+  const banners=[];
+  if(S.status)banners.push(h("div",{class:"banner"},S.status));
+  else if(!S.canWrite)banners.push(h("div",{class:"banner"},"보기 전용 권한입니다. 보고를 작성하려면 대표에게 편집 권한을 요청하세요."));
+  const view={home,ads,reports,clients,tasks,notices}[S.tab]();
+  main.replaceChildren(...banners,view);
+  ensureNames();}
+
+function ensureNames(){}
+
+/* ---------- home ---------- */
+function home(){
+  const pend=S.reports.filter(r=>!r.checked);
+  const open=S.tasks.filter(t=>t.status!=="done");
+  const mine=S.me?open.filter(t=>t.assigneeId===S.me.id):[];
+  const late=open.filter(t=>{const d=daysUntil(t.due);return d!==null&&d<0;});
+  const active=S.clients.filter(c=>c.status==="active");
+  const heads=active.reduce((s,c)=>s+(+c.headcount||0),0);
+  const expiring=active.filter(c=>{const d=daysUntil(c.end);return d!==null&&d>=0&&d<=30;});
+  const todayDaily=S.reports.filter(r=>r.type==="daily"&&r.date===today()).length;
+  const hero=S.isOwner
+    ? h("h1",{class:"hero"},"확인할 보고 ",h("span",{class:"mark"},pend.length+"건"))
+    : h("h1",{class:"hero"},"내 업무 ",h("span",{class:"mark"},mine.length+"건"));
+  const sub=h("p",{class:"sub"},new Date().toLocaleDateString("ko-KR",{month:"long",day:"numeric",weekday:"long"})+
+    (late.length?`, 마감 지난 지시가 ${late.length}건 있습니다.`:", 마감 지난 지시는 없습니다."));
+  const stats=h("div",{class:"stats"},
+    h("div",{class:"stat"},h("b",{},active.length+"곳"),h("span",{},"운영 중 현장")),
+    h("div",{class:"stat"},h("b",{},heads+"명"),h("span",{},"투입 인원")),
+    h("div",{class:"stat"},h("b",{},won(adAgg(adDocs(...monthRange(0))).amt)),h("span",{},"이번 달 광고비")),
+    h("div",{class:"stat"},h("b",{},expiring.length+"곳"),h("span",{},"30일 내 계약 만료")));
+  const repList=(S.isOwner?pend:S.reports.filter(r=>S.me&&r.author===S.me.id)).slice(0,5);
+  const taskList=(S.isOwner?open:mine).slice().sort((a,b)=>(a.due||"9999").localeCompare(b.due||"9999")).slice(0,5);
+  const pins=S.notices.filter(n=>n.pinned).concat(S.notices.filter(n=>!n.pinned)).slice(0,4);
+  return h("div",{},hero,sub,stats,adTodayPanel(),S.isOwner?missingPanel():null,h("div",{class:"cols"},
+    h("section",{},h("h2",{},S.isOwner?"확인 대기 보고":"내가 쓴 보고",S.canWrite?h("button",{class:"btn vis",onclick:()=>reportForm()},"보고 작성"):null),
+      repList.length?h("div",{class:"list"},repList.map(reportItem)):h("div",{class:"empty"},S.isOwner?"확인할 보고가 없습니다.":"아직 작성한 보고가 없습니다.")),
+    h("section",{},h("h2",{},S.isOwner?"진행 중인 지시":"내게 온 지시"),
+      taskList.length?h("div",{class:"list"},taskList.map(taskItem)):h("div",{class:"empty"},"진행 중인 지시가 없습니다.")),
+    h("section",{},h("h2",{},"공지"),
+      pins.length?h("div",{class:"list"},pins.map(noticeItem)):h("div",{class:"empty"},"등록된 공지가 없습니다."))));}
+
+/* ---------- reports ---------- */
+const RT={daily:"일일",weekly:"주간"};
+function reportItem(r){
+  const cn=clientName(r.clientId);
+  return h("button",{class:"item"+(r.checked?"":" pending"),onclick:()=>reportDetail(r)},
+    h("div",{class:"t"},h("span",{class:"chip"},RT[r.type]||"보고"),`${nameOf(r.author)} · ${md(r.date)}${r.type==="weekly"?" 주":""}`,
+      r.checked?h("span",{class:"chip ok"},"확인됨"):h("span",{class:"chip vis"},"미확인")),
+    cn?h("div",{class:"m"},cn):null,
+    h("div",{class:"x"},r.done||""));}
+function reports(){
+  let list=S.reports;
+  if(S.rf.type!=="all")list=list.filter(r=>r.type===S.rf.type);
+  if(S.rf.pending)list=list.filter(r=>!r.checked);
+  list=list.slice().sort((a,b)=>(b.date||"").localeCompare(a.date||"")||(b.createdAt||0)-(a.createdAt||0));
+  const seg=h("div",{class:"seg",role:"group","aria-label":"보고 종류"},[["all","전체"],["daily","일일"],["weekly","주간"]].map(([k,t])=>
+    h("button",{"aria-pressed":String(S.rf.type===k),onclick:()=>{S.rf.type=k;render();}},t)));
+  const cb=h("input",{type:"checkbox",checked:S.rf.pending,onchange:e=>{S.rf.pending=e.target.checked;render();}});
+  return h("div",{},
+    h("div",{class:"sectionhead"},h("h1",{},"업무 보고"),h("div",{style:"display:flex;gap:8px;flex-wrap:wrap"},S.isOwner?h("button",{class:"btn",onclick:digestModal},"주간 요약"):null,S.canWrite?h("button",{class:"btn vis",onclick:()=>reportForm()},"보고 작성"):null)),
+    h("div",{class:"filters"},seg,h("label",{class:"chk"},cb,"미확인만 보기")),
+    list.length?h("div",{class:"list"},list.map(reportItem)):h("div",{class:"empty"},"조건에 맞는 보고가 없습니다."));}
+function reportForm(r){
+  const type=sel([["daily","일일 보고"],["weekly","주간 보고"]],r?r.type:"daily");
+  const date=h("input",{type:"date",value:r?r.date:today()});
+  const client=sel([["","선택 안 함"],...S.clients.map(c=>[c.id,c.name])],r?r.clientId||"":"");
+  const done=h("textarea",{value:r?r.done:""}),plan=h("textarea",{value:r?r.plan:""}),issue=h("textarea",{value:r?r.issue:""});
+  const lDone=h("span",{}),lPlan=h("span",{});
+  const sync=()=>{const w=type.value==="weekly";lDone.textContent=w?"이번 주 한 일":"오늘 한 일";lPlan.textContent=w?"다음 주 계획":"내일 할 일";};
+  type.addEventListener("change",()=>{sync();if(!r)date.value=type.value==="weekly"?monday():today();});sync();
+  const body=h("div",{},h("div",{class:"row2"},field("종류",type),field("날짜",date)),field("관련 현장·거래처",client),
+    h("label",{class:"field"},lDone,done),h("label",{class:"field"},lPlan,plan),field("이슈·건의사항",issue));
+  openModal(r?"보고 수정":"보고 작성",body,[
+    h("button",{class:"btn",onclick:closeModal},"취소"),
+    h("button",{class:"btn primary",onclick:async()=>{
+      if(!done.value.trim()){toast("한 일을 입력하세요.");done.focus();return;}
+      const data={type:type.value,date:date.value||today(),clientId:client.value,done:done.value.trim(),plan:plan.value.trim(),issue:issue.value.trim()};
+      const ok=await save(()=>r?S.db.doc("reports/"+r.id).update(data)
+        :S.db.collection("reports").add({...data,author:S.me.id,createdAt:Date.now(),checked:false,comment:""}),r?"보고 수정됨":"보고 제출됨");
+      if(ok)closeModal();}},r?"수정 저장":"보고 제출")]);}
+function reportDetail(r){
+  const w=r.type==="weekly";const cn=clientName(r.clientId);
+  const mineR=S.me&&r.author===S.me.id;
+  const comment=h("textarea",{value:r.comment||"",placeholder:"직원에게 남길 코멘트 (선택)"});
+  const body=h("div",{},
+    h("p",{class:"sub",style:"margin-bottom:14px"},`${nameOf(r.author)} · ${r.date}${cn?" · "+cn:""}`),
+    block(w?"이번 주 한 일":"오늘 한 일",r.done),block(w?"다음 주 계획":"내일 할 일",r.plan),block("이슈·건의사항",r.issue),
+    r.checked&&!S.isOwner?h("div",{class:"ceo"},h("b",{},"대표 확인 완료"),r.comment?h("p",{style:"margin:4px 0 0;white-space:pre-line"},r.comment):null):null,
+    S.isOwner?field(r.checked?"대표 코멘트 (확인 완료)":"대표 코멘트",comment):null);
+  const acts=[];
+  if(mineR||S.isOwner)acts.push(h("button",{class:"btn danger",onclick:async()=>{if(!confirm("이 보고를 삭제할까요?"))return;if(await save(()=>S.db.doc("reports/"+r.id).delete(),"삭제됨"))closeModal();}},"삭제"));
+  if(mineR&&!r.checked)acts.push(h("button",{class:"btn",onclick:()=>reportForm(r)},"수정"));
+  acts.push(h("span",{class:"spacer"}));
+  acts.push(h("button",{class:"btn",onclick:closeModal},"닫기"));
+  if(S.isOwner)acts.push(h("button",{class:"btn primary",onclick:async()=>{
+    if(await save(()=>S.db.doc("reports/"+r.id).update({checked:true,checkedAt:Date.now(),comment:comment.value.trim()}),"확인 완료"))closeModal();}},r.checked?"코멘트 저장":"확인 완료"));
+  openModal(`${RT[r.type]} 보고`,body,acts);}
+
+/* ---------- clients ---------- */
+const CS={active:["운영 중",""],talk:["협의 중","vis"],ending:["종료 예정","late"],closed:["종료","mute"]};
+function clients(){
+  const list=S.clients.slice().sort((a,b)=>Object.keys(CS).indexOf(a.status)-Object.keys(CS).indexOf(b.status)||(a.name||"").localeCompare(b.name||""));
+  const active=list.filter(c=>c.status==="active");
+  return h("div",{},
+    h("div",{class:"sectionhead"},h("h1",{},"현장·거래처 현황"),S.canWrite?h("button",{class:"btn vis",onclick:()=>clientForm()},"현장 추가"):null),
+    h("p",{class:"sub"},`운영 중 ${active.length}곳, 투입 인원 ${active.reduce((s,c)=>s+(+c.headcount||0),0)}명`),
+    list.length?h("div",{class:"tablewrap"},h("table",{},
+      h("thead",{},h("tr",{},["거래처","현장·근무지","형태","투입 인원","계약 기간","담당","상태"].map(t=>h("th",{},t)))),
+      h("tbody",{},list.map(c=>{const d=daysUntil(c.end);const st=CS[c.status]||CS.active;
+        return h("tr",{tabindex:"0",onclick:()=>clientForm(c),onkeydown:e=>{if(e.key==="Enter")clientForm(c);}},
+          h("td",{},h("b",{},c.name)),h("td",{},c.site||""),h("td",{},c.kind||""),h("td",{class:"num"},(+c.headcount||0)+"명"),
+          h("td",{},`${md(c.start)} ~ ${md(c.end)}`,c.status==="active"&&d!==null&&d>=0&&d<=30?h("span",{class:"chip late",style:"margin-left:6px"},`D-${d}`):null),
+          h("td",{},c.manager||""),h("td",{},h("span",{class:"chip "+st[1]},st[0])));}))))
+    :h("div",{class:"empty"},"등록된 현장이 없습니다. 현장 추가로 거래처와 투입 인원을 등록하세요."));}
+function clientForm(c){
+  const name=h("input",{value:c?c.name:"",placeholder:"예: ○○물류"}),site=h("input",{value:c?c.site||"":"",placeholder:"예: 평택 2센터"});
+  const kind=sel([["파견","파견"],["도급","도급"]],c?c.kind:"파견");
+  const head=h("input",{type:"number",min:"0",value:c?c.headcount||0:0});
+  const start=h("input",{type:"date",value:c?c.start||"":""}),end=h("input",{type:"date",value:c?c.end||"":""});
+  const status=sel(Object.entries(CS).map(([k,v])=>[k,v[0]]),c?c.status:"active");
+  const manager=h("input",{value:c?c.manager||"":"",placeholder:"담당 직원 이름"});
+  const memo=h("textarea",{value:c?c.memo||"":"",placeholder:"단가, 특이사항 등"});
+  const ro=!S.canWrite;
+  if(ro)[name,site,kind,head,start,end,status,manager,memo].forEach(e=>e.disabled=true);
+  const body=h("div",{},field("거래처명",name),field("현장·근무지",site),
+    h("div",{class:"row2"},field("계약 형태",kind),field("투입 인원",head)),
+    h("div",{class:"row2"},field("계약 시작",start),field("계약 종료",end)),
+    h("div",{class:"row2"},field("상태",status),field("담당",manager)),field("메모",memo));
+  const acts=[];
+  if(c&&!ro)acts.push(h("button",{class:"btn danger",onclick:async()=>{if(!confirm("이 현장을 삭제할까요?"))return;if(await save(()=>S.db.doc("clients/"+c.id).delete(),"삭제됨"))closeModal();}},"삭제"));
+  acts.push(h("span",{class:"spacer"}),h("button",{class:"btn",onclick:closeModal},ro?"닫기":"취소"));
+  if(!ro)acts.push(h("button",{class:"btn primary",onclick:async()=>{
+    if(!name.value.trim()){toast("거래처명을 입력하세요.");name.focus();return;}
+    const data={name:name.value.trim(),site:site.value.trim(),kind:kind.value,headcount:Math.max(0,parseInt(head.value)||0),start:start.value,end:end.value,status:status.value,manager:manager.value.trim(),memo:memo.value.trim(),updatedAt:Date.now()};
+    if(await save(()=>c?S.db.doc("clients/"+c.id).update(data):S.db.collection("clients").add({...data,createdAt:Date.now()})))closeModal();}},"저장"));
+  openModal(c?c.name:"현장 추가",body,acts);}
+
+/* ---------- tasks ---------- */
+const TS=[["todo","대기"],["doing","진행 중"],["done","완료"]];
+function taskItem(t){
+  const d=daysUntil(t.due);const lateT=t.status!=="done"&&d!==null&&d<0;
+  return h("button",{class:"item",onclick:()=>taskDetail(t)},
+    h("div",{class:"t"},t.urgent?h("span",{class:"chip late"},"긴급"):null,t.title),
+    h("div",{class:"m"},`${t.assigneeId?nameOf(t.assigneeId):(t.assigneeText||"미지정")}${t.due?" · 마감 "+md(t.due):""}`,
+      lateT?h("span",{class:"chip late",style:"margin-left:6px"},`${-d}일 지남`):(t.status!=="done"&&d===0?h("span",{class:"chip vis",style:"margin-left:6px"},"오늘 마감"):null)));}
+function tasks(){
+  return h("div",{},
+    h("div",{class:"sectionhead"},h("h1",{},"업무 지시"),S.canWrite?h("button",{class:"btn vis",onclick:()=>taskForm()},"지시 등록"):null),
+    h("div",{class:"board"},TS.map(([k,t])=>{const l=S.tasks.filter(x=>(x.status||"todo")===k).sort((a,b)=>(a.due||"9999").localeCompare(b.due||"9999"));
+      return h("div",{class:"col"},h("h3",{},`${t} ${l.length}`),l.length?h("div",{class:"list"},l.map(taskItem)):h("div",{class:"m",style:"color:var(--muted);font-size:13px"},"없음"));})));}
+function taskForm(t){
+  const title=h("input",{value:t?t.title:"",placeholder:"예: ○○현장 10월 근태 정리"});
+  const detail=h("textarea",{value:t?t.detail||"":""});
+  const opts=[["","미지정"]];const seen=new Set();
+  const addP=(id,n)=>{if(id&&!seen.has(id)){seen.add(id);opts.push([id,n||nameOf(id)]);}};
+  if(S.me)addP(S.me.id,(S.me.name||"나")+" (나)");S.people.forEach(p=>addP(p.id,p.name));if(t&&t.assigneeId)addP(t.assigneeId);
+  opts.push(["__text","직접 입력"]);
+  const who=sel(opts,t?(t.assigneeId||(t.assigneeText?"__text":"")):"");
+  const whoText=h("input",{value:t?t.assigneeText||"":"",placeholder:"담당자 이름"});
+  const wtField=field("담당자 이름",whoText);
+  const syncW=()=>wtField.style.display=who.value==="__text"?"":"none";who.addEventListener("change",syncW);syncW();
+  const due=h("input",{type:"date",value:t?t.due||"":""});
+  const urgent=sel([["0","보통"],["1","긴급"]],t&&t.urgent?"1":"0");
+  const body=h("div",{},field("지시 내용",title),field("세부 설명",detail),field("담당자",who),wtField,
+    h("div",{class:"row2"},field("마감일",due),field("중요도",urgent)));
+  openModal(t?"지시 수정":"업무 지시 등록",body,[h("button",{class:"btn",onclick:closeModal},"취소"),
+    h("button",{class:"btn primary",onclick:async()=>{
+      if(!title.value.trim()){toast("지시 내용을 입력하세요.");title.focus();return;}
+      const isText=who.value==="__text";
+      const data={title:title.value.trim(),detail:detail.value.trim(),assigneeId:isText?"":who.value,assigneeText:isText?whoText.value.trim():"",due:due.value,urgent:urgent.value==="1"};
+      if(await save(()=>t?S.db.doc("tasks/"+t.id).update(data):S.db.collection("tasks").add({...data,status:"todo",createdBy:S.me.id,createdAt:Date.now()})))closeModal();}},t?"수정 저장":"지시 등록")]);}
+function taskDetail(t){
+  const body=h("div",{},
+    h("p",{class:"sub",style:"margin-bottom:14px"},`담당 ${t.assigneeId?nameOf(t.assigneeId):(t.assigneeText||"미지정")}${t.due?" · 마감 "+t.due:""} · 지시 ${nameOf(t.createdBy)}`),
+    block("세부 설명",t.detail),
+    S.canWrite?h("div",{},h("b",{style:"font-size:13px;color:var(--muted)"},"진행 상태"),
+      h("div",{class:"seg",style:"display:flex;margin-top:6px"},TS.map(([k,l])=>h("button",{style:"flex:1","aria-pressed":String((t.status||"todo")===k),
+        onclick:async()=>{if(await save(()=>S.db.doc("tasks/"+t.id).update({status:k,updatedAt:Date.now()}),`${l}(으)로 변경됨`))closeModal();}},l)))):null);
+  const acts=[];
+  if(S.canWrite){acts.push(h("button",{class:"btn danger",onclick:async()=>{if(!confirm("이 지시를 삭제할까요?"))return;if(await save(()=>S.db.doc("tasks/"+t.id).delete(),"삭제됨"))closeModal();}},"삭제"),
+    h("button",{class:"btn",onclick:()=>taskForm(t)},"수정"));}
+  acts.push(h("span",{class:"spacer"}),h("button",{class:"btn",onclick:closeModal},"닫기"));
+  openModal(t.title,body,acts);}
+
+/* ---------- notices ---------- */
+function noticeItem(n){
+  return h("button",{class:"item",onclick:()=>noticeDetail(n)},
+    h("div",{class:"t"},n.pinned?h("span",{class:"chip vis"},"고정"):null,n.link?h("span",{class:"chip"},"자료"):null,n.title),
+    h("div",{class:"m"},`${nameOf(n.author)} · ${n.createdAt?md(ymd(new Date(n.createdAt))):""}`));}
+function notices(){
+  const list=S.notices.filter(n=>n.pinned).concat(S.notices.filter(n=>!n.pinned));
+  return h("div",{},
+    h("div",{class:"sectionhead"},h("h1",{},"공지·자료"),S.canWrite?h("button",{class:"btn vis",onclick:()=>noticeForm()},"공지 올리기"):null),
+    list.length?h("div",{class:"list"},list.map(noticeItem)):h("div",{class:"empty"},"등록된 공지가 없습니다. 공지나 공유할 자료 링크를 올려 보세요."));}
+const safeUrl=u=>/^https?:\/\//i.test(u||"")?u:"";
+function noticeForm(n){
+  const title=h("input",{value:n?n.title:""}),body=h("textarea",{value:n?n.body||"":"",style:"min-height:140px"});
+  const link=h("input",{type:"url",value:n?n.link||"":"",placeholder:"https:// (구글드라이브, 노션 등 자료 링크)"});
+  const pin=h("input",{type:"checkbox",checked:n?!!n.pinned:false});
+  openModal(n?"공지 수정":"공지 올리기",h("div",{},field("제목",title),field("내용",body),field("자료 링크",link),h("label",{class:"chk"},pin,"홈 상단에 고정")),
+    [h("button",{class:"btn",onclick:closeModal},"취소"),h("button",{class:"btn primary",onclick:async()=>{
+      if(!title.value.trim()){toast("제목을 입력하세요.");title.focus();return;}
+      if(link.value.trim()&&!safeUrl(link.value.trim())){toast("링크는 https:// 로 시작해야 합니다.");link.focus();return;}
+      const data={title:title.value.trim(),body:body.value.trim(),link:link.value.trim(),pinned:pin.checked};
+      if(await save(()=>n?S.db.doc("notices/"+n.id).update(data):S.db.collection("notices").add({...data,author:S.me.id,createdAt:Date.now()}),n?"공지 수정됨":"공지 등록됨"))closeModal();}},n?"수정 저장":"공지 등록")]);}
+function noticeDetail(n){
+  const u=safeUrl(n.link);
+  const acts=[];
+  if(S.canWrite&&(S.isOwner||(S.me&&n.author===S.me.id)))acts.push(
+    h("button",{class:"btn danger",onclick:async()=>{if(!confirm("이 공지를 삭제할까요?"))return;if(await save(()=>S.db.doc("notices/"+n.id).delete(),"삭제됨"))closeModal();}},"삭제"),
+    h("button",{class:"btn",onclick:()=>noticeForm(n)},"수정"));
+  acts.push(h("span",{class:"spacer"}),h("button",{class:"btn",onclick:closeModal},"닫기"));
+  openModal(n.title,h("div",{},h("p",{class:"sub",style:"margin-bottom:14px"},`${nameOf(n.author)} · ${n.createdAt?ymd(new Date(n.createdAt)):""}`),
+    n.body?h("p",{style:"white-space:pre-line;margin:0 0 14px"},n.body):null,
+    u?h("p",{},h("a",{href:u,target:"_blank",rel:"noopener noreferrer"},"첨부 자료 열기")):null),acts);}
+
+/* ---------- xlsx reader (no library) ---------- */
+async function readXlsx(buf){
+  const dv=new DataView(buf),u8=new Uint8Array(buf),td=new TextDecoder();
+  let e=-1;for(let i=u8.length-22;i>=Math.max(0,u8.length-65600);i--){if(dv.getUint32(i,true)===0x06054b50){e=i;break;}}
+  if(e<0)throw new Error("zip");
+  const n=dv.getUint16(e+10,true);let p=dv.getUint32(e+16,true);const files={};
+  for(let k=0;k<n;k++){if(dv.getUint32(p,true)!==0x02014b50)break;
+    const method=dv.getUint16(p+10,true),csize=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),off=dv.getUint32(p+42,true);
+    files[td.decode(u8.subarray(p+46,p+46+nl))]={method,csize,off};p+=46+nl+xl+cl;}
+  const get=async name=>{const f=files[name.replace(/^\//,"")];if(!f)return null;
+    const st=f.off+30+dv.getUint16(f.off+26,true)+dv.getUint16(f.off+28,true);const data=u8.slice(st,st+f.csize);
+    if(f.method===0)return td.decode(data);
+    const out=await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer();
+    return td.decode(out);};
+  const xml=t=>new DOMParser().parseFromString(t,"application/xml");
+  const tags=(node,name)=>[...node.getElementsByTagNameNS("*",name)];
+  const ss=[];const sst=await get("xl/sharedStrings.xml");
+  if(sst)for(const si of tags(xml(sst),"si"))ss.push(tags(si,"t").filter(t=>!(t.parentNode&&t.parentNode.localName==="rPh")).map(t=>t.textContent).join(""));
+  const wb=xml(await get("xl/workbook.xml"));const rels=xml(await get("xl/_rels/workbook.xml.rels"));
+  const rmap={};for(const r of tags(rels,"Relationship"))rmap[r.getAttribute("Id")]=r.getAttribute("Target");
+  const out=[];
+  for(const sh of tags(wb,"sheet")){
+    const rid=sh.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","id")||sh.getAttribute("r:id");
+    let t=rmap[rid]||"";t=t.startsWith("/")?t.slice(1):(t.startsWith("xl/")?t:"xl/"+t);
+    const src=await get(t);if(!src)continue;const rows=new Map();
+    for(const c of tags(xml(src),"c")){const ref=c.getAttribute("r");const m=/^([A-Z]+)(\d+)$/.exec(ref||"");if(!m)continue;
+      const typ=c.getAttribute("t");let v;
+      if(typ==="inlineStr")v=tags(c,"t").map(x=>x.textContent).join("");
+      else{const ve=tags(c,"v")[0];if(!ve)continue;v=ve.textContent;if(typ==="s")v=ss[+v]??"";}
+      const r=+m[2];if(!rows.has(r))rows.set(r,{});rows.get(r)[m[1]]=v;}
+    out.push({name:sh.getAttribute("name"),rows});}
+  return out;}
+
+/* ---------- ad report parser ---------- */
+const colNum=c=>{let n=0;for(const ch of c)n=n*26+ch.charCodeAt(0)-64;return n;};
+const colL=n=>{let s="";while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26);}return s;};
+const nz=v=>String(v??"").replace(/\s+/g,"");
+const FIELD={"담당자":"m","업체":"c","티오(명)":"to","티오":"to","비고":"note","광고플랫폼":"pf","광고상품":"pd","게재지역":"rg","게재시작일":"s","게재종료일":"e","광고금액":"amt",
+  "면접일정_날짜":"ivd","면접일정_명수":"iv","면접_날짜":"ivd","면접_명수":"iv","면접명수":"iv","투입일정_날짜":"ind","투입일정_명수":"inn","투입_날짜":"ind","투입_명수":"inn","투입명수":"inn"};
+const num=v=>{const t=String(v??"").replace(/[,원\s]/g,"");return /^-?\d+(\.\d+)?$/.test(t)?+t:null;};
+function toDate(v,year){const t=String(v??"").trim();if(!t)return"";
+  if(/^\d{5}(\.\d+)?$/.test(t)){const d=new Date(Date.UTC(1899,11,30)+Math.floor(+t)*864e5);return d.toISOString().slice(0,10);}
+  let m=/^(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})/.exec(t);if(m)return `${m[1]}-${pad(+m[2])}-${pad(+m[3])}`;
+  m=/^(\d{1,2})월\s*(\d{1,2})일?$/.exec(t);if(m)return `${year}-${pad(+m[1])}-${pad(+m[2])}`;
+  m=/^(\d{1,2})[.\/](\d{1,2})$/.exec(t);if(m)return `${year}-${pad(+m[1])}-${pad(+m[2])}`;
+  return t;}
+function parseAdSheet(sh,fileName){
+  const rn=[...sh.rows.keys()].sort((a,b)=>a-b);let H=null;
+  for(const r of rn){if(r>25)break;if(Object.values(sh.rows.get(r)).some(v=>nz(v)==="광고금액")){H=r;break;}}
+  if(!H)return null;
+  const sub=sh.rows.get(H)||{},grp=sh.rows.get(H-1)||{};
+  const cols=[...new Set([...Object.keys(sub),...Object.keys(grp)])].map(colNum).sort((a,b)=>a-b);
+  const dam=cols.filter(c=>nz(sub[colL(c)])==="담당자"||nz(grp[colL(c)])==="담당자");if(!dam.length)return null;
+  const start=Math.max(...dam),maxc=Math.max(...cols);
+  let g="";const map={};
+  for(let c=start;c<=maxc;c++){const L=colL(c);const gv=nz(grp[L]),sv=nz(sub[L]);if(gv)g=gv;
+    const label=sv?(/일정$|^면접|^투입/.test(g)&&/^(날짜|명수)$/.test(sv)?g+"_"+sv:sv):gv;
+    const f=FIELD[label];if(f&&!(f in map))map[f]=L;}
+  if(!map.c||!map.amt)return null;
+  let date="";let m=/(\d{2})-(\d{2})-(\d{2})/.exec(sh.name);if(m)date=`20${m[1]}-${m[2]}-${m[3]}`;
+  if(!date)for(const r of rn){if(r>=H)break;for(const v of Object.values(sh.rows.get(r))){const x=/(\d{4})-(\d{2})-(\d{2})/.exec(v);if(x){date=x[0];break;}}if(date)break;}
+  if(!date){m=/^(\d{2})(\d{2})(\d{2})/.exec(fileName);if(m)date=`20${m[1]}-${m[2]}-${m[3]}`;}
+  if(!date)return null;
+  const year=date.slice(0,4);const rows=[];let prev={},excelSum=null;
+  for(const r of rn){if(r<=H)continue;const row=sh.rows.get(r);
+    const blockVals=Object.entries(row).filter(([k])=>colNum(k)>=start-2);
+    if(blockVals.some(([,v])=>nz(v)==="총계")){excelSum=num(row[map.amt]);break;}
+    const get=f=>{if(!map[f])return"";let v=String(row[map[f]]??"").trim();if(/^["“”〃]+$/.test(v))return prev[f]??"";if(/^[ㅡ\-—–]+$/.test(v))return"";return v;};
+    const raw={};for(const f of Object.keys(map))raw[f]=get(f);
+    if(!raw.c){continue;}
+    const x={m:raw.m||"",c:raw.c,to:num(raw.to),note:raw.note||"",pf:(raw.pf||"").trim(),pd:raw.pd||"",rg:raw.rg||"",
+      s:toDate(raw.s,year),e:toDate(raw.e,year),amt:num(raw.amt)||0,iv:num(raw.iv)||0,inn:num(raw.inn)||0,ivd:toDate(raw.ivd,year),ind:toDate(raw.ind,year)};
+    rows.push(x);prev=raw;}
+  const sum=rows.reduce((a,x)=>a+x.amt,0);
+  return {date,sheet:sh.name,rows,sum,excelSum};}
+async function parseAdFile(file){
+  const sheets=await readXlsx(await file.arrayBuffer());
+  const days=[];for(const sh of sheets){const d=parseAdSheet(sh,file.name);if(d)days.push(d);}
+  const by={};for(const d of days)by[d.date]=d;
+  return Object.values(by).sort((a,b)=>a.date.localeCompare(b.date));}
+
+/* ---------- ad data helpers ---------- */
+const won=n=>Math.round(n||0).toLocaleString("ko-KR")+"원";
+const branchName=id=>{const b=S.branches.find(x=>x.id===id);return b?b.name:"(삭제된 지점)";};
+const monthRange=off=>{const d=new Date();const a=new Date(d.getFullYear(),d.getMonth()+off,1),b=new Date(d.getFullYear(),d.getMonth()+off+1,0);return [ymd(a),ymd(b)];};
+function periodRange(p){if(p==="week"){const m=monday();return [m,addDays(m,6)];}if(p==="lastmonth")return monthRange(-1);if(p==="all")return ["0000-00-00","9999-99-99"];return monthRange(0);}
+const adDocs=(from,to,br)=>S.adDays.filter(d=>d.date>=from&&d.date<=to&&(!br||d.branch===br));
+function adAgg(docs){
+  const r={amt:0,n:0,iv:0,inn:0,byM:{},byP:{},byC:{},byB:{},days:docs.length};
+  const add=(o,k,v)=>{o[k]=(o[k]||0)+v;};
+  for(const d of docs){let ds=0;
+    for(const x of d.rows||[]){const a=+x.amt||0;r.amt+=a;ds+=a;if(a>0)r.n++;r.iv+=+x.iv||0;r.inn+=+x.inn||0;
+      if(a>0){add(r.byM,x.m||"미기재",a);add(r.byP,x.pf||"미기재",a);}
+      const c=r.byC[x.c]||(r.byC[x.c]={amt:0,n:0,iv:0,inn:0,to:null,toDate:"",br:new Set()});
+      c.amt+=a;if(a>0)c.n++;c.iv+=+x.iv||0;c.inn+=+x.inn||0;c.br.add(d.branch);
+      if(x.to!=null){if(d.date>c.toDate){c.toDate=d.date;c.to=x.to;}else if(d.date===c.toDate)c.to=Math.max(c.to||0,x.to);}}
+    add(r.byB,d.branch,ds);}
+  return r;}
+const mismatch=d=>d.excelSum!=null&&Math.round(d.excelSum)!==Math.round(d.sum);
+function bars(obj,limit){
+  const arr=Object.entries(obj).sort((a,b)=>b[1]-a[1]).slice(0,limit||8);const max=arr.length?arr[0][1]:0;
+  return arr.length?h("div",{class:"bars"},arr.map(([k,v])=>h("div",{class:"bar"},h("span",{},k),h("div",{class:"track"},h("div",{class:"fill",style:`width:${max?Math.max(2,v/max*100):0}%`})),h("span",{class:"v"},won(v)))))
+    :h("div",{class:"empty"},"자료 없음");}
+function adTodayPanel(){
+  if(!S.branches.length)return null;const t=today();const wd=new Date().getDay();
+  return h("section",{class:"panel"},h("h2",{},"오늘 광고 보고",h("button",{class:"btn",onclick:()=>{S.tab="ads";render();}},"광고 보고 보기")),
+    h("div",{class:"chips"},S.branches.map(b=>{const d=S.adDays.find(x=>x.date===t&&x.branch===b.id);
+      return d?h("span",{class:"chip ok"},`${b.name} 제출 · ${won(d.sum)}`):h("span",{class:wd===0?"chip mute":"chip late"},`${b.name} 미제출`);})));}
+
+/* ---------- ads tab ---------- */
+function ads(){
+  const [from,to]=periodRange(S.af.period);const docs=adDocs(from,to,S.af.branch);const a=adAgg(docs);
+  const seg=h("div",{class:"seg",role:"group","aria-label":"기간"},[["week","이번 주"],["month","이번 달"],["lastmonth","지난달"],["all","전체"]].map(([k,t])=>
+    h("button",{"aria-pressed":String(S.af.period===k),onclick:()=>{S.af.period=k;render();}},t)));
+  const brSel=sel([["","전체 지점"],...S.branches.map(b=>[b.id,b.name])],S.af.branch);brSel.addEventListener("change",()=>{S.af.branch=brSel.value;render();});
+  const per=a.inn?won(a.amt/a.inn):"투입 기록 없음";
+  const kpis=h("div",{class:"kpis"},
+    h("div",{class:"kpi"},h("b",{},won(a.amt)),h("span",{},"광고비 합계")),
+    h("div",{class:"kpi"},h("b",{},a.n+"건"),h("span",{},"광고 게재")),
+    h("div",{class:"kpi"},h("b",{},a.iv+"명"),h("span",{},"면접")),
+    h("div",{class:"kpi"},h("b",{},a.inn+"명"),h("span",{},"투입")),
+    h("div",{class:"kpi"},h("b",{style:a.inn?"":"font-size:15px;padding-top:6px"},per),h("span",{},"투입 1명당 광고비")));
+  // last 7 days grid
+  const days=[];for(let i=6;i>=0;i--)days.push(addDays(today(),-i));
+  const brs=S.af.branch?S.branches.filter(b=>b.id===S.af.branch):S.branches;
+  const grid=h("div",{class:"tablewrap"},h("table",{class:"grid7",style:"min-width:640px"},
+    h("thead",{},h("tr",{},h("th",{},"지점"),days.map(d=>h("th",{},`${md(d)}(${"일월화수목금토"[new Date(d+"T00:00:00").getDay()]})`)))),
+    h("tbody",{},brs.map(b=>h("tr",{style:"cursor:default"},h("td",{},h("b",{},b.name)),days.map(d=>{const doc=S.adDays.find(x=>x.date===d&&x.branch===b.id);
+      const sun=new Date(d+"T00:00:00").getDay()===0;
+      if(doc)return h("td",{class:"num"+(mismatch(doc)?" warn":""),style:"cursor:pointer",title:mismatch(doc)?"엑셀 총계와 다름":"",onclick:()=>adDayModal(doc)},won(doc.sum).replace("원",""),mismatch(doc)?" ⚠":"");
+      return h("td",{class:sun?"off":"miss"},sun?"–":"미제출");}))))));
+  const warns=docs.filter(mismatch).sort((x,y)=>y.date.localeCompare(x.date));
+  const comp=Object.entries(a.byC).sort((x,y)=>y[1].amt-x[1].amt);
+  const compT=comp.length?h("div",{class:"tablewrap"},h("table",{},
+    h("thead",{},h("tr",{},["업체","지점","게재","광고비","최근 티오","면접","투입","1명당 광고비"].map(t=>h("th",{},t)))),
+    h("tbody",{},comp.slice(0,40).map(([k,c])=>h("tr",{style:"cursor:default"},h("td",{},h("b",{},k)),h("td",{},[...c.br].map(branchName).join(", ")),h("td",{class:"num"},c.n+"건"),
+      h("td",{class:"num"},won(c.amt)),h("td",{class:"num"},c.to!=null?c.to+"명":"–"),h("td",{class:"num"},c.iv||"–"),h("td",{class:"num"},c.inn||"–"),h("td",{class:"num"},c.inn?won(c.amt/c.inn):"–"))))))
+    :h("div",{class:"empty"},"이 기간에 올라온 광고 보고가 없습니다.");
+  const recent=docs.slice().sort((x,y)=>y.date.localeCompare(x.date)||branchName(x.branch).localeCompare(branchName(y.branch))).slice(0,30);
+  return h("div",{},
+    h("div",{class:"sectionhead"},h("h1",{},"광고 보고"),h("div",{style:"display:flex;gap:8px;flex-wrap:wrap"},
+      S.isOwner?h("button",{class:"btn",onclick:branchModal},"지점 설정"):null,
+      S.canWrite?h("button",{class:"btn vis",onclick:uploadModal},"엑셀 올리기"):null)),
+    !S.branches.length?h("div",{class:"banner"},S.isOwner?"먼저 '지점 설정'에서 지점(본사, 아산, 천안 등)을 등록하세요.":"아직 지점이 등록되지 않았습니다. 대표에게 문의하세요."):null,
+    h("div",{class:"filters"},seg,brSel,h("span",{class:"m",style:"color:var(--muted);font-size:13px"},S.af.period==="all"?"":`${from.replace(/-/g,".")} ~ ${to.replace(/-/g,".")}`)),
+    kpis,
+    h("h2",{},"최근 7일 제출 현황"),grid,
+    warns.length?h("div",{class:"banner",style:"margin-top:14px"},`엑셀에 적힌 총계와 실제 줄 합계가 다른 보고가 ${warns.length}건 있습니다: `,
+      warns.slice(0,6).map((d,i)=>h("a",{href:"#",onclick:e=>{e.preventDefault();adDayModal(d);}},`${i?", ":""}${branchName(d.branch)} ${md(d.date)}`))):null,
+    h("div",{class:"cols",style:"margin-top:28px"},
+      h("section",{},h("h2",{},"지점별 광고비"),bars(Object.fromEntries(Object.entries(a.byB).map(([k,v])=>[branchName(k),v])))),
+      h("section",{},h("h2",{},"담당자별 광고비"),bars(a.byM)),
+      h("section",{},h("h2",{},"플랫폼별 광고비"),bars(a.byP))),
+    h("h2",{style:"margin-top:28px"},"업체별 현황"),compT,
+    h("h2",{style:"margin-top:28px"},"보고 목록"),
+    recent.length?h("div",{class:"list"},recent.map(d=>h("button",{class:"item"+(mismatch(d)?" pending":""),onclick:()=>adDayModal(d)},
+      h("div",{class:"t"},h("span",{class:"chip"},branchName(d.branch)),`${d.date} · ${(d.rows||[]).length}줄 · ${won(d.sum)}`,mismatch(d)?h("span",{class:"chip vis"},"총계 불일치"):null),
+      h("div",{class:"m"},`${nameOf(d.uploader)} · ${d.fileName||""}`)))):h("div",{class:"empty"},"올라온 보고가 없습니다."));}
+function adDayModal(d){
+  const rows=d.rows||[];
+  const t=h("div",{class:"tablewrap"},h("table",{class:"mdt",style:"font-size:13px"},
+    h("thead",{},h("tr",{},["담당자","업체","티오","플랫폼","상품","지역","기간","광고비","면접","투입","비고"].map(x=>h("th",{},x)))),
+    h("tbody",{},rows.map(x=>h("tr",{},h("td",{},x.m),h("td",{},h("b",{},x.c)),h("td",{class:"num"},x.to!=null?x.to:""),h("td",{},x.pf),h("td",{},x.pd),h("td",{},x.rg),
+      h("td",{},[x.s,x.e].filter(Boolean).map(v=>/^\d{4}-/.test(v)?md(v):v).join(" ~ ")),h("td",{class:"num"},x.amt?won(x.amt):""),h("td",{class:"num"},x.iv||""),h("td",{class:"num"},x.inn||""),h("td",{},x.note))),
+      h("tr",{},h("td",{},h("b",{},"합계")),h("td",{}),h("td",{}),h("td",{}),h("td",{}),h("td",{}),h("td",{}),h("td",{class:"num"},h("b",{},won(d.sum))),
+        h("td",{class:"num"},rows.reduce((s,x)=>s+(+x.iv||0),0)||""),h("td",{class:"num"},rows.reduce((s,x)=>s+(+x.inn||0),0)||""),h("td",{})))));
+  const acts=[];
+  if(S.isOwner||(S.me&&d.uploader===S.me.id))acts.push(h("button",{class:"btn danger",onclick:async()=>{if(!confirm("이 날짜 보고를 삭제할까요?"))return;if(await save(()=>S.db.doc("adDays/"+d.id).delete(),"삭제됨"))closeModal();}},"삭제"));
+  acts.push(h("span",{class:"spacer"}),h("button",{class:"btn primary",onclick:closeModal},"닫기"));
+  openModal(`${branchName(d.branch)} 광고 보고 — ${d.date}`,h("div",{},
+    h("p",{class:"sub",style:"margin-bottom:12px"},`${nameOf(d.uploader)} 올림 · ${d.fileName||""} · 시트 ${d.sheet||""}`),
+    mismatch(d)?h("div",{class:"banner"},`엑셀에 적힌 총계는 ${won(d.excelSum)}인데, 줄별 광고금액을 더하면 ${won(d.sum)}입니다. 엑셀 총계 수식을 확인하세요.`):null,t),acts,true);}
+function uploadModal(){
+  if(!S.branches.length){toast(S.isOwner?"먼저 지점을 등록하세요.":"지점이 등록되지 않았습니다.");return;}
+  let items=[];
+  const inp=h("input",{type:"file",accept:".xlsx",multiple:true,style:"display:none"});
+  const drop=h("label",{class:"drop"},inp,h("b",{},"엑셀 파일 선택"),h("div",{style:"font-size:13px;margin-top:4px"},"광고 일일보고 .xlsx 파일 (여러 개 가능). 같은 날짜는 바뀐 경우에만 덮어씁니다."));
+  const area=h("div",{});const go=h("button",{class:"btn primary",disabled:true},"올리기");
+  const status=(it,d)=>{if(!it.branch)return["지점 선택 필요","late"];const ex=S.adDays.find(x=>x.id===`${d.date}_${it.branch}`);
+    if(!ex)return["새로 추가",""];return stable(ex.rows)===stable(d.rows)&&ex.excelSum===d.excelSum?["변경 없음","mute"]:["수정됨 (덮어씀)","vis"];};
+  const draw=()=>{area.replaceChildren(...items.map(it=>{
+    const bs=sel([["","지점 선택"],...S.branches.map(b=>[b.id,b.name])],it.branch);bs.addEventListener("change",()=>{it.branch=bs.value;draw();});
+    return h("div",{class:"upfile"},h("div",{style:"display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px"},h("b",{style:"word-break:break-all"},it.file),it.days.length?bs:null),
+      it.err?h("div",{style:"color:var(--late);font-size:14px"},it.err):
+      h("div",{class:"tablewrap"},h("table",{class:"mdt"},h("thead",{},h("tr",{},["날짜","줄","광고비","엑셀 총계","상태"].map(x=>h("th",{},x)))),
+        h("tbody",{},it.days.map(d=>{const[st,cl]=status(it,d);return h("tr",{},h("td",{},d.date),h("td",{class:"num"},d.rows.length),h("td",{class:"num"},won(d.sum)),
+          h("td",{class:"num"},d.excelSum==null?"–":(mismatch(d)?h("span",{style:"color:var(--late)"},won(d.excelSum)+" ⚠"):"일치")),h("td",{},h("span",{class:"chip "+cl},st)));})))));}));
+    const todo=items.flatMap(it=>it.days.filter(d=>{const st=status(it,d)[0];return st==="새로 추가"||st.startsWith("수정됨");}));
+    const needB=items.some(it=>it.days.length&&!it.branch);
+    go.disabled=!todo.length||needB;go.textContent=needB?"지점을 선택하세요":todo.length?`${todo.length}일치 올리기`:"올릴 변경 없음";};
+  inp.addEventListener("change",async()=>{
+    area.replaceChildren(h("div",{class:"empty"},"파일 읽는 중…"));items=[];
+    for(const f of inp.files){try{const days=await parseAdFile(f);const g=S.branches.find(b=>f.name.includes(b.name));
+        items.push({file:f.name,days,branch:g?g.id:"",err:days.length?null:"광고 보고 시트를 찾지 못했습니다. '광고금액' 칸이 있는 양식인지 확인하세요."});}
+      catch(e){items.push({file:f.name,days:[],err:"엑셀 파일을 읽지 못했습니다. .xlsx 형식인지 확인하세요."});}}
+    inp.value="";draw();});
+  go.addEventListener("click",async()=>{go.disabled=true;let ok=0,fail=0;
+    for(const it of items)for(const d of it.days){const[st]=status(it,d);if(!(st==="새로 추가"||st.startsWith("수정됨")))continue;
+      const id=`${d.date}_${it.branch}`;const ex=S.adDays.find(x=>x.id===id);
+      go.textContent=`올리는 중… ${ok+fail+1}`;
+      try{await S.db.doc("adDays/"+id).set({date:d.date,branch:it.branch,rows:d.rows,sum:d.sum,excelSum:d.excelSum,sheet:d.sheet,fileName:it.file,uploader:S.me.id,uploadedAt:Date.now(),createdAt:ex&&ex.createdAt||Date.now()});ok++;}
+      catch(e){fail++;if(e&&e.code==="invalid_argument"){toast("올릴 권한이 없습니다. 대표에게 편집 권한을 요청하세요.");break;}}}
+    toast(fail?`${ok}일치 올림, ${fail}건 실패`:`${ok}일치 올림`);if(!fail)closeModal();else draw();});
+  openModal("광고 보고 엑셀 올리기",h("div",{},drop,area),[h("button",{class:"btn",onclick:closeModal},"취소"),h("span",{class:"spacer"}),go],true);}
+/* ---------- AI weekly digest ---------- */
+function mdRender(src){
+  const root=h("div",{class:"md"});const lines=(src||"").split("\n");let i=0,ul=null;
+  const inline=t=>{const f=document.createDocumentFragment();t.split(/(\*\*[^*]+\*\*)/).forEach(p=>{if(/^\*\*[^*]+\*\*$/.test(p))f.append(h("strong",{},p.slice(2,-2)));else if(p)f.append(p);});return f;};
+  const cells=r=>r.trim().replace(/^\|/,"").replace(/\|$/,"").split("|").map(c=>c.trim());
+  while(i<lines.length){const l=lines[i];
+    if(/^\s*\|/.test(l)){const rows=[];while(i<lines.length&&/^\s*\|/.test(lines[i])){rows.push(lines[i]);i++;}
+      const body=rows.filter(r=>!/^\s*\|[\s:|-]+\|?\s*$/.test(r));const[head,...rest]=body;
+      root.append(h("div",{class:"tablewrap"},h("table",{class:"mdt"},h("thead",{},h("tr",{},cells(head||"").map(c=>h("th",{},inline(c))))),
+        h("tbody",{},rest.map(r=>h("tr",{},cells(r).map(c=>h("td",{},inline(c)))))))));ul=null;continue;}
+    if(/^#{1,4} /.test(l)){root.append(h(/^# /.test(l)?"h3":"h4",{},inline(l.replace(/^#+ /,""))));ul=null;}
+    else if(/^\s*[-*] /.test(l)){if(!ul){ul=h("ul",{});root.append(ul);}const box=/^\s*[-*] \[ \] /.test(l);
+      ul.append(h("li",{},box?"☐ ":"",inline(l.replace(/^\s*[-*] (\[[ xX]\] )?/,""))));}
+    else if(!l.trim())ul=null;
+    else{root.append(h("p",{},inline(l)));ul=null;}
+    i++;}
+  return root;}
+function weekReports(mon){const sun=addDays(mon,6);return S.reports.filter(r=>r.date>=mon&&r.date<=sun);}
+function digestPrompt(mon){
+  const sun=addDays(mon,6),m=missing();
+  const rs=weekReports(mon).slice().sort((a,b)=>nameOf(a.author).localeCompare(nameOf(b.author))||(a.date||"").localeCompare(b.date||""));
+  const reps=rs.map(r=>`[${RT[r.type]||""}보고] 작성자: ${nameOf(r.author)} / 날짜: ${r.date} / 현장·거래처: ${clientName(r.clientId)||"미기재"}\n- 한 일: ${r.done||"없음"}\n- 계획: ${r.plan||"없음"}\n- 이슈·건의: ${r.issue||"없음"}`).join("\n\n");
+  const cl=S.clients.filter(c=>c.status!=="closed").map(c=>`- ${c.name}${c.site?" ("+c.site+")":""} / ${c.kind||""} / 투입 ${+c.headcount||0}명 / 계약 ${c.start||"?"}~${c.end||"?"} / 담당 ${c.manager||"미정"} / 상태 ${(CS[c.status]||CS.active)[0]}`).join("\n")||"없음";
+  const ad=adAgg(adDocs(mon,sun,""));
+  const adB=S.branches.map(b=>{const ds=adDocs(mon,sun,b.id);const g=adAgg(ds);return `- ${b.name}: 제출 ${ds.length}일 (${ds.map(d=>md(d.date)).join(", ")||"없음"}) / 광고비 ${won(g.amt)} / 게재 ${g.n}건 / 면접 ${g.iv}명 / 투입 ${g.inn}명`;}).join("\n")||"지점 미등록";
+  const adC=Object.entries(ad.byC).sort((x,y)=>y[1].amt-x[1].amt).slice(0,25).map(([k,c])=>`- ${k}: 광고비 ${won(c.amt)}, 게재 ${c.n}건, 최근 티오 ${c.to??"미기재"}명, 면접 ${c.iv}명, 투입 ${c.inn}명`).join("\n")||"없음";
+  const adM=Object.entries(ad.byM).sort((x,y)=>y[1]-x[1]).map(([k,v])=>`${k} ${won(v)}`).join(", ")||"없음";
+  const adW=adDocs(mon,sun,"").filter(mismatch).map(d=>`- ${branchName(d.branch)} ${d.date}: 엑셀 총계 ${won(d.excelSum)} / 실제 합계 ${won(d.sum)}`).join("\n")||"없음";
+  const staff=m.ids.map(nameOf).join(", ")||"명단 미등록";
+  const miss=m.ids.length?(m.weekly.map(nameOf).join(", ")||"없음"):"명단 미등록 (판단 불가)";
+  return `당신은 인력 파견·도급 아웃소싱 회사 대표에게 올릴 주간 업무 요약을 작성합니다. 아래 '이번 주 보고'만 근거로 쓰세요.
+
+[단계]
+1. 보고를 작성자별로 나누고 미제출자를 확인한다.
+2. 각 보고에서 현장/거래처명, 투입 인원 변동, 실적, 문제·리스크, 다음 주 계획, 대표 결정이 필요한 사항을 뽑는다.
+3. 같은 현장·거래처 이야기는 하나로 합치고, 보고끼리 내용이 다르면 둘 다 적고 "보고 불일치"로 표시한다.
+4. 문제·리스크를 긴급(이번 주 내 조치)과 주의(지켜볼 것)로 나눈다.
+5. 숫자(인원, 금액, 날짜)는 보고에 적힌 그대로 옮기고, 합계는 계산식과 함께 적는다.
+
+[출력 형식 — 마크다운, 이 틀 그대로, 다른 말 없이]
+# 주간 업무 요약 — ${mon.replace(/-/g,".")} (${weekLabel(mon)})
+## 이번 주 한 줄 결론
+(대표가 이것만 읽어도 되는 한 문장)
+## 대표 결정 필요
+- [ ] 안건 — 요청자 / 기한
+## 긴급 이슈
+| 현장·거래처 | 내용 | 담당 | 조치 기한 |
+|---|---|---|---|
+## 광고 집행 현황
+| 지점 | 광고비 | 게재 | 면접 | 투입 | 미제출일 |
+|---|---|---|---|---|---|
+(아래에 광고비 상위 업체와 눈에 띄는 점 2~3줄: 광고비 대비 투입 실적, 총계 불일치 등)
+## 현장·거래처 현황
+| 현장·거래처 | 투입 인원(증감) | 이번 주 주요 내용 | 담당 |
+|---|---|---|---|
+## 주의 사항
+- …
+## 다음 주 주요 계획
+- 담당자: 내용
+## 보고 현황
+- 제출: … / 미제출: …
+- 확인 필요: 보고 간 불일치·불분명한 내용
+
+[규칙 — 예외 없이]
+- A4 한 장을 넘기지 않는다. 넘치면 "현장·거래처 현황"부터 줄이고 "대표 결정 필요"와 "긴급 이슈"는 줄이지 않는다.
+- 보고에 없는 내용은 추가하지 않는다. 추측이 필요하면 "확인 필요"로 보낸다.
+- 담당자나 기한이 없으면 지어내지 말고 "미정"으로 적는다.
+- 직원 개인 평가·질책 표현은 쓰지 않는다. 사실만 적는다.
+- 비어 있는 섹션도 지우지 말고 "없음"으로 적는다.
+- 문장은 "~함", "~예정" 보고서체로 짧게 쓴다.
+- 마지막에 모든 보고를 다시 대조해 빠진 현장·이슈가 없는지 확인한다.
+- 광고 숫자는 아래 '광고 보고 집계'에 있는 값만 그대로 쓴다. 미제출일은 월~토 중 제출이 없는 날로 적는다.
+- 면접·투입이 0이면 '기록 없음'으로 적고, 광고 효과를 추측하지 않는다.
+- 아래 '현장 등록 현황'은 이름·담당 확인용 참고 자료이며, 보고에 언급되지 않은 현장을 표에 넣지 않는다.
+
+[기간] ${mon} ~ ${sun}
+[보고 대상 직원] ${staff}
+[주간보고 미제출] ${miss}
+[현장 등록 현황]
+${cl}
+
+[광고 보고 집계 — 지점별]
+${adB}
+[광고 보고 집계 — 담당자별 광고비] ${adM}
+[광고 보고 집계 — 업체별]
+${adC}
+[엑셀 총계 불일치]
+${adW}
+
+[이번 주 보고]
+${reps||"없음"}`;}
+/* ---------- staff (from profiles) & missing ---------- */
+const staffIds=()=>S.profiles.filter(p=>p.active&&p.role==="staff").map(p=>p.id);
+function missing(){
+  const mon=monday(),sun=addDays(mon,6),t=today(),ids=staffIds();
+  const wd=new Date().getDay(),workday=wd>=1&&wd<=5;
+  const weekly=ids.filter(id=>!S.reports.some(r=>r.author===id&&r.type==="weekly"&&r.date>=mon&&r.date<=sun));
+  const daily=workday?ids.filter(id=>!S.reports.some(r=>r.author===id&&r.type==="daily"&&r.date===t)):[];
+  return {weekly,daily,workday,ids};}
+function missingPanel(){
+  const m=missing();const n=m.ids.length;
+  const chips=(arr,ok)=>arr.length?arr.map(id=>h("span",{class:"chip late"},nameOf(id))):[h("span",{class:"chip ok"},ok)];
+  return h("section",{class:"panel"},
+    h("h2",{},"이번 주 보고 현황",h("span",{style:"display:flex;gap:6px;flex-wrap:wrap"},
+      h("button",{class:"btn",onclick:accountsModal},"직원 계정"),
+      h("button",{class:"btn vis",onclick:digestModal},"주간 요약"))),
+    n?h("div",{},
+      h("div",{class:"missrow"},h("b",{},`주간보고 미제출 ${m.weekly.length}/${n}명`),h("div",{class:"chips"},chips(m.weekly,"모두 제출"))),
+      h("div",{class:"missrow"},h("b",{},m.workday?`오늘 일일보고 미제출 ${m.daily.length}/${n}명`:"오늘 일일보고"),
+        h("div",{class:"chips"},m.workday?chips(m.daily,"모두 제출"):[h("span",{class:"chip mute"},"주말 (집계 안 함)")])))
+    :h("div",{class:"empty"},"직원 계정을 만들면 보고 미제출자가 여기에 표시됩니다."));}
+
+/* ---------- accounts (admin) ---------- */
+function accountsModal(){
+  const box=h("div",{class:"list"});
+  const draw=()=>box.replaceChildren(...S.profiles.slice().sort((a,b)=>(b.role==="admin")-(a.role==="admin")||(a.name||"").localeCompare(b.name||"")).map(p=>{
+    const name=h("input",{value:p.name||""}),br=sel([["","지점 없음"],...S.branches.map(b=>[b.id,b.name])],p.branch_id||"");
+    const role=sel([["staff","직원"],["admin","대표·관리자"]],p.role),act=h("input",{type:"checkbox",checked:p.active});
+    const me=S.me&&p.id===S.me.id;if(me){role.disabled=true;act.disabled=true;}
+    return h("div",{class:"item",style:"cursor:default"},
+      h("div",{class:"t",style:"justify-content:space-between"},h("span",{},`아이디 ${p.login_id||""}`),p.active?null:h("span",{class:"chip late"},"사용 중지")),
+      h("div",{class:"row2",style:"margin-top:8px"},field("이름",name),field("지점",br)),
+      h("div",{style:"display:flex;gap:12px;align-items:center;flex-wrap:wrap"},field("권한",role),h("label",{class:"chk"},act,"사용 중"),
+        h("span",{class:"spacer",style:"flex:1"}),
+        h("button",{class:"btn primary",onclick:async()=>{
+          if(await save(()=>sbWrite(sb.from("profiles").update({name:name.value.trim(),branch_id:br.value||null,role:role.value,active:act.checked}).eq("id",p.id),"profiles"),"저장됨"))draw();}},"저장")));}));
+  S.staffDraw=draw;draw();
+  const guide=h("div",{class:"ceo",style:"margin-top:16px;font-size:14px"},
+    h("b",{},"새 직원 계정 만들기"),
+    h("p",{style:"margin:4px 0 0;white-space:pre-line"},`1. Supabase → Authentication → Users → Add user → Create new user
+2. Email에 "아이디@${ID_DOMAIN}" (예: kimtk@${ID_DOMAIN}), 비밀번호 입력, Auto Confirm User 체크
+3. 이 창을 닫았다 열면 목록에 나타납니다. 이름과 지점을 적고 저장하세요.
+직원은 허브에서 아이디(@ 앞부분)와 비밀번호로 로그인합니다.
+퇴사자는 '사용 중' 체크를 풀고 저장하면 바로 접속이 막힙니다.`));
+  openModal("직원 계정",h("div",{},box,guide),[h("button",{class:"btn primary",onclick:closeModal},"닫기")],true);}
+
+/* ---------- branches (admin) ---------- */
+function branchModal(){
+  let list=S.branches.map(b=>({...b}));
+  const box=h("div",{class:"list"});
+  const draw=()=>box.replaceChildren(...list.map((b,i)=>{const inpt=h("input",{value:b.name});inpt.addEventListener("input",()=>{b.name=inpt.value;});
+    const used=S.adDays.some(d=>d.branch===b.id);
+    return h("div",{style:"display:flex;gap:8px;align-items:center"},h("div",{class:"field",style:"flex:1;margin:0"},inpt),
+      h("button",{class:"btn danger",disabled:used,title:used?"보고가 있는 지점은 삭제할 수 없습니다":"",onclick:()=>{list.splice(i,1);draw();}},"삭제"));}));
+  draw();
+  openModal("지점 설정",h("div",{},h("p",{class:"sub",style:"margin-bottom:10px"},"파일 이름에 지점 이름이 들어 있으면 올릴 때 자동으로 선택됩니다. (예: '261002 천안 광고내역.xlsx' → 천안)"),box,
+    h("button",{class:"btn",style:"margin-top:10px",onclick:()=>{list.push({id:"new_"+Date.now(),name:""});draw();}},"+ 지점 추가")),
+    [h("button",{class:"btn",onclick:closeModal},"취소"),h("button",{class:"btn primary",onclick:async()=>{
+      const clean=list.map(b=>({id:b.id,name:b.name.trim()})).filter(b=>b.name);
+      const ok=await save(async()=>{
+        for(const b of S.branches)if(!clean.find(x=>x.id===b.id)){const {error}=await sb.from("branches").delete().eq("id",b.id);if(error)throw error;}
+        for(const [i,b] of clean.entries()){const q=b.id.startsWith("new_")?sb.from("branches").insert({name:b.name,sort:i+1}):sb.from("branches").update({name:b.name,sort:i+1}).eq("id",b.id);
+          const {error}=await q;if(error)throw error;}
+        await reload("branches");},"지점 저장됨");
+      if(ok)closeModal();}},"저장")]);}
+
+/* ---------- weekly digest (copy to Claude) ---------- */
+function digestModal(){
+  const thisMon=monday();
+  const weeks=[...new Set([thisMon,addDays(thisMon,-7),...S.digests.map(d=>d.id)])].sort().reverse();
+  let mon=thisMon;
+  const info=h("p",{class:"sub",style:"margin:0 0 10px"});
+  const pick=sel(weeks.map(w=>[w,`${w.replace(/-/g,".")} 주 (${weekLabel(w)})`]),mon);
+  const copyB=h("button",{class:"btn vis",type:"button"},"① 요약 요청문 복사");
+  const ta=h("textarea",{placeholder:"② Claude에 붙여 넣어 받은 요약을 여기에 붙여 넣으세요",style:"min-height:120px"});
+  const prev=h("div",{class:"digestbox"});
+  const saveB=h("button",{class:"btn primary"},"③ 저장");
+  const show=()=>{const saved=S.digests.find(d=>d.id===mon);const n=weekReports(mon).length+adDocs(mon,addDays(mon,6),"").length;
+    info.textContent=`이 주의 보고·광고 자료 ${n}건`+(saved?` · ${new Date(saved.createdAt).toLocaleString("ko-KR")} 저장본 있음`:"");
+    ta.value=saved?saved.text:"";upd();};
+  const upd=()=>{prev.replaceChildren(ta.value.trim()?mdRender(ta.value):h("div",{class:"empty"},"저장된 요약이 없습니다."));saveB.disabled=!ta.value.trim();};
+  ta.addEventListener("input",upd);
+  pick.addEventListener("change",()=>{mon=pick.value;show();});
+  copyB.addEventListener("click",async()=>{const t=digestPrompt(mon);
+    try{await navigator.clipboard.writeText(t);toast("복사됨. Claude 대화창에 붙여 넣으세요.");}
+    catch(e){ta.value=t;ta.select();toast("자동 복사가 안 돼서 아래 칸에 넣었습니다. 전체 선택 후 복사하세요.");}});
+  saveB.addEventListener("click",async()=>{const text=ta.value.trim();if(!text)return;
+    if(await save(()=>sbWrite(sb.from("digests").upsert({week:mon,body:text,created_at:new Date().toISOString()},{onConflict:"week"}),"digests"),"요약 저장됨"))show();});
+  show();
+  openModal("주간 요약",h("div",{},field("주간 선택",pick),info,
+    h("p",{class:"m",style:"color:var(--muted);font-size:13px;margin:0 0 10px"},"① 버튼으로 이 주의 보고를 정리 규칙과 함께 복사 → claude.ai 대화창에 붙여 넣기 → 나온 요약을 아래 칸에 붙여 넣고 저장."),
+    copyB,h("div",{style:"margin-top:12px"},field("요약 붙여넣기",ta)),prev),
+    [h("button",{class:"btn",onclick:closeModal},"닫기"),h("span",{class:"spacer"}),saveB],true);}
+
+/* ---------- Supabase data layer ---------- */
+const stable=v=>Array.isArray(v)?"["+v.map(stable).join(",")+"]":(v&&typeof v==="object")?"{"+Object.keys(v).sort().map(k=>JSON.stringify(k)+":"+stable(v[k])).join(",")+"}":JSON.stringify(v??null);
+const SB_URL="https://jxwvkloodovpyzmdbkja.supabase.co";
+const SB_KEY="sb_publishable_zSKeSjHrtQbg-I_Wu7QUCw_lzC--d6i";
+const ID_DOMAIN="harangwork.co.kr";
+let sb=null;
+const ms=v=>v?Date.parse(v):null,iso=v=>v?new Date(v).toISOString():null;
+const pick=o=>Object.fromEntries(Object.entries(o).filter(([,v])=>v!==undefined));
+const und=(v,f)=>v===undefined?undefined:f(v);
+const since=()=>addDays(today(),-430);
+const MAP={
+  reports:{table:"reports",q:t=>t.select("*").order("created_at",{ascending:false}).limit(1000),
+    in:r=>({id:r.id,author:r.author,type:r.type,date:r.date,clientId:r.client_id||"",done:r.done,plan:r.plan,issue:r.issue,checked:r.checked,checkedAt:ms(r.checked_at),comment:r.comment,createdAt:ms(r.created_at)}),
+    out:d=>pick({type:d.type,date:d.date,client_id:und(d.clientId,v=>v||null),done:d.done,plan:d.plan,issue:d.issue,checked:d.checked,checked_at:und(d.checkedAt,iso),comment:d.comment})},
+  clients:{table:"clients",q:t=>t.select("*").order("created_at",{ascending:false}),
+    in:r=>({id:r.id,name:r.name,site:r.site,kind:r.kind,headcount:r.headcount,start:r.start_date||"",end:r.end_date||"",status:r.status,manager:r.manager,memo:r.memo,createdAt:ms(r.created_at)}),
+    out:d=>pick({name:d.name,site:d.site,kind:d.kind,headcount:d.headcount,start_date:und(d.start,v=>v||null),end_date:und(d.end,v=>v||null),status:d.status,manager:d.manager,memo:d.memo,updated_at:new Date().toISOString()})},
+  tasks:{table:"tasks",q:t=>t.select("*").order("created_at",{ascending:false}).limit(1000),
+    in:r=>({id:r.id,title:r.title,detail:r.detail,assigneeId:r.assignee_id||"",assigneeText:r.assignee_text,due:r.due||"",urgent:r.urgent,status:r.status,createdBy:r.created_by,createdAt:ms(r.created_at)}),
+    out:d=>pick({title:d.title,detail:d.detail,assignee_id:und(d.assigneeId,v=>v||null),assignee_text:d.assigneeText,due:und(d.due,v=>v||null),urgent:d.urgent,status:d.status,updated_at:new Date().toISOString()})},
+  notices:{table:"notices",q:t=>t.select("*").order("created_at",{ascending:false}).limit(500),
+    in:r=>({id:r.id,title:r.title,body:r.body,link:r.link,pinned:r.pinned,author:r.author,createdAt:ms(r.created_at)}),
+    out:d=>pick({title:d.title,body:d.body,link:d.link,pinned:d.pinned})},
+  adDays:{table:"ad_days",q:t=>t.select("*").gte("date",since()).order("date",{ascending:false}).limit(1000),
+    in:r=>({id:`${r.date}_${r.branch_id}`,uid:r.id,date:r.date,branch:r.branch_id,rows:r.items||[],sum:+r.total,excelSum:r.excel_sum==null?null:+r.excel_sum,sheet:r.sheet,fileName:r.file_name,uploader:r.uploader,uploadedAt:ms(r.uploaded_at),createdAt:ms(r.uploaded_at)}),
+    out:d=>pick({date:d.date,branch_id:d.branch,items:d.rows,total:d.sum,excel_sum:d.excelSum,sheet:d.sheet,file_name:d.fileName,uploader:S.me.id,uploaded_at:new Date().toISOString()})},
+  digests:{table:"digests",q:t=>t.select("*").order("week",{ascending:false}).limit(200),
+    in:r=>({id:r.week,week:r.week,text:r.body,createdAt:ms(r.created_at),by:r.created_by})},
+  branches:{table:"branches",q:t=>t.select("*").order("sort").order("name"),in:r=>({id:r.id,name:r.name})},
+  profiles:{table:"profiles",q:t=>t.select("*"),in:r=>r}
+};
+const timers={};
+function reload(name){clearTimeout(timers[name]);return new Promise(res=>{timers[name]=setTimeout(async()=>{
+  const m=MAP[name];const {data,error}=await m.q(sb.from(m.table));
+  if(!error){S[name]=(data||[]).map(m.in);if(name==="profiles"){S.names={};S.profiles.forEach(p=>S.names[p.id]=p.name||p.login_id||"");S.people=S.profiles.filter(p=>p.active).map(p=>({id:p.id,name:p.name||p.login_id}));}render();}
+  res();},150);});}
+async function sbWrite(q,name){const {error}=await q;if(error)throw error;if(name){const p=reload(name);if(name!=="adDays")await p;}}
+const db={
+  collection:name=>({add:d=>sbWrite(sb.from(MAP[name].table).insert(MAP[name].out(d)),name)}),
+  doc:path=>{const [name,id]=path.split("/");const m=MAP[name];
+    const where=q=>{if(name==="adDays"){const [date,b]=id.split("_");return q.eq("date",date).eq("branch_id",b);}return q.eq(name==="digests"?"week":"id",id);};
+    return{
+      update:d=>sbWrite(where(sb.from(m.table).update(m.out(d))),name),
+      set:d=>sbWrite(sb.from(m.table).upsert(m.out(d),{onConflict:name==="adDays"?"date,branch_id":"id"}),name),
+      delete:()=>sbWrite(where(sb.from(m.table).delete()),name)};}
+};
+
+/* ---------- login / account ---------- */
+function loginView(){
+  const id=h("input",{autocomplete:"username",placeholder:"예: kimtk",id:"loginId"}),pw=h("input",{type:"password",autocomplete:"current-password",id:"loginPw"});
+  const msg=h("p",{style:"color:var(--late);font-size:14px;min-height:1.4em;margin:6px 0 0"});
+  const btn=h("button",{class:"btn primary",type:"submit",style:"width:100%;margin-top:8px"},"로그인");
+  const form=h("form",{class:"modal",style:"margin:40px auto;max-width:380px",onsubmit:async e=>{e.preventDefault();
+    const v=id.value.trim();if(!v||!pw.value){msg.textContent="아이디와 비밀번호를 입력하세요.";return;}
+    btn.disabled=true;btn.textContent="확인 중…";msg.textContent="";
+    const {data,error}=await sb.auth.signInWithPassword({email:v.includes("@")?v:`${v}@${ID_DOMAIN}`,password:pw.value});
+    btn.disabled=false;btn.textContent="로그인";
+    if(error){msg.textContent=/invalid/i.test(error.message)?"아이디 또는 비밀번호가 맞지 않습니다.":"로그인하지 못했습니다. 잠시 후 다시 시도하세요.";return;}
+    await afterLogin(data.user);}},
+    h("h2",{},"하랑 업무 허브"),h("p",{class:"sub",style:"margin:0 0 16px"},"회사에서 받은 아이디와 비밀번호로 로그인하세요."),
+    field("아이디",id),field("비밀번호",pw),btn,msg,
+    h("p",{class:"m",style:"color:var(--muted);font-size:13px;margin:12px 0 0"},"비밀번호를 잊었으면 대표에게 재설정을 요청하세요."));
+  return form;}
+function passwordModal(){
+  const a=h("input",{type:"password",autocomplete:"new-password"}),b=h("input",{type:"password",autocomplete:"new-password"});
+  openModal("비밀번호 변경",h("div",{},field("새 비밀번호 (8자 이상)",a),field("새 비밀번호 확인",b)),[h("button",{class:"btn",onclick:closeModal},"취소"),
+    h("button",{class:"btn primary",onclick:async()=>{if(a.value.length<8){toast("8자 이상 입력하세요.");return;}if(a.value!==b.value){toast("두 비밀번호가 다릅니다.");return;}
+      const {error}=await sb.auth.updateUser({password:a.value});if(error){toast("변경하지 못했습니다: "+error.message);return;}toast("비밀번호를 바꿨습니다.");closeModal();}},"변경")]);}
+async function logout(){await sb.auth.signOut();location.reload();}
+let poll=null;
+async function afterLogin(u){
+  const {data:p,error}=await sb.from("profiles").select("*").eq("id",u.id).maybeSingle();
+  if(error||!p||!p.active){S.me=null;S.status=null;S.blocked=true;render();return;}
+  S.me={id:u.id,name:p.name||p.login_id,loginId:p.login_id};S.isOwner=p.role==="admin";S.canWrite=true;S.db=db;S.blocked=false;
+  const names=["profiles","branches","reports","clients","tasks","notices","adDays",...(S.isOwner?["digests"]:[])];
+  await Promise.all(names.map(reload));
+  clearInterval(poll);poll=setInterval(()=>{if(document.visibilityState==="visible")names.forEach(reload);},60000);
+  render();}
+(function boot(){
+  if(!window.supabase){document.getElementById("main").replaceChildren(h("div",{class:"banner"},"접속 모듈을 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침하세요."));return;}
+  sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
+  sb.auth.getSession().then(async({data})=>{if(data&&data.session)await afterLogin(data.session.user);else render();});
+})();
+
+</script>
+</body>
+</html>
