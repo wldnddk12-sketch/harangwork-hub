@@ -1,0 +1,14 @@
+{
+  "name": "하랑 업무 허브",
+  "short_name": "하랑허브",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F3F5F8",
+  "theme_color": "#1D4A6E",
+  "lang": "ko",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}
