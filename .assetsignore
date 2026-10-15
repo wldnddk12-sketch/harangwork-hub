@@ -1,0 +1,5 @@
+.git
+*.sql
+*.md
+.gitignore
+wrangler.jsonc
