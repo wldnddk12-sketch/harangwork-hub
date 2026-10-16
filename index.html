@@ -297,15 +297,15 @@ const monthRange=()=>({from:iso(new Date(TODAY.getFullYear(),TODAY.getMonth(),1)
 function emptyS(){return {role:ME.role,tab:"home",ui:{joinWk:0,quitYm:ym(TODAY),hcBr:"본사",toBr:"본사",hcEdit:false,toEdit:false,ttView:"day",ttDate:iso(TODAY),calYm:ym(TODAY),condBr:"전체",condQ:"",noteF:"all",invYm:ym(TODAY)},
   hc:Object.fromEntries(HC_TABS.map(t=>[t,[]])),baseLabel:"기준",to:Object.fromEntries(BRANCHES.map(b=>[b,[]])),ad:{rows:[]},events:[],conds:{},posts:[],ar:[],
   leave:{alloc:{},reqs:[]},inv:[],goal:{total:0,net:0,fill:0,sales:0,salesActual:0,collect:0,salesG:{meet:0,to:0,deal:0,...monthRange()}},joins:[],quits:[],
-  adw:{},adwSample:{},adPrice:{j:146000,r:35200,rDays:2},adAlias:{},adPersonBudget:{},sales:[],pays:[],docreqs:[],notifs:[]};}
+  adw:{},adwSample:{},adPrice:{j:146000,r:35200,rDays:2},adAlias:{},adPersonBudget:{},adMembers:{},sales:[],pays:[],docreqs:[],notifs:[]};}
 /* 화면 상태(S) → 저장 단위(문서) */
 function docsOf(s){const D=new Map();const put=(kind,key,branch,data)=>D.set(kind+"|"+key,{kind,key:String(key),branch:branch||null,data});
   HC_TABS.forEach(t=>(s.hc[t]||[]).forEach((g,i)=>put("hcg",g.name,g.branch,{...g,tab:t,idx:i})));
-  put("cfg","baseLabel",null,{v:s.baseLabel});put("cfg","adAlias",null,{v:s.adAlias});put("cfg","adPrice",null,{v:s.adPrice});put("cfg","adPersonBudget",null,{v:s.adPersonBudget});
+  put("cfg","baseLabel",null,{v:s.baseLabel});put("cfg","adAlias",null,{v:s.adAlias});put("cfg","adPrice",null,{v:s.adPrice});put("cfg","adPersonBudget",null,{v:s.adPersonBudget});put("cfg","adMembers",null,{v:s.adMembers||{}});
   Object.entries(s.to).forEach(([b,rows])=>put("to",b,b,{rows}));
   Object.entries(s.adw).forEach(([w,bs])=>Object.entries(bs).forEach(([b,rows])=>put("adw",w+"|"+b,b,{week:w,rows})));
   s.ad.rows.forEach(r=>put("adbudget",r.id,r.branch,r));
-  s.events.forEach(e=>put("event",e.id,null,e));s.posts.forEach(p=>put("post",p.id,null,p));
+  s.events.forEach(e=>put("event",e.id,(typeof TT_MGR_ONLY!=="undefined"&&TT_MGR_ONLY.includes(e.staff))?"팀장급":null,e));s.posts.forEach(p=>put("post",p.id,null,p));
   s.ar.forEach(r=>put("ar",r.id,r.branch,r));s.joins.forEach(j=>put("join",j.id,null,j));s.quits.forEach(q=>put("quit",q.id,null,q));
   s.inv.forEach(it=>put("inv",it.id,it.branch,it));Object.entries(s.conds).forEach(([k,v])=>put("cond",k,k.split("|")[0],v));
   Object.entries(s.leave.alloc).forEach(([n,d])=>put("leave_alloc",n,brOf(n),{days:d}));s.leave.reqs.forEach(r=>put("leave_req",r.id,brOf(r.name),r));
@@ -316,7 +316,7 @@ function docsOf(s){const D=new Map();const put=(kind,key,branch,data)=>D.set(kin
 function buildS(rows,ui){const s=emptyS();if(ui)s.ui={...s.ui,...ui};const gs=[];
   rows.forEach(({kind,key,data})=>{const d=data||{};switch(kind){
     case "hcg":gs.push(d);break;
-    case "cfg":if(key==="baseLabel")s.baseLabel=d.v||"기준";if(key==="adAlias")s.adAlias=d.v||{};if(key==="adPrice")s.adPrice={...s.adPrice,...(d.v||{})};if(key==="adPersonBudget")s.adPersonBudget=d.v||{};break;
+    case "cfg":if(key==="baseLabel")s.baseLabel=d.v||"기준";if(key==="adAlias")s.adAlias=d.v||{};if(key==="adPrice")s.adPrice={...s.adPrice,...(d.v||{})};if(key==="adPersonBudget")s.adPersonBudget=d.v||{};if(key==="adMembers")s.adMembers=d.v||{};break;
     case "to":s.to[key]=d.rows||[];break;
     case "adw":{const [w,b]=key.split("|");(s.adw[w]=s.adw[w]||{})[b]=d.rows||[];break;}
     case "adbudget":s.ad.rows.push(d);break;
@@ -334,6 +334,7 @@ function buildS(rows,ui){const s=emptyS();if(ui)s.ui={...s.ui,...ui};const gs=[]
 const isFin=()=>ME.team==="경영지원팀";
 function canRead(kind,branch){const r=ME.role,boss=r==="ceo"||r==="mgr",hq=ME.branch==="본사";
   if(kind==="ar"||kind==="goal_money")return boss;
+  if(kind==="event"&&branch==="팀장급")return boss;
   if(kind==="sale")return boss||hq||!branch||branch===ME.branch||branch==="본사";
   if(["hcg","to","adw","adbudget","pay","docreq"].includes(kind))return boss||hq||!branch||branch===ME.branch;return true;}
 function canWrite(kind,branch,data){const r=ME.role,boss=r==="ceo"||r==="mgr";
@@ -594,7 +595,7 @@ function vHome(){
   const goals=[["총 투입 인원",all.cur,g.total,"명",pct(all.cur,g.total)],["신규 투입(순증)",net,g.net,"명",pct(Math.max(net,0),g.net)],["TO 충원율",fill,g.fill,"%",pct(fill,g.fill)]];
   const sst=salesStat(),sg=SG();goals.push([`영업 성사 (기한 ${mdShort(sg.due)})`,sst.deal,sg.deal,"건",pct(sst.deal,sg.deal)]);
   if(isBoss()){goals.push(["매출",g.salesActual,g.sales,"원",pct(g.salesActual,g.sales)]);}
-  const evToday=S.events.filter(e=>e.date===iso(TODAY)).sort((a,b)=>(a.hour??0)-(b.hour??0));
+  const evToday=ttEvents().filter(e=>e.date===iso(TODAY)).sort((a,b)=>(a.hour??0)-(b.hour??0));
   const mine=S.posts.filter(p=>(p.to.includes(me())||p.to.includes("전체"))&&!p.reads.includes(me()));
   const pend=S.leave.reqs.filter(r=>r.status==="대기");
   const m=ym(TODAY);const ivs=invSum(m);const payWait=S.pays.filter(p=>p.status!=="지급완료"&&payVisBR().includes(p.branch));
@@ -735,16 +736,17 @@ function adWeekPick(){const weeks=Object.keys(S.adw).sort();if(!weeks.includes(S
 function personMonth(mon,brs){const out={};Object.entries(S.adw).forEach(([w,bs])=>{brs.forEach(b=>((bs||{})[b]||[]).forEach(r=>rowCost(r).ch.forEach(c=>{const d=iso(addDays(new Date(w),c.i));if(!d.startsWith(mon))return;
   const n=pName(c.p);const o=out[n]=out[n]||{cost:0,j:0,r:0,o:0,k:0,u:0,al:new Set()};o.cost+=c.amt;o[c.m]++;o.al.add(c.p);})));});return out;}
 function adPersonCard(w,brs){const mon=w.slice(0,7);const mo=+mon.slice(5,7);const pm=personMonth(mon,brs);const B=S.adPersonBudget||{};
-  const names=[...new Set([...Object.keys(pm),...Object.keys(B).filter(n=>B[n]>0&&(!limited()||brs.includes(brOf(n))))])];
+  let names=[...new Set([...Object.keys(pm),...Object.keys(B).filter(n=>B[n]>0&&(!limited()||brs.includes(brOf(n))))])];
+  const mem=limited()&&brs.length===1?(S.adMembers||{})[brs[0]]:null;if(mem&&mem.length)names=[...new Set([...mem,...names])].filter(n=>mem.includes(n));
   names.sort((a,b)=>((pm[b]||{}).cost||0)-((pm[a]||{}).cost||0)||(B[b]||0)-(B[a]||0));
   return `<div class="card adpc" style="margin-bottom:14px"><h3><span>광고사용 누적금액 및 사용량 <span class="sub">${mo}월 누적</span></span>${S.role==="ceo"?'<button class="btn sm" data-act="adPB" style="white-space:nowrap">개인 예산 설정</button>':""}</h3><div class="aplist">
-   ${names.map(n=>{const o=pm[n]||{cost:0,j:0,r:0,o:0,k:0,u:0,al:new Set()};const bud=+B[n]||0;const p=bud?pct(o.cost,bud):0;const al=[...o.al][0];
+   ${names.map(n=>{const o=pm[n]||{cost:0,j:0,r:0,o:0,k:0,u:0,al:new Set()};const bud=+B[n]||0;const p=bud?pct(o.cost,bud):0;const al=[...o.al][0]||Object.keys(S.adAlias).find(k=>S.adAlias[k]===n);
      return `<div class="apr"><div class="apt"><span>${al?pChip(al):""} ${esc(n)}</span><span class="v">${won(o.cost)}${bud?` / ${manwon(bud)}`:""}원</span></div>
-      ${bud?`<div class="pbar ${p>100?"bad":p>=80?"warn":"ok"}"><i style="width:${Math.min(100,p)}%"></i></div>`:'<div class="sub">개인 예산 미설정</div>'}
+      ${bud?`<div class="pbar ${p>100?"bad":p>=80?"warn":"ok"}"><i style="width:${Math.min(100,p)}%"></i></div>`:""}
       <div class="sub">${bud?`<b class="${p>100?"up":""}">${p}%</b> · `:""}${MED.filter(([m])=>o[m]).map(([m])=>`${MSHORT[m]} ${o[m]}`).join(" · ")||"사용 없음"}</div></div>`}).join("")||'<span class="sub">기록 없음</span>'}</div></div>`;}
 function adPBForm(){const B=S.adPersonBudget||{};const ppl=PEOPLE();
-  modal("개인별 광고 예산 (월)",`<p class="sub" style="margin-top:0">사람마다 한 달 광고 예산을 정하면 '광고사용 누적금액' 막대가 예산 대비로 표시됩니다. 비워 두면 금액만 보입니다.</p><div class="kgrid">${ppl.map(n=>`<label>${esc(n)} <span class="chip mute">${titleOf(n)||""}</span></label><input type="number" name="b_${esc(n)}" value="${B[n]||""}" step="10000" min="0" placeholder="월 예산(원)" aria-label="${esc(n)} 월 예산">`).join("")}</div>`,
-  {onSubmit:fd=>{const m={};ppl.forEach(n=>{const v=+fd.get("b_"+n)||0;if(v)m[n]=v;});S.adPersonBudget=m;toast("개인 예산을 저장했습니다");}});}
+  modal("개인별 광고 예산 (월)",`<p class="sub" style="margin-top:0">사람마다 한 달 광고 예산을 정하면 '광고사용 누적금액' 막대가 예산 대비로 표시됩니다. 비워 두면 금액만 보입니다.</p><div class="kgrid">${ppl.map(n=>`<label>${esc(n)} <span class="chip mute">${titleOf(n)||""}</span></label><input type="number" name="b_${esc(n)}" value="${B[n]||""}" step="10000" min="0" placeholder="월 예산(원)" aria-label="${esc(n)} 월 예산">`).join("")}</div><h3 style="margin:16px 0 4px;font-size:15px">지사 화면에 보일 사람</h3><p class="sub" style="margin-top:0">지사장·지사 직원이 볼 때 '광고사용 누적금액'에 고른 사람만 나옵니다. 아무도 안 고르면 그 지사 기록에 나온 사람이 모두 보입니다.</p>${BRANCHES.filter(b=>b!=="본사").map(b=>{const M=(S.adMembers||{})[b]||[];return `<div class="pkg" style="margin-bottom:8px"><b>${b}</b><div class="pkl">${ppl.map(n=>`<label class="pk"><input type="checkbox" name="mem_${b}" value="${esc(n)}" ${M.includes(n)?"checked":""}>${esc(n)}</label>`).join("")}</div></div>`}).join("")}`,
+  {onSubmit:fd=>{const m={};ppl.forEach(n=>{const v=+fd.get("b_"+n)||0;if(v)m[n]=v;});S.adPersonBudget=m;const mm={};BRANCHES.filter(b=>b!=="본사").forEach(b=>{const v=fd.getAll("mem_"+b);if(v.length)mm[b]=v;});S.adMembers=mm;toast("개인 예산을 저장했습니다");}});}
 function vADweek(){const [weeks,w,brs,br]=adWeekPick();
   const rows=(S.adw[w]||{})[br]||[];const cs=rows.map(rowCost);const tot=weekCost(w,[br]);
   const meds=MED.filter(([m])=>m!=="u"||tot.u>0);const pmax=Math.max(1,...Object.values(tot.by).map(o=>o.j+o.r+o.o+o.k+o.u));
@@ -777,7 +779,7 @@ function vADweek(){const [weeks,w,brs,br]=adWeekPick();
 }
 function vADcost(){const [weeks,w]=adWeekPick();const t=weekCost(w,visBR());
   const rows=S.ad.rows.filter(r=>visBR().includes(r.branch)).map(r=>({...r,ppl:[]}));
-  Object.entries(t.by).forEach(([a,o])=>{const n=pName(a);let row=rows.find(r=>r.mgr.split("/").includes(n));if(!row){row={branch:Object.keys(o.br)[0]||brOf(n),mgr:n,month:0,week:0,ppl:[],nobudget:NO_AD_BUDGET[n]||"예산 미설정"};rows.push(row);}row.ppl.push([a,o]);});
+  Object.entries(t.by).forEach(([a,o])=>{const n=pName(a);let row=rows.find(r=>r.mgr.split("/").includes(n));if(!row&&limited())return;if(!row){row={branch:Object.keys(o.br)[0]||brOf(n),mgr:n,month:0,week:0,ppl:[],nobudget:NO_AD_BUDGET[n]||"예산 미설정"};rows.push(row);}row.ppl.push([a,o]);});
   rows.forEach(r=>{r.c={j:0,r:0,o:0,k:0,cost:0};r.ppl.forEach(([a,o])=>["j","r","o","k","cost"].forEach(k=>r.c[k]+=o[k]));});
   const legacyRep=w===AD_SEED_WEEK;const W=rows.reduce((s,r)=>s+r.week,0),U=rows.reduce((s,r)=>s+r.c.cost,0),M=rows.reduce((s,r)=>s+r.month,0);
   return `<div class="tools" style="margin-bottom:10px;justify-content:flex-end"><button class="btn sm" data-act="adWk" data-v="-1" aria-label="이전 주" ${weeks.indexOf(w)===0?"disabled":""}>◀</button><b>${wkLabel(w)}${S.adwSample[w]?' <span class="chip vis">예시</span>':""}</b><button class="btn sm" data-act="adWk" data-v="1" aria-label="다음 주" ${weeks.indexOf(w)===weeks.length-1?"disabled":""}>▶</button><button class="btn sm" data-act="adAlias">약칭·단가 설정</button>${S.role==="ceo"||S.role==="mgr"?'<button class="btn sm" data-act="budgetEdit">팀 예산 설정</button>':""}</div>
@@ -858,35 +860,41 @@ async function adFilePicked(f){const box=document.getElementById("adPrev");box.t
 
 /* ---------- 타임트리 ---------- */
 const PEOPLE=()=>[CEO_NAME,...STAFF].filter(Boolean);
+/* 타임트리: 대표 칸은 빼고, TT_MGR_ONLY 사람의 일정은 대표·팀장만 봄 */
+const TT_MGR_ONLY=["서영은"];
+const ttVis=e=>(e.staff!==PEOPLE()[0]||me()===PEOPLE()[0])&&(!TT_MGR_ONLY.includes(e.staff)||isBoss());
+const TT_PEOPLE=()=>STAFF.filter(n=>n!==PEOPLE()[0]&&(isBoss()||!TT_MGR_ONLY.includes(n)));
+const ttEvents=()=>S.events.filter(ttVis);
+const ttDef=()=>TT_PEOPLE().includes(me())?me():TT_PEOPLE()[0];
 function vTT(){
   const v=S.ui.ttView;
   let html=ph("타임트리","담당자별 시간표(08~22시)와 월간 달력. 칸을 누르면 일정을 넣을 수 있습니다.",`<button class="btn primary" data-act="evNew">+ 일정 추가</button>`)+
    `<div class="subtabs"><button data-act="ttView" data-v="day" aria-pressed="${v==="day"}">담당자별 시간표</button><button data-act="ttView" data-v="cal" aria-pressed="${v==="cal"}">월간 달력</button></div>`;
   if(v==="day"){const d=S.ui.ttDate;const dd=new Date(d);
     html+=`<div class="tools" style="margin-bottom:10px"><button class="btn sm" data-act="ttDay" data-v="-1" aria-label="전날">◀</button><input type="date" data-ui="ttDate" value="${d}" class="btn sm"><button class="btn sm" data-act="ttDay" data-v="1" aria-label="다음날">▶</button><button class="btn sm" data-act="ttDay" data-v="0">오늘</button><b>${dd.getMonth()+1}월 ${dd.getDate()}일 (${DOW[dd.getDay()]})</b></div>`;
-    const ev=S.events.filter(e=>e.date===d);const allday=ev.filter(e=>e.hour==null);
+    const ev=ttEvents().filter(e=>e.date===d);const allday=ev.filter(e=>e.hour==null);
     if(allday.length)html+=`<div class="banner">종일: ${allday.map(e=>`<button class="task" style="display:inline-block;border:0;cursor:pointer" data-act="evEdit" data-id="${e.id}">${esc(e.staff)} · ${esc(e.title)}</button>`).join(" ")}</div>`;
-    html+=`<div class="tw"><table class="tt"><thead><tr><th>시간</th>${PEOPLE().map(p=>`<th>${p}</th>`).join("")}</tr></thead><tbody>`;
-    for(let h=8;h<=22;h++){html+=`<tr><td class="h">${pad(h)}:00</td>${PEOPLE().map(p=>{const es=ev.filter(e=>e.hour===h&&e.staff===p);return `<td data-act="evNew" data-h="${h}" data-s="${p}" aria-label="${p} ${h}시">${es.map(e=>`<button class="task" style="border:0;cursor:pointer;width:100%;text-align:left" data-act="evEdit" data-id="${e.id}">${esc(e.title)}</button>`).join("")}</td>`}).join("")}</tr>`;}
+    html+=`<div class="tw"><table class="tt"><thead><tr><th>시간</th>${TT_PEOPLE().map(p=>`<th>${p}${TT_MGR_ONLY.includes(p)?' <small class="sub">🔒</small>':""}</th>`).join("")}</tr></thead><tbody>`;
+    for(let h=8;h<=22;h++){html+=`<tr><td class="h">${pad(h)}:00</td>${TT_PEOPLE().map(p=>{const es=ev.filter(e=>e.hour===h&&e.staff===p);return `<td data-act="evNew" data-h="${h}" data-s="${p}" aria-label="${p} ${h}시">${es.map(e=>`<button class="task" style="border:0;cursor:pointer;width:100%;text-align:left" data-act="evEdit" data-id="${e.id}">${esc(e.title)}</button>`).join("")}</td>`}).join("")}</tr>`;}
     html+=`</tbody></table></div>`;
   }else{const [y,mo]=S.ui.calYm.split("-").map(Number);const first=new Date(y,mo-1,1);const start=addDays(first,-first.getDay());
     html+=`<div class="tools" style="margin-bottom:10px"><button class="btn sm" data-act="calM" data-v="-1" aria-label="이전 달">◀</button><b style="font-size:17px">${y}년 ${mo}월</b><button class="btn sm" data-act="calM" data-v="1" aria-label="다음 달">▶</button><button class="btn sm" data-act="calM" data-v="0">이번 달</button><span class="sub">날짜를 누르면 크게 보입니다</span></div><div class="cal">${DOW.map((d,i)=>`<div class="dw ${i===0?"sun":i===6?"sat":""}">${d}</div>`).join("")}`;
-    for(let i=0;i<42;i++){const d=addDays(start,i);const k=iso(d);const es=S.events.filter(e=>e.date===k).sort((a,b)=>(a.hour??-1)-(b.hour??-1));
+    for(let i=0;i<42;i++){const d=addDays(start,i);const k=iso(d);const es=ttEvents().filter(e=>e.date===k).sort((a,b)=>(a.hour??-1)-(b.hour??-1));
       html+=`<button class="day ${d.getMonth()!==mo-1?"other":""} ${k===iso(TODAY)?"today":""}" data-act="calDay" data-v="${k}" aria-label="${d.getMonth()+1}월 ${d.getDate()}일 일정 ${es.length}건"><span class="dn ${d.getDay()===0?"sun":d.getDay()===6?"sat":""}">${d.getDate()}</span>${es.slice(0,3).map(e=>`<span class="ev">${e.hour==null?"":pad(e.hour)+" "}${esc(e.staff)} ${esc(e.title)}</span>`).join("")}${es.length>3?`<span class="more">+${es.length-3}건 더</span>`:""}${es.length?`<span class="cnt">${es.length}건</span>`:""}</button>`;}
     html+=`</div>`;
   }
   return html;
 }
 function evForm(e){
-  modal(e.id?"일정 수정":"일정 추가",`<div class="row3">${F("날짜",inp("date",e.date,"date","required"))}${F("시간",`<select name="hour"><option value="">종일</option>${Array.from({length:15},(_,i)=>i+8).map(h=>`<option value="${h}" ${e.hour===h?"selected":""}>${pad(h)}:00</option>`).join("")}</select>`)}${F("담당자",sel("staff",PEOPLE(),e.staff||me()))}</div>${F("내용",inp("title",e.title||"","text",'required placeholder="예: 삼화 면접 3명"'))}`,
+  modal(e.id?"일정 수정":"일정 추가",`<div class="row3">${F("날짜",inp("date",e.date,"date","required"))}${F("시간",`<select name="hour"><option value="">종일</option>${Array.from({length:15},(_,i)=>i+8).map(h=>`<option value="${h}" ${e.hour===h?"selected":""}>${pad(h)}:00</option>`).join("")}</select>`)}${F("담당자",sel("staff",TT_PEOPLE(),e.staff||ttDef()))}</div>${F("내용",inp("title",e.title||"","text",'required placeholder="예: 삼화 면접 3명"'))}`,
    {onSubmit:fd=>{const o={id:e.id||uid(),date:fd.get("date"),hour:fd.get("hour")===""?null:+fd.get("hour"),staff:fd.get("staff"),title:fd.get("title")};
      if(e.id)Object.assign(S.events.find(x=>x.id===e.id),o);else S.events.push(o);toast("일정을 저장했습니다");if(o.staff!==me())notify([o.staff],`타임트리 일정: ${mdShort(o.date)}${o.hour!=null?" "+pad(o.hour)+"시":""} ${o.title}`,"tt");},
     extra:e.id?`<button type="button" class="btn danger" data-act="evDel" data-id="${e.id}">삭제</button>`:""});
 }
-function dayModal(k){const d=new Date(k);const es=S.events.filter(e=>e.date===k).sort((a,b)=>(a.hour??-1)-(b.hour??-1));
+function dayModal(k){const d=new Date(k);const es=ttEvents().filter(e=>e.date===k).sort((a,b)=>(a.hour??-1)-(b.hour??-1));
   modal(`${d.getMonth()+1}월 ${d.getDate()}일 (${DOW[d.getDay()]}) 일정 ${es.length}건`,
    (es.length?`<div class="tw"><table class="x" style="font-size:15px"><thead><tr><th>시간</th><th>담당자</th><th>내용</th><th></th></tr></thead><tbody>${es.map(e=>`<tr><td>${e.hour==null?"종일":pad(e.hour)+":00"}</td><td>${esc(e.staff)}</td><td class="l">${esc(e.title)}</td><td><button type="button" class="btn sm" data-act="evEdit" data-id="${e.id}">수정</button></td></tr>`).join("")}</tbody></table></div>`:'<div class="empty">이 날 일정이 없습니다.</div>')+
-   `<h3 style="margin:16px 0 8px;font-size:15px">이 날 일정 추가</h3><div class="row3">${F("시간",`<select name="hour"><option value="">종일</option>${Array.from({length:15},(_,i)=>i+8).map(h=>`<option value="${h}">${pad(h)}:00</option>`).join("")}</select>`)}${F("담당자",sel("staff",PEOPLE(),me()))}${F("내용",inp("title","","text","required"))}</div>`,
+   `<h3 style="margin:16px 0 8px;font-size:15px">이 날 일정 추가</h3><div class="row3">${F("시간",`<select name="hour"><option value="">종일</option>${Array.from({length:15},(_,i)=>i+8).map(h=>`<option value="${h}">${pad(h)}:00</option>`).join("")}</select>`)}${F("담당자",sel("staff",TT_PEOPLE(),ttDef()))}${F("내용",inp("title","","text","required"))}</div>`,
    {wide:true,submit:"추가",onSubmit:fd=>{S.events.push({id:uid(),date:k,hour:fd.get("hour")===""?null:+fd.get("hour"),staff:fd.get("staff"),title:fd.get("title")});toast("추가했습니다");setTimeout(()=>dayModal(k),0);}});
 }
 
