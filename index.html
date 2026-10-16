@@ -486,7 +486,7 @@ function boot(){if(!window.supabase){document.getElementById("main").innerHTML='
 
 const brOf=n=>(ORG.find(o=>o[0]===n)||[])[1]||"본사";
 const titleOf=n=>n===CEO_NAME?"대표":(ORG.find(o=>o[0]===n)||[])[2]||"";
-const TABS=[["home","홈"],["hc","현재 인원 현황"],["to","TO 현황"],["join","금주 입사예정자"],["quit","퇴사자 공유"],["ad","광고 보고"],["pay","주급·가불 신청"],["tt","타임트리"],["notes","특이사항 공유"],["docs","서류요청"],["sales","영업성과"],["cond","업체별 채용조건"],["inv","계산서·명세표"],["leave","연차 현황"],["ar","미수금 현황",["ceo","mgr"]],["goal","목표 설정",["ceo"]]];
+const TABS=[["home","홈"],["hc","현재 인원 현황"],["to","TO 현황"],["join","금주 입사예정자"],["quit","퇴사자 공유"],["ad","광고 보고"],["pay","주급·가불 신청"],["tt","타임트리"],["notes","특이사항 공유"],["docs","서류요청"],["sales","영업성과"],["cond","업체별 채용조건"],["leave","연차 현황"],["ar","미수금 현황",["ceo","mgr"]],["goal","목표 설정",["ceo"]]];
 const clone=o=>JSON.parse(JSON.stringify(o));
 const pad=n=>String(n).padStart(2,"0");
 const iso=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
@@ -597,7 +597,7 @@ function vHome(){
   const evToday=ttEvents().filter(e=>e.date===iso(TODAY)).sort((a,b)=>(a.hour??0)-(b.hour??0));
   const mine=S.posts.filter(p=>(p.to.includes(me())||p.to.includes("전체"))&&!p.reads.includes(me()));
   const pend=S.leave.reqs.filter(r=>r.status==="대기");
-  const m=ym(TODAY);const ivs=invSum(m);const payWait=S.pays.filter(p=>p.status!=="지급완료"&&payVisBR().includes(p.branch));
+  const payWait=S.pays.filter(p=>p.status!=="지급완료"&&payVisBR().includes(p.branch));
   const conds=condList();const condDone=conds.filter(c=>condPct(c)===100).length;
   const adWk=Object.keys(S.adw).sort().filter(x=>!S.adwSample[x]).pop();const adW=S.ad.rows.filter(r=>visBR().includes(r.branch)).reduce((s,r)=>s+r.week,0),adC=weekCost(adWk,visBR()),adU=adC.total;
   return ph(`${TODAY.getMonth()+1}월 ${TODAY.getDate()}일 (${DOW[TODAY.getDay()]}) 한눈에 보기`,`${VW().label} ${me()}님 화면 · 숫자는 각 메뉴에서 수정한 값이 바로 반영됩니다.`)+
@@ -618,7 +618,6 @@ function vHome(){
    <button class="card cardlink" data-act="tab" data-v="tt"><h3>오늘 일정 <span class="go">타임트리 →</span></h3>${evToday.length?evToday.slice(0,5).map(e=>`<div class="meta"><span class="chip">${e.hour==null?"종일":pad(e.hour)+"시"}</span>${esc(e.staff)} · ${esc(e.title)}</div>`).join(""):'<p class="sub">오늘 등록된 일정이 없습니다.</p>'}</button>
    <button class="card cardlink" data-act="tab" data-v="notes"><h3>나에게 온 특이사항 <span class="go">특이사항 →</span></h3>${mine.length?mine.slice(0,4).map(p=>`<div class="meta">${p.level==="urgent"?'<span class="chip late">긴급</span>':p.level==="imp"?'<span class="chip vis">중요</span>':""}${esc(p.title)}</div>`).join(""):'<p class="sub">확인할 글이 없습니다.</p>'}</button>
    <button class="card cardlink" data-act="tab" data-v="ad"><h3>광고 (${wkLabel(adWk)}) <span class="go">광고 보고 →</span></h3><div class="kpi">${ring(pct(adU,adW),64)}<div><b>${won(adU)}원</b><span>주 예산 ${won(adW)}원 · 광고 ${adC.cnt}회</span></div></div></button>
-   <button class="card cardlink" data-act="tab" data-v="inv"><h3>${TODAY.getMonth()+1}월 계산서·명세표 <span class="go">발행 현황 →</span></h3><div class="kpi">${ring(pct(ivs.io+ivs.so,ivs.in+ivs.sn),64)}<div><b>계산서 O ${ivs.io}/${ivs.in} · 명세표 O ${ivs.so}/${ivs.sn}</b><span>${ivs.ix+ivs.sx?`<span class="up">X ${ivs.ix+ivs.sx}건</span>`:"X 없음"}</span></div></div></button>
    <button class="card cardlink" data-act="tab" data-v="docs"><h3>서류요청 <span class="go">서류요청 →</span></h3>${(()=>{const w=S.docreqs.filter(d=>d.status!=="전달완료"&&docVisBR().includes(d.branch));const mine=S.docreqs.filter(d=>d.by===me()&&d.status==="전달완료"&&(d.doneAt||"")>=iso(addDays(TODAY,-3)));return `<div class="big ${w.length?"up":""}">${w.length}<span class="sub"> 건 처리 대기</span></div><p class="sub">${canPay()?"경영지원팀 처리 필요":`내 요청 중 최근 전달완료 ${mine.length}건`}</p>`})()}</button>
    <button class="card cardlink" data-act="tab" data-v="pay"><h3>주급·가불 <span class="go">신청 현황 →</span></h3><div class="big ${payWait.length?"up":""}">${payWait.length}<span class="sub"> 명 지급 대기</span></div><p class="sub">주급 ${payWait.filter(p=>p.type==="주급").length} · 가불 ${payWait.filter(p=>p.type==="가불").length}</p></button>
    <button class="card cardlink" data-act="tab" data-v="leave"><h3>연차 <span class="go">연차 현황 →</span></h3><div class="big">${pend.length}<span class="sub"> 건 승인 대기</span></div><p class="sub">${esc(me())}님 잔여 ${S.leave.alloc[me()]!=null?(S.leave.alloc[me()]-leaveUsed(me()))+"일":"대상 아님"}</p></button>
@@ -1324,7 +1323,7 @@ function qForm(q){const n=!q;q=q||{co:"",branch:"본사",name:"",inDate:"",outDa
 
 /* ---------- 렌더 ---------- */
 const VIEWS={docs:vDocs,pay:vPay,home:vHome,hc:vHC,join:vJoin,quit:vQuit,to:vTO,sales:vSales,ad:vAD,tt:vTT,cond:vCond,notes:vNotes,ar:vAR,leave:vLeave,inv:vInv,goal:vGoal};
-function render(){if(!ME.id){return;}if(!visHC().includes(S.ui.hcBr))S.ui.hcBr=visHC()[0];if(!visBR().includes(S.ui.toBr))S.ui.toBr=visBR()[0];const t=TABS.find(x=>x[0]===S.tab);if(t&&t[2]&&!t[2].includes(S.role))S.tab="home";renderHead();document.getElementById("main").innerHTML=VIEWS[S.tab]();labelTables();const at=document.querySelector('nav.tabs [aria-current="page"]');if(at&&at.scrollIntoView)at.scrollIntoView({block:"nearest",inline:"nearest"});}
+function render(){if(!ME.id){return;}if(!visHC().includes(S.ui.hcBr))S.ui.hcBr=visHC()[0];if(!visBR().includes(S.ui.toBr))S.ui.toBr=visBR()[0];const t=TABS.find(x=>x[0]===S.tab);if(!t)S.tab="home";if(t&&t[2]&&!t[2].includes(S.role))S.tab="home";renderHead();document.getElementById("main").innerHTML=VIEWS[S.tab]();labelTables();const at=document.querySelector('nav.tabs [aria-current="page"]');if(at&&at.scrollIntoView)at.scrollIntoView({block:"nearest",inline:"nearest"});}
 function labelTables(){document.querySelectorAll("table.resp").forEach(t=>{const hs=[...t.querySelectorAll("thead th")].map(th=>th.textContent.trim());t.querySelectorAll("tbody tr").forEach(tr=>{if(tr.classList.contains("tot"))return;[...tr.children].forEach((td,i)=>{if(hs[i]&&!td.hasAttribute("colspan"))td.setAttribute("data-label",hs[i]);});});});}
 function setPath(path,val,type){const ks=path.split(".");let o=S;for(let i=0;i<ks.length-1;i++){if(o[ks[i]]==null)o[ks[i]]={};o=o[ks[i]];}
   const k=ks[ks.length-1];if(type==="num")val=val===""?0:+val;else if(type==="numnull")val=val===""||+val===0?null:+val;else if(type==="bool")val=!!val;
