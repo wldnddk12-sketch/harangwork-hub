@@ -296,7 +296,7 @@ const TITLE_RANK={"대표":0,"지사장":1,"팀장":2,"직원":3};
 const monthRange=()=>({from:iso(new Date(TODAY.getFullYear(),TODAY.getMonth(),1)),due:iso(new Date(TODAY.getFullYear(),TODAY.getMonth()+1,0))});
 function emptyS(){return {role:ME.role,tab:"home",ui:{joinWk:0,quitYm:ym(TODAY),hcBr:"본사",toBr:"본사",hcEdit:false,toEdit:false,ttView:"day",ttDate:iso(TODAY),calYm:ym(TODAY),condBr:"전체",condQ:"",noteF:"all",invYm:ym(TODAY)},
   hc:Object.fromEntries(HC_TABS.map(t=>[t,[]])),baseLabel:"기준",to:Object.fromEntries(BRANCHES.map(b=>[b,[]])),ad:{rows:[]},events:[],conds:{},posts:[],ar:[],
-  leave:{alloc:{},reqs:[]},inv:[],goal:{total:0,net:0,fill:0,sales:0,salesActual:0,collect:0,salesG:{meet:0,to:0,deal:0,...monthRange()}},joins:[],quits:[],
+  leave:{alloc:{},reqs:[]},inv:[],goal:{total:0,net:0,fill:0,collect:0,salesG:{meet:0,to:0,deal:0,...monthRange()}},joins:[],quits:[],
   adw:{},adwSample:{},adPrice:{j:146000,r:35200,rDays:2},adAlias:{},adPersonBudget:{},adMembers:{},sales:[],pays:[],docreqs:[],notifs:[]};}
 /* 화면 상태(S) → 저장 단위(문서) */
 function docsOf(s){const D=new Map();const put=(kind,key,branch,data)=>D.set(kind+"|"+key,{kind,key:String(key),branch:branch||null,data});
@@ -310,7 +310,7 @@ function docsOf(s){const D=new Map();const put=(kind,key,branch,data)=>D.set(kin
   s.inv.forEach(it=>put("inv",it.id,it.branch,it));Object.entries(s.conds).forEach(([k,v])=>put("cond",k,k.split("|")[0],v));
   Object.entries(s.leave.alloc).forEach(([n,d])=>put("leave_alloc",n,brOf(n),{days:d}));s.leave.reqs.forEach(r=>put("leave_req",r.id,brOf(r.name),r));
   s.sales.forEach(d=>put("sale",d.id,d.branch,d));s.pays.forEach(p=>put("pay",p.id,p.branch,p));s.docreqs.forEach(d=>put("docreq",d.id,d.branch,d));
-  const g=s.goal;put("goal","cur",null,{total:g.total,net:g.net,fill:g.fill,salesG:g.salesG});put("goal_money","cur",null,{sales:g.sales,salesActual:g.salesActual,collect:g.collect});
+  const g=s.goal;put("goal","cur",null,{total:g.total,net:g.net,fill:g.fill,salesG:g.salesG});put("goal_money","cur",null,{collect:g.collect});
   return D;}
 /* 문서 → 화면 상태 */
 function buildS(rows,ui){const s=emptyS();if(ui)s.ui={...s.ui,...ui};const gs=[];
@@ -594,7 +594,6 @@ function vHome(){
   const fill=pct(ts.placed,ts.to);
   const goals=[["총 투입 인원",all.cur,g.total,"명",pct(all.cur,g.total)],["신규 투입(순증)",net,g.net,"명",pct(Math.max(net,0),g.net)],["TO 충원율",fill,g.fill,"%",pct(fill,g.fill)]];
   const sst=salesStat(),sg=SG();goals.push([`영업 성사 (기한 ${mdShort(sg.due)})`,sst.deal,sg.deal,"건",pct(sst.deal,sg.deal)]);
-  if(isBoss()){goals.push(["매출",g.salesActual,g.sales,"원",pct(g.salesActual,g.sales)]);}
   const evToday=ttEvents().filter(e=>e.date===iso(TODAY)).sort((a,b)=>(a.hour??0)-(b.hour??0));
   const mine=S.posts.filter(p=>(p.to.includes(me())||p.to.includes("전체"))&&!p.reads.includes(me()));
   const pend=S.leave.reqs.filter(r=>r.status==="대기");
@@ -1150,17 +1149,16 @@ function vGoal(){
   if(S.role!=="ceo")return `<div class="lockview card"><h3 style="justify-content:center">🔒 대표 전용</h3><p class="sub">목표 설정은 대표만 할 수 있습니다. 결과는 홈에서 보입니다.</p></div>`;
   const g=S.goal,all=hcAll(),ts=toStat(),ar=arStat();
   const row=(k,l,u,cur,note)=>`<tr><td class="l"><b>${l}</b><div class="sub">${note}</div></td><td><input type="number" data-set="goal.${k}" data-type="num" value="${g[k]}" style="width:140px" aria-label="${l} 목표"> ${u}</td><td class="num cur">${u==="원"?won(cur):num(cur)} ${u}</td><td style="min-width:160px">${bar(pct(Math.max(cur,0),g[k]))}<span class="sub">${pct(Math.max(cur,0),g[k])}%</span></td></tr>`;
-  return ph(`${TODAY.getMonth()+1}월 목표 설정`,"여기서 정한 목표 대비 실적이 홈 화면에 원형 그래프로 나옵니다. 매출·미수금 목표는 대표·팀장에게만 보입니다.")+
+  return ph(`${TODAY.getMonth()+1}월 목표 설정`,"여기서 정한 목표 대비 실적이 홈 화면에 원형 그래프로 나옵니다. 미수금 목표는 대표·팀장에게만 보입니다.")+
   `<div class="tw"><table class="x resp"><thead><tr><th>항목</th><th>이번 달 목표</th><th>현재 실적</th><th>달성률</th></tr></thead><tbody>
   ${row("total","총 투입 인원","명",all.cur,"인원현황 합계에서 자동")}${row("net","신규 투입(순증)","명",all.cur-all.base,`${esc(S.baseLabel)} 대비 증감`)}${row("fill","TO 충원율","%",pct(ts.placed,ts.to),"TO 현황의 실제 투입 ÷ TO")}
-  ${row("sales","매출","원",g.salesActual,"아래 '이번 달 매출 실적'에 입력")}${row("collect","미수금 회수","원",ar.p,"미수금 현황의 회수액 합계")}</tbody></table></div>
+  ${row("collect","미수금 회수","원",ar.p,"미수금 현황의 회수액 합계")}</tbody></table></div>
   <div class="card" style="margin-top:14px"><h3>영업 목표 <span class="sub">영업은 시간이 걸리니 기한을 따로 정합니다 · 결과는 '영업성과' 메뉴와 홈에 나옵니다</span></h3>
    <div class="row2" style="max-width:520px">${F("목표 시작일",`<input type="date" data-set="goal.salesG.from" value="${SG().from}">`)}${F("목표 기한",`<input type="date" data-set="goal.salesG.due" value="${SG().due}">`)}</div>
    <div class="tw" style="border:0"><table class="x resp"><thead><tr><th>항목</th><th>목표</th><th>현재 실적</th><th>달성률</th></tr></thead><tbody>
    ${(()=>{const st=salesStat(S.sales);const sg=SG();const r=(k,l,cur,u)=>`<tr><td class="l"><b>${l}</b></td><td><input type="number" data-set="goal.salesG.${k}" data-type="num" value="${sg[k]}" style="width:110px" aria-label="${l} 목표"> ${u}</td><td class="num cur">${num(cur)} ${u}</td><td style="min-width:160px">${bar(sg[k]?pct(cur,sg[k]):0)}<span class="sub">${sg[k]?pct(cur,sg[k]):0}%</span></td></tr>`;
      return r("meet","미팅 횟수",st.meet,"회")+r("to","미팅으로 확보한 TO",st.to,"명")+r("deal","영업 성사 (도급·채용대행·일용직)",st.deal,"건");})()}</tbody></table></div>
-   <div class="sub" style="margin-top:8px">지사별 성사: ${BRANCHES.map(b=>`${b} ${salesStat(S.sales.filter(d=>d.branch===b)).deal}건`).join(" · ")}</div></div>
-  <div class="card" style="margin-top:14px;max-width:420px"><label class="field"><span>이번 달 매출 실적 (원)</span><input type="number" data-set="goal.salesActual" data-type="num" value="${g.salesActual}"></label></div>`;
+   <div class="sub" style="margin-top:8px">지사별 성사: ${BRANCHES.map(b=>`${b} ${salesStat(S.sales.filter(d=>d.branch===b)).deal}건`).join(" · ")}</div></div>`;
 }
 
 /* ---------- 영업성과 ---------- */
