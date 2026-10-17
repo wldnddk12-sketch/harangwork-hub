@@ -160,6 +160,20 @@ table.x input[type=number]{width:64px}
 .checks{display:flex;flex-wrap:wrap;gap:6px 14px}
 .checks label{display:flex;align-items:center;gap:5px;font-size:13.5px}
 .field input[type=checkbox],.field input[type=radio]{width:auto;flex:none;padding:0;margin:0}
+.colink{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}.colink:hover{color:var(--brand);text-decoration-color:var(--brand)}
+.rb{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 7px;margin-left:4px;vertical-align:1px}.rb.rn{background:#DCE7FA;color:#1A458C}.rb.ro{background:#FBE0E0;color:#A32020}
+.pplist{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.pp{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 11px;font-size:13.5px;background:var(--surface)}
+.pp small{font-size:11px;opacity:.85}
+.pp.pnew{background:#DCE7FA;border-color:#8FB0E6;color:#1A458C;font-weight:600}
+.pp.pout{background:#FBE0E0;border-color:#E9A3A3;color:#A32020;text-decoration:line-through;text-decoration-thickness:1px}
+.pp.pout small{text-decoration:none;display:inline-block}
+.pp a.tel{font-size:12px;color:inherit;opacity:.8;text-decoration:none;border-left:1px solid var(--line);padding-left:6px;margin-left:2px}.pp.pout a.tel{text-decoration:line-through}
+.pp .pn{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer}.pp .pn:hover{text-decoration:underline}
+.ins{font-size:11px;border-radius:5px;padding:1px 5px;font-weight:600}.ins.ok{background:#DDF3E6;color:#16653A}.ins.no{background:#FFF1CC;color:#7A5200}
+.px{border:0;background:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 4px;border-radius:50%;line-height:1}.px:hover{background:var(--soft);color:var(--ink)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .rb.rn,:root:not([data-theme="light"]) .pp.pnew{background:#1E2F4A;color:#9DBDF2;border-color:#355a90}:root:not([data-theme="light"]) .rb.ro,:root:not([data-theme="light"]) .pp.pout{background:#3E1E1E;color:#F2A3A3;border-color:#7a3a3a}}
+:root[data-theme="dark"] .rb.rn,:root[data-theme="dark"] .pp.pnew{background:#1E2F4A;color:#9DBDF2;border-color:#355a90}:root[data-theme="dark"] .rb.ro,:root[data-theme="dark"] .pp.pout{background:#3E1E1E;color:#F2A3A3;border-color:#7a3a3a}
 .picker{border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:10px;background:var(--paper)}
 .pkq{display:flex;flex-wrap:wrap;gap:6px}.pkq .btn{padding:4px 10px}
 .pkg{display:grid;grid-template-columns:44px 1fr;gap:8px;align-items:start}.pkg>b{font-size:12.5px;color:var(--muted);padding-top:6px}
@@ -297,7 +311,7 @@ const monthRange=()=>({from:iso(new Date(TODAY.getFullYear(),TODAY.getMonth(),1)
 function emptyS(){return {role:ME.role,tab:"home",ui:{joinWk:0,quitYm:ym(TODAY),hcBr:"본사",toBr:"본사",hcEdit:false,toEdit:false,ttView:"day",ttDate:iso(TODAY),calYm:ym(TODAY),condBr:"전체",condQ:"",noteF:"all",invYm:ym(TODAY)},
   hc:Object.fromEntries(HC_TABS.map(t=>[t,[]])),baseLabel:"기준",to:Object.fromEntries(BRANCHES.map(b=>[b,[]])),ad:{rows:[]},events:[],conds:{},posts:[],ar:[],
   leave:{alloc:{},reqs:[]},inv:[],goal:{total:0,net:0,fill:0,collect:0,salesG:{meet:0,to:0,deal:0,...monthRange()}},joins:[],quits:[],
-  adw:{},adwSample:{},adPrice:{j:146000,r:35200,rDays:2},adAlias:{},adPersonBudget:{},adMembers:{},sales:[],pays:[],docreqs:[],notifs:[]};}
+  adw:{},adwSample:{},adPrice:{j:35200,r:146000,rDays:2},adAlias:{},adPersonBudget:{},adMembers:{},sales:[],pays:[],docreqs:[],notifs:[]};}
 /* 화면 상태(S) → 저장 단위(문서) */
 function docsOf(s){const D=new Map();const put=(kind,key,branch,data)=>D.set(kind+"|"+key,{kind,key:String(key),branch:branch||null,data});
   HC_TABS.forEach(t=>(s.hc[t]||[]).forEach((g,i)=>put("hcg",g.name,g.branch,{...g,tab:t,idx:i})));
@@ -638,7 +652,7 @@ function vHC(){
     const rs=g.rows;const act=rs.filter(r=>!r.excluded);const c=act.reduce((s,r)=>s+(+r.cur||0),0),bs=act.reduce((s,r)=>s+(+r.base||0),0);
     html+=`<div class="gname"><b>${esc(g.name)}</b>${g.daily?'<span class="chip mute">일 보고 인원 기준</span>':""}${g.note?`<span class="note">${esc(g.note)}</span>`:""}${ed?`<button class="btn sm" data-act="hcAdd" data-g="${gi}">+ 줄 추가</button>`:""}</div>`;
     if(!rs.length){html+=`<div class="empty">아직 등록된 업체가 없습니다.${ed?"":" '수정하기'를 눌러 추가하세요."}</div>`;return;}
-    if(!ed)html+=`<div class="mlist only-m">${rs.map(r=>{const d=(+r.cur||0)-(+r.base||0);return `<div class="mi ${r.excluded?"mx":""}"><div class="mt"><b>${esc(r.co)}</b>${r.isNew?' <span class="chip vis">신규</span>':""}${r.excluded?` <span class="chip mute">${esc(r.memo||"타 지사 집계")}</span>`:""}<div class="sub">${esc(r.gubun)} · 관리 ${esc(r.mgr)}${CEO&&r.sales?` · 영업 ${esc(r.sales)}`:""}</div></div><div class="mv"><b>${num(r.cur)}</b><span class="sub">기준 ${num(r.base)} · ${diff(d)}</span></div></div>`}).join("")}<div class="mi mtot"><div class="mt"><b>합계</b></div><div class="mv"><b>${num(c)}</b><span class="sub">기준 ${num(bs)} · ${diff(c-bs)}</span></div></div></div>`;
+    if(!ed)html+=`<div class="mlist only-m">${rs.map((r,ri)=>{const d=(+r.cur||0)-(+r.base||0);return `<div class="mi ${r.excluded?"mx":""}"><div class="mt"><button class="colink" data-act="hcPpl" data-p="hc.${b}.${gi}.rows.${ri}"><b>${esc(r.co)}</b></button>${rosterBadge(r)}${r.isNew?' <span class="chip vis">신규</span>':""}${r.excluded?` <span class="chip mute">${esc(r.memo||"타 지사 집계")}</span>`:""}<div class="sub">${esc(r.gubun)} · 관리 ${esc(r.mgr)}${CEO&&r.sales?` · 영업 ${esc(r.sales)}`:""}</div></div><div class="mv"><b>${num(r.cur)}</b><span class="sub">기준 ${num(r.base)} · ${diff(d)}</span></div></div>`}).join("")}<div class="mi mtot"><div class="mt"><b>합계</b></div><div class="mv"><b>${num(c)}</b><span class="sub">기준 ${num(bs)} · ${diff(c-bs)}</span></div></div></div>`;
     html+=`<div class="tw ${ed?"":"only-d"}"><table class="x"><thead><tr><th>순번</th><th>구분</th>${CEO?"<th>영업담당자 🔒</th>":""}<th>관리담당자</th><th>업체</th><th>합계인원</th><th>${esc(S.baseLabel)}</th><th>증감</th>${ed?"<th>타 지사 집계</th><th></th>":""}</tr></thead><tbody>`;
     let n=0;
     rs.forEach((r,i)=>{const p=`hc.${b}.${gi}.rows.${i}`;const ms=mgrs(r);n++;
@@ -648,11 +662,11 @@ function vHC(){
         const sp=r.splits||{};
         curCell=ed?`<div class="split">${inpS(p+".cur",r.cur,"합계")}${ms.map(m=>`<span>${esc(m)} ${inpS(p+".splits."+m,sp[m]??"","")}</span>`).join("")}</div>`
           :`<div class="split"><b>${num(r.cur)}</b>${ms.map(m=>`<span>${esc(m)}<b>${sp[m]??"-"}</b></span>`).join("")}</div>`;
-      }else if(ed)curCell=inpS(p+".cur",r.cur);
+      }else if(ed)curCell=hasRoster(r)?`<b>${num(r.cur)}</b><div class="sub">명단 연동</div>`:inpS(p+".cur",r.cur);
       if(ed)baseCell=inpS(p+".base",r.base);
       html+=`<tr><td>${n}</td>`+
         (ed?["gubun",...(CEO?["sales"]:[]),"mgr","co"].map(k=>`<td><input data-set="${p}.${k}" value="${esc(r[k])}" aria-label="${k}" style="min-width:${k==="co"?150:k==="period"?130:k==="gubun"?90:70}px"></td>`).join("")
-           :`<td>${esc(r.gubun)}</td>${CEO?`<td>${esc(r.sales)}</td>`:""}<td>${esc(r.mgr)}</td><td class="l">${esc(r.co)}${tag}</td>`)+
+           :`<td>${esc(r.gubun)}</td>${CEO?`<td>${esc(r.sales)}</td>`:""}<td>${esc(r.mgr)}</td><td class="l"><button class="colink" data-act="hcPpl" data-p="${p}" title="근무자 명단 보기">${esc(r.co)}</button>${rosterBadge(r)}${tag}</td>`)+
         `<td class="cur num">${curCell}</td><td class="num">${baseCell}</td><td class="num">${diff((+r.cur||0)-(+r.base||0))}</td>`+
         (ed?`<td><input type="checkbox" data-set="${p}.excluded" data-type="bool" ${r.excluded?"checked":""} aria-label="다른 지사 집계"></td><td><button class="btn sm danger" data-act="hcDel" data-g="${gi}" data-i="${i}">삭제</button></td>`:"")+`</tr>`;
     });
@@ -1261,7 +1275,7 @@ function jPasteForm(mode){
   modal(q?"퇴사자 적어 넣기":"입사예정자 정보등록",`<p class="sub" style="margin-top:0">${q?"업체를 &lt; &gt;로 묶고, 한 줄에 '입사일 이름 퇴사일 사유' 순서로 적어 주세요.":"업체를 &lt; &gt;로 묶고, 한 줄에 '날짜 이름 연락처' 순서로 적어 주세요. 날짜는 첫 사람에게만 써도 아래 사람에게 이어집니다. ✓(V)는 사전 연락 확인 표시."}</p>
    <label class="field"><span>내용</span><textarea name="t" id="pasteT" style="min-height:170px;font-family:var(--font)" placeholder="${q?"<코스원>\n9/29 김민수 10/2 업무 강도\n9/22 이영희 10/6":"<코스원>\n10/8 이국화 3218 8515\n최현지 3097 2545 V\n\n<하이뷰티>\n10/12 이도림 8156 7058"}"></textarea></label><div id="pasteP" class="sub">미리보기가 여기에 나옵니다.</div>`,
    {wide:true,submit:"추가",onSubmit:fd=>{const rs=parseBoard(fd.get("t"),q?"quit":"join");
-     if(q)rs.forEach(r=>{const c=hcCands(r.co)[0];const link=c&&c.sc>0?{hc:c.path}:null;if(link)bumpPath(link.hc,-1);S.quits.push({id:uid(),...r,co:r.co||"업체 미정",branch:"본사",mgr:mgrOfCo(r.co),link});});
+     if(q)rs.forEach(r=>{const c=hcCands(r.co)[0];const link=c&&c.sc>0?{hc:c.path}:null;const qid=uid();if(link)hcMove(link.hc,-1,{name:r.name,date:r.outDate,inDate:r.inDate,src:"q:"+qid});S.quits.push({id:qid,...r,co:r.co||"업체 미정",branch:"본사",mgr:mgrOfCo(r.co),link});});
      else rs.forEach(r=>S.joins.push({id:uid(),...r,co:r.co||"업체 미정",mgr:mgrOfCo(r.co),status:"대기",memo:"",hist:[]}));toast(`${rs.length}명 추가했습니다`);}});
   const ta=document.getElementById("pasteT");ta.dataset.mode=q?"quit":"join";
 }
@@ -1278,6 +1292,49 @@ function jPostpone(j){modal(`${esc(j.name)} 입사연기`,`${F("재투입 예정
 function findHcRow(id){for(const t of HC_TABS)for(const g of (S.hc[t]||[]))for(const r of g.rows)if(r.id===id)return [g,r];return [null,null];}
 function findToRow(id){for(const b of Object.keys(S.to))for(const r of S.to[b])if(r.id===id)return [b,r];return [null,null];}
 function getPath(p){if(!p)return null;if(p.startsWith("hcid:"))return findHcRow(p.slice(5))[1];if(p.startsWith("toid:"))return findToRow(p.slice(5))[1];return p.split(".").reduce((o,k)=>o==null?o:o[k],S);}
+/* ---------- 업체별 근무자 명단 (인원현황 연동) ---------- */
+const rowOf=p=>getPath(String(p).replace(/\.cur$/,""));
+const hasRoster=r=>!!(r&&Array.isArray(r.people)&&r.people.length);
+const rosterAct=r=>((r&&r.people)||[]).filter(x=>!x.out);
+const wkAgo=()=>iso(addDays(TODAY,-6));
+const isNewP=x=>!x.out&&x.in&&x.in>=wkAgo()&&x.in<=iso(TODAY);
+const isOutP=x=>x.out&&x.out>=wkAgo();
+function rosterSync(r){if(hasRoster(r))r.cur=rosterAct(r).length;}
+function hcMove(path,d,info){const r=rowOf(path);if(!hasRoster(r)||!info){bumpPath(path,d);return;}
+  if(d>0)r.people.push({id:uid(),name:info.name,phone:fmtPhone(info.phone||""),in:info.date||iso(TODAY),src:info.src});
+  else{const nm=norm(info.name);const x=r.people.find(y=>!y.out&&norm(y.name)===nm);
+    if(x){x.out=info.date||iso(TODAY);x.outSrc=info.src;}else r.people.push({id:uid(),name:info.name,in:info.inDate||"",out:info.date||iso(TODAY),outSrc:info.src,added:true});}
+  rosterSync(r);}
+function hcUnmove(path,d,src){const r=rowOf(path);if(!hasRoster(r)){bumpPath(path,d);return;}
+  if(d<0)r.people=r.people.filter(x=>x.src!==src);
+  else{r.people=r.people.filter(x=>!(x.outSrc===src&&x.added));r.people.forEach(x=>{if(x.outSrc===src){x.out="";delete x.outSrc;}});}
+  rosterSync(r);}
+function rosterBadge(r){if(!hasRoster(r))return "";const n=r.people.filter(isNewP).length,o=r.people.filter(isOutP).length;
+  return `${n?` <span class="rb rn" title="최근 7일 신규">+${n}</span>`:""}${o?` <span class="rb ro" title="최근 7일 퇴사">−${o}</span>`:""}`;}
+const fmtPhone=v=>{const d=String(v||"").replace(/\D/g,"");return d.length===11?d.replace(/(\d{3})(\d{4})(\d{4})/,"$1-$2-$3"):d.length===10?d.replace(/(\d{3})(\d{3,4})(\d{4})/,"$1-$2-$3"):String(v||"").trim();};
+function parseRosterLines(t,asNew){return String(t||"").split(/\n|,/).map(l=>l.trim()).filter(Boolean).map(l=>{let d="",ph="";const pm=l.match(/01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/);if(pm){ph=fmtPhone(pm[0]);l=l.replace(pm[0],"").trim();}const m=l.match(/(\d{4}-\d{1,2}-\d{1,2})|(\d{1,2})[\/.](\d{1,2})/);
+  if(m){if(m[1])d=iso(new Date(m[1]));else{const y=TODAY.getFullYear();d=iso(new Date(y,+m[2]-1,+m[3]));}l=l.replace(m[0],"").trim();}
+  return {id:uid(),name:l.replace(/\s+/g," "),in:d||(asNew?iso(TODAY):""),phone:ph};}).filter(x=>x.name);}
+function hcPeopleModal(rp){const r=getPath(rp);if(!r)return;const all=r.people||[];const act=rosterAct(r).sort((a,b)=>(isNewP(b)-isNewP(a))||a.name.localeCompare(b.name,"ko"));
+  const recentOut=all.filter(isOutP),oldOut=all.filter(x=>x.out&&!isOutP(x));
+  const insB=x=>x.ins==="가입"?` <span class="ins ok" title="4대보험 가입${x.insDate?" "+x.insDate:""}">4대${x.insDate?" "+mdShort(x.insDate):" ✓"}</span>`:x.ins==="미가입"?' <span class="ins no">4대 미가입</span>':"";
+  const insN=act.filter(x=>x.ins==="가입").length,insX=act.filter(x=>x.ins==="미가입").length;
+  const pill=x=>`<span class="pp ${isNewP(x)?"pnew":""} ${x.out?"pout":""}"><button type="button" class="pn" onclick="hcPplEdit('${rp}','${x.id}')" title="눌러서 정보 수정">${esc(x.name)}</button>${insB(x)}${isNewP(x)?` <small>신규 ${mdShort(x.in)}</small>`:""}${x.out?` <small>퇴사 ${mdShort(x.out)}</small>`:""}${x.phone?` <a class="tel" href="tel:${esc(x.phone.replace(/\D/g,""))}">${esc(x.phone)}</a>`:""}<button type="button" class="px" aria-label="${esc(x.name)} 명단에서 빼기" onclick="hcPplDel('${rp}','${x.id}')">✕</button></span>`;
+  modal(`${esc(r.co)} 근무자 명단`,`<p class="sub" style="margin-top:0">${hasRoster(r)?`재직 <b>${act.length}명</b> — 합계인원이 이 명단 수로 자동 계산됩니다. 입사 처리하면 파란색, 퇴사 등록하면 빨간색으로 7일간 표시됩니다. 이름을 누르면 전화번호·4대보험을 고칠 수 있습니다.${insN||insX?`<br>4대보험 가입 <b>${insN}명</b>${insX?` · <span class="up">미가입 ${insX}명</span>`:""}${act.length-insN-insX?` · 미입력 ${act.length-insN-insX}명`:""}`:""}`:`아직 명단이 없습니다. 아래에 이름을 넣으면 그때부터 합계인원(지금 ${num(r.cur)}명)이 명단 수로 자동 계산됩니다.`}</p>
+   ${act.length||recentOut.length?`<div class="pplist">${act.map(pill).join("")}${recentOut.map(pill).join("")}</div>`:""}
+   ${oldOut.length?`<details style="margin-top:8px"><summary class="sub">지난 퇴사자 ${oldOut.length}명</summary><div class="pplist">${oldOut.map(pill).join("")}</div></details>`:""}
+   <div class="field" style="margin-top:12px"><span>이름 추가 <small class="sub">한 줄에 한 명 (또는 쉼표). 전화번호·입사일도 같이 쓸 수 있습니다: "홍길동 010-1234-5678 10/15". 이미 있는 이름을 다시 쓰면 번호·입사일만 바뀝니다.</small></span><textarea name="names" rows="4" placeholder="홍길동 010-1234-5678\n김철수 01098765432 10/15"></textarea></div>
+   <label class="checks"><label><input type="checkbox" name="asNew">날짜 없는 사람도 오늘 신규 입사로 표시 (파란색)</label></label>`,
+   {submit:"명단 추가",onSubmit:fd=>{const add=parseRosterLines(fd.get("names"),!!fd.get("asNew"));if(!add.length){toast("추가할 이름이 없습니다");return;}r.people=r.people||[];let nAdd=0,nUp=0;
+     add.forEach(a=>{const ex=r.people.find(y=>!y.out&&norm(y.name)===norm(a.name));if(ex){if(a.phone)ex.phone=a.phone;if(a.in)ex.in=a.in;nUp++;}else{r.people.push(a);nAdd++;}});
+     rosterSync(r);toast(`${nAdd?nAdd+"명 추가":""}${nAdd&&nUp?" · ":""}${nUp?nUp+"명 정보 수정":""} · 재직 ${rosterAct(r).length}명`);setTimeout(()=>hcPeopleModal(rp),0);}});}
+function hcPplEdit(rp,id){const r=getPath(rp);const x=r&&(r.people||[]).find(y=>y.id===id);if(!x)return;
+  modal(`${esc(x.name)} 정보`,`<div class="row2">${F("이름",inp("name",x.name,"text","required"))}${F("전화번호",inp("phone",x.phone||"","tel",'placeholder="010-0000-0000"'))}</div>
+   <div class="row3">${F("입사일",inp("in",x.in||"","date"))}${F("4대보험",`<select name="ins"><option value="">미입력</option><option ${x.ins==="가입"?"selected":""}>가입</option><option ${x.ins==="미가입"?"selected":""}>미가입</option></select>`)}${F("4대보험 가입일",inp("insDate",x.insDate||"","date"))}</div>
+   ${x.out?`<p class="sub">퇴사일 ${x.out} (퇴사 등록은 '퇴사자 공유'에서 관리합니다)</p>`:""}`,
+   {onSubmit:fd=>{x.name=String(fd.get("name")||"").trim()||x.name;x.phone=fmtPhone(fd.get("phone"));x.in=fd.get("in")||"";x.ins=fd.get("ins")||"";x.insDate=fd.get("insDate")||"";if(x.insDate&&!x.ins)x.ins="가입";toast("저장했습니다");setTimeout(()=>hcPeopleModal(rp),0);}});}
+function hcPplDel(rp,id){const r=getPath(rp);if(!r)return;const x=(r.people||[]).find(y=>y.id===id);if(!x||!confirm(`${x.name}님을 명단에서 뺄까요? (퇴사 처리는 '퇴사자 공유'에서 하면 빨간색으로 남습니다)`))return;
+  r.people=r.people.filter(y=>y.id!==id);if(!r.people.length)delete r.people;else rosterSync(r);save();render();hcPeopleModal(rp);}
 function bumpPath(p,d){if(p.startsWith("hcid:")){const r=findHcRow(p.slice(5))[1];if(r)r.cur=Math.max(0,(+r.cur||0)+d);return;}const ks=p.split(".");const k=ks.pop();const o=ks.reduce((x,y)=>x[y],S);o[k]=Math.max(0,(+o[k]||0)+d);}
 function coScore(a,b){const x=norm(a),y=norm(b);if(!x||!y)return 0;if(x===y)return 3;if(x.includes(y)||y.includes(x))return 2;return 0;}
 function hcCands(co){const out=[];HC_TABS.forEach(t=>(S.hc[t]||[]).forEach((g,gi)=>{if(!visG(g))return;g.rows.forEach((r,i)=>{const sc=coScore(co,r.co)-(r.excluded?1.5:0);
@@ -1292,14 +1349,14 @@ function jDone(j){const hc=hcCands(j.co),to=toCands(j.co);
    ${F("인원현황 · 합계인원 +1",candSel("hc",hc,"인원현황에는 반영 안 함"))}${F("TO 현황 · 실제 투입 +1 (투입 예정이 있으면 −1)",candSel("to",to,"TO에는 반영 안 함"))}
    ${!(hc[0]&&hc[0].sc>0)?`<p class="banner">인원현황에서 '${esc(j.co)}'와 비슷한 업체를 찾지 못했습니다. 목록에서 고르거나 '반영 안 함'으로 두세요.</p>`:""}`,
    {submit:"입사 처리",onSubmit:fd=>{const L={hc:fd.get("hc")||"",to:fd.get("to")||"",planDec:false};
-     if(L.hc)bumpPath(L.hc,1);
+     if(L.hc)hcMove(L.hc,1,{name:j.name,phone:j.phone||"",date:j.date&&j.date<=iso(TODAY)?j.date:iso(TODAY),src:"j:"+j.id});
      if(L.to){const r=getPath(L.to);r.placed=(+r.placed||0)+1;if(+r.plan>0){r.plan--;L.planDec=true;}}
      j.status="완료";j.link=L;toast(`${j.name} 입사 — ${[L.hc&&"인원현황",L.to&&"TO"].filter(Boolean).join("·")||"숫자 반영 없이"} 처리`);}});}
 function unlinkJoin(j){const L=j.link;if(!L)return false;
-  if(L.hc&&getPath(L.hc)!=null)bumpPath(L.hc,-1);
+  if(L.hc&&getPath(L.hc)!=null)hcUnmove(L.hc,-1,"j:"+j.id);
   if(L.to){const r=getPath(L.to);if(r){r.placed=Math.max(0,(+r.placed||0)-1);if(L.planDec)r.plan=(+r.plan||0)+1;}}
   j.link=null;return true;}
-function unlinkQuit(q){if(q.link&&q.link.hc&&getPath(q.link.hc)!=null){bumpPath(q.link.hc,1);q.link=null;return true;}return false;}
+function unlinkQuit(q){if(q.link&&q.link.hc&&getPath(q.link.hc)!=null){hcUnmove(q.link.hc,1,"q:"+q.id);q.link=null;return true;}return false;}
 
 /* ---------- 퇴사자 공유 ---------- */
 const daysWorked=q=>q.inDate&&q.outDate?Math.round((new Date(q.outDate)-new Date(q.inDate))/864e5)+1:null;
@@ -1319,7 +1376,7 @@ function vQuit(){
 }
 function qForm(q){const n=!q;q=q||{co:"",branch:"본사",name:"",inDate:"",outDate:iso(TODAY),reason:""};
   modal(n?"퇴사자 등록":"퇴사자 수정",`<div class="row3">${F("업체",inp("co",q.co,"text","required"))}${F("지사",sel("branch",HC_TABS,q.branch))}${F("이름",inp("name",q.name,"text","required"))}</div><div class="row3">${F("입사일",inp("inDate",q.inDate,"date"))}${F("퇴사일",inp("outDate",q.outDate,"date","required"))}${F("사유",inp("reason",q.reason))}</div>${n?F("인원현황 · 합계인원 −1",`<span id="qHcWrap">${candSel("hc",hcCands(q.co),"인원현황에는 반영 안 함")}</span>`)+'<p class="sub">업체 칸을 다 쓰면 비슷한 업체가 자동으로 골라집니다.</p>':(q.link&&q.link.hc?`<p class="sub">인원현황 반영: ${esc(linkLabel(q.link.hc))} −1</p>`:"")}`,
-   {onSubmit:fd=>{const o=n?{id:uid()}:S.quits.find(x=>x.id===q.id);if(n&&fd.get("hc")){bumpPath(fd.get("hc"),-1);o.link={hc:fd.get("hc")};}Object.assign(o,{co:fd.get("co"),branch:fd.get("branch"),name:fd.get("name"),inDate:fd.get("inDate"),outDate:fd.get("outDate"),reason:fd.get("reason")});o.mgr=mgrOfCo(o.co);if(n)S.quits.push(o);toast("저장했습니다");},
+   {onSubmit:fd=>{const o=n?{id:uid()}:S.quits.find(x=>x.id===q.id);if(n&&fd.get("hc")){hcMove(fd.get("hc"),-1,{name:fd.get("name"),date:fd.get("outDate"),inDate:fd.get("inDate"),src:"q:"+o.id});o.link={hc:fd.get("hc")};}Object.assign(o,{co:fd.get("co"),branch:fd.get("branch"),name:fd.get("name"),inDate:fd.get("inDate"),outDate:fd.get("outDate"),reason:fd.get("reason")});o.mgr=mgrOfCo(o.co);if(n)S.quits.push(o);toast("저장했습니다");},
     extra:n?"":`<button type="button" class="btn danger" data-act="qDel" data-id="${q.id}">삭제</button>`});}
 
 /* ---------- 렌더 ---------- */
@@ -1347,7 +1404,7 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
     pw:()=>passwordModal(),accounts:()=>accountsModal(),logout:()=>logout(),budgetEdit:()=>budgetModal(),pushOn:()=>pushSetup(),
     role:()=>{S.viewer=v;S.role=ROLES[v].role||v;S.ui.showSales=false;S.ui.hcEdit=false;S.ui.toEdit=false;if(isBr())S.ui.condBr=myBr();toast(`${ROLES[v].label} 화면으로 바꿨습니다`);},
     tab:()=>{S.tab=v;scrollTo(0,0);},
-    hcBr:()=>S.ui.hcBr=v,hcSales:()=>{S.ui.showSales=!S.ui.showSales;},hcEdit:()=>S.ui.hcEdit=!S.ui.hcEdit,
+    hcBr:()=>S.ui.hcBr=v,hcPpl:()=>hcPeopleModal(el.dataset.p),hcSales:()=>{S.ui.showSales=!S.ui.showSales;},hcEdit:()=>S.ui.hcEdit=!S.ui.hcEdit,
     hcAdd:()=>{S.hc[S.ui.hcBr][+el.dataset.g].rows.push({id:uid(),gubun:"도급",period:P,pay:"",sales:"",mgr:"",co:"새 업체",cur:0,base:0});S.ui.hcEdit=true;},
     hcDel:()=>{if(confirm("이 줄을 삭제할까요?"))S.hc[S.ui.hcBr][+el.dataset.g].rows.splice(+el.dataset.i,1);},
     hcBase:()=>{const lbl=`${pad(TODAY.getMonth()+1)}월 ${pad(TODAY.getDate())}일 기준`;if(!confirm(`지금 인원을 '${lbl}' 기준 인원으로 저장할까요?\n(보통 매달 1일에 누릅니다. 증감이 0부터 다시 시작합니다.)`))return;
@@ -1417,7 +1474,7 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
       {onSubmit:fd=>{S.inv.push({id:uid(),co:fd.get("co"),branch:fd.get("branch"),kind:fd.get("kind"),due:+fd.get("due")||10,status:{}});}}),
   };
   const CHG={docUndo:"서류 전달 되돌리기",docDel:"서류 요청 취소",docFileDel:"서류 파일 빼기",hcAdd:"인원현황 줄 추가",hcDel:"인원현황 줄 삭제",hcBase:"기준 인원 저장",toAdd:"TO 줄 추가",toDel:"TO 줄 삭제",jSet:"입사예정자 결과 처리",jDel:"입사예정자 삭제",qDel:"퇴사자 삭제",postRead:"특이사항 확인",postDel:"특이사항 삭제",evDel:"일정 삭제",lvOk:"연차 승인",lvNo:"연차 반려",invSet:"계산서·명세표 O/X 표시",payDone:"주급·가불 지급완료",payUndo:"지급완료 취소",payBatch:"주급·가불 지급완료",payDel:"주급·가불 신청 삭제",arMemoAdd:"미수금 메모",arMemoPaid:"미수금 입금 확인",arMemoMiss:"미수금 미입금 표시",arMemoUndo:"미수금 되돌리기",arDel:"미수금 삭제",dlDel:"영업 건 삭제",adNewWk:"광고표 새 주 시작",adAddCo:"광고표 업체 추가"};
-  if(H[a]){if(CHG[a]&&S.role!=="ceo"){const t=S.tab;queueMicrotask(()=>{notifyCeoChange(CHG[a],t);save();renderHead();});}const opensModal=["pw","accounts","logout","budgetEdit","pushOn","docNew","docDone","invEdit","notif","payNew","payEdit","adPB","dlNew","dlEdit","dlDone","dlResult","arMemoFor","adUp","adCell","adAlias","jPaste","qPaste","jEdit","qNew","qEdit","calDay","evNew","evEdit","condEdit","postNew","arNew","arEdit","lvNew","invNew"].includes(a);H[a]();save();
+  if(H[a]){if(CHG[a]&&S.role!=="ceo"){const t=S.tab;queueMicrotask(()=>{notifyCeoChange(CHG[a],t);save();renderHead();});}const opensModal=["pw","accounts","logout","budgetEdit","pushOn","hcPpl","docNew","docDone","invEdit","notif","payNew","payEdit","adPB","dlNew","dlEdit","dlDone","dlResult","arMemoFor","adUp","adCell","adAlias","jPaste","qPaste","jEdit","qNew","qEdit","calDay","evNew","evEdit","condEdit","postNew","arNew","arEdit","lvNew","invNew"].includes(a);H[a]();save();
     if(!opensModal&&a!=="close"&&!document.querySelector(".overlay")){const y=scrollY;render();if(a!=="tab")scrollTo(0,y);}
     void keepModal;}
 });
