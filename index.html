@@ -160,6 +160,7 @@ table.x input[type=number]{width:64px}
 .checks{display:flex;flex-wrap:wrap;gap:6px 14px}
 .checks label{display:flex;align-items:center;gap:5px;font-size:13.5px}
 .field input[type=checkbox],.field input[type=radio]{width:auto;flex:none;padding:0;margin:0}
+.paytbl tr.paid td{opacity:.6}.paytbl td{vertical-align:top}.paysheet h3{flex-wrap:wrap;gap:8px}
 .colink{background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}.colink:hover{color:var(--brand);text-decoration-color:var(--brand)}
 .rb{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 7px;margin-left:4px;vertical-align:1px}.rb.rn{background:#DCE7FA;color:#1A458C}.rb.ro{background:#FBE0E0;color:#A32020}
 .pplist{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
@@ -543,9 +544,12 @@ function prow(label,a,b,unit=""){const p=pct(a,b);return `<div class="prow"><spa
 function diff(n){return n>0?`<span class="up">+${n}</span>`:n<0?`<span class="down">${n}</span>`:`<span class="zero">0</span>`;}
 function ph(title,desc,tools=""){return `<div class="ph"><div><h1 class="pt">${title}</h1>${desc?`<p>${desc}</p>`:""}</div><div class="tools">${tools}</div></div>`;}
 function toast(t){const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),1800);}
-let modalSubmit=null;
+let modalSubmit=null,modalDirty=false;
+document.addEventListener("input",e=>{if(e.target.closest&&e.target.closest("#mform"))modalDirty=true;},true);
+document.addEventListener("change",e=>{if(e.target.closest&&e.target.closest("#mform"))modalDirty=true;},true);
+function guardClose(){if(modalDirty&&modalSubmit){toast("작성 중인 내용이 있어 창을 닫지 않았습니다. 닫으려면 '닫기'를 누르세요");return false;}closeModal();return true;}
 function modal(title,body,{wide=false,submit="저장",onSubmit=null,extra=""}={}){
-  modalSubmit=onSubmit;
+  modalSubmit=onSubmit;modalDirty=false;
   document.getElementById("modal").innerHTML=`<div class="overlay" data-act="closeBg"><form class="modal ${wide?"wide":""}" id="mform" role="dialog" aria-modal="true" aria-label="${esc(title)}"><h2>${title}</h2>${body}<div class="actions">${extra}<span class="sp"></span><button type="button" class="btn" data-act="close">닫기</button>${onSubmit?`<button class="btn primary">${submit}</button>`:""}</div></form></div>`;
   const f=document.querySelector("#mform input,#mform textarea,#mform select");if(f)f.focus();
 }
@@ -913,25 +917,30 @@ function dayModal(k){const d=new Date(k);const es=ttEvents().filter(e=>e.date===
 
 /* ---------- 업체별 채용조건 ---------- */
 const CF=[["hours","근무시간"],["brk","휴게시간"],["pay","급여"],["ot","잔업·특근"],["wel","식대·통근·기숙사"],["caution","주의사항"]];
-function condList(){const m=new Map();
-  BRANCHES.forEach(b=>{HC_TABS.flatMap(t=>S.hc[t]||[]).filter(g=>g.branch===b).forEach(g=>g.rows.forEach(r=>{if(r.excluded)return;const k=b+"|"+r.co;if(!m.has(k))m.set(k,{key:k,branch:b,co:r.co,mgr:r.mgr,sales:r.sales,pay:r.pay,period:r.period,gubun:r.gubun,cur:r.cur,to:[]});}));
-    (S.to[b]||[]).forEach(t=>{const hit=[...m.values()].find(c=>c.branch===b&&(c.co.replace(/\s/g,"").includes(t.co.replace(/\(.*\)/,"").replace(/\s/g,""))||t.co.replace(/\s/g,"").includes(c.co.replace(/\(.*\)/,"").replace(/\s/g,""))));
-      const k=hit?hit.key:b+"|"+t.co;if(!m.has(k))m.set(k,{key:k,branch:b,co:t.co,mgr:t.mgr,sales:"",pay:"",period:"",gubun:"",cur:null,to:[]});m.get(k).to.push(t);});});
-  return [...m.values()];}
-function condPct(c){const d=S.conds[c.key]||{};return pct(CF.filter(([k])=>String(d[k]||"").trim()).length,CF.length);}
+const coKey2=s=>String(s||"").replace(/주식회사|\(주\)|㈜|\s/g,"").toLowerCase();
+function coSame(a,b){const x=coKey2(a),y=coKey2(b);if(!x||!y)return false;if(x===y)return true;const ax=CO_ALIAS[norm(a)],ay=CO_ALIAS[norm(b)];if(ax&&ax===ay&&!/\(/.test(a+b))return true;return x.length>=4&&y.length>=4&&lev1(x,y);}
+function condList(){const L=[];
+  BRANCHES.forEach(b=>{const add=(co,o)=>{let c=L.find(x=>x.branch===b&&coSame(x.co,co));if(c){const k=b+"|"+co;if(k!==c.key&&!c.alts.includes(k))c.alts.push(k);return c;}c={key:b+"|"+co,alts:[],branch:b,co,...o,to:[]};L.push(c);return c;};
+    HC_TABS.flatMap(t=>S.hc[t]||[]).filter(g=>g.branch===b).forEach(g=>g.rows.forEach(r=>{if(r.excluded)return;add(r.co,{mgr:r.mgr,sales:r.sales,pay:r.pay,period:r.period,gubun:r.gubun,cur:r.cur});}));
+    (S.to[b]||[]).forEach(t=>{let c=L.find(x=>x.branch===b&&coSame(x.co,t.co))||L.find(x=>x.branch===b&&(x.co.replace(/\s/g,"").includes(t.co.replace(/\(.*\)/,"").replace(/\s/g,""))||t.co.replace(/\s/g,"").includes(x.co.replace(/\(.*\)/,"").replace(/\s/g,""))));
+      if(c){const k=b+"|"+t.co;if(k!==c.key&&!c.alts.includes(k))c.alts.push(k);}else c=add(t.co,{mgr:t.mgr,sales:"",pay:"",period:"",gubun:"",cur:null});c.to.push(t);});});
+  return L;}
+const condData=c=>{const o={};[...(c.alts||[]),c.key].forEach(k=>{const d=S.conds[k]||{};Object.entries(d).forEach(([f,v])=>{if(String(v||"").trim())o[f]=v;});});return o;};
+function condPct(c){const d=condData(c);return pct(CF.filter(([k])=>String(d[k]||"").trim()).length,CF.length);}
+function condFilter(v){const q=String(v||"").trim().toLowerCase();let n=0;document.querySelectorAll("#condGrid .cond").forEach(el=>{const ok=!q||el.dataset.q.includes(q);el.style.display=ok?"":"none";if(ok)n++;});const em=document.getElementById("condEmpty");if(em)em.style.display=n?"none":"";}
 function vCond(){
-  const q=S.ui.condQ.trim(),br=S.ui.condBr;let list=condList().filter(c=>(br==="전체"||c.branch===br)&&(!q||c.co.includes(q)||String(c.mgr).includes(q)));
+  const q=S.ui.condQ.trim(),br=S.ui.condBr;let list=condList().filter(c=>(br==="전체"||c.branch===br));
   const all=condList();const done=all.filter(c=>condPct(c)===100).length;
   list.sort((a,b)=>condPct(b)-condPct(a));
   return ph("업체별 채용조건","신규 직원 교육·지사 지원용. 인원현황·TO의 정보는 자동으로 채워지고, 나머지는 '작성'에서 입력합니다.",`<input class="btn" style="min-width:200px" placeholder="업체·담당자 검색" data-ui="condQ" value="${esc(q)}" aria-label="검색">`)+
   `<div class="card" style="margin-bottom:14px"><div class="prow"><span>전체 작성률</span>${bar(pct(done,all.length))}<span class="v">${done}/${all.length}곳 · ${pct(done,all.length)}%</span></div></div>
   <div class="subtabs">${["전체",...BRANCHES].map(x=>`<button data-act="condBr" data-v="${x}" aria-pressed="${x===br}">${x}</button>`).join("")}</div>
-  <div class="grid g3">${list.map(c=>{const d=S.conds[c.key]||{};const p=condPct(c);const t0=c.to[0];
-   return `<div class="cond"><h4><span>${esc(c.co)} <span class="chip mute">${c.branch}</span></span><button class="btn sm" data-act="condEdit" data-k="${esc(c.key)}">작성</button></h4>
+  <div class="grid g3" id="condGrid">${list.map(c=>{const d=condData(c);const p=condPct(c);const t0=c.to[0];const qs=(c.co+" "+c.mgr+" "+(c.sales||"")).toLowerCase();
+   return `<div class="cond" data-q="${esc(qs)}" ${q&&!qs.includes(q.toLowerCase())?'style="display:none"':""}><h4><span>${esc(c.co)} <span class="chip mute">${c.branch}</span></span><button class="btn sm" data-act="condEdit" data-k="${esc(c.key)}">작성</button></h4>
     <div class="prow" style="grid-template-columns:auto 1fr auto;margin:4px 0"><span class="sub">작성</span>${bar(p)}<span class="v">${p}%</span></div>
     <dl><dt>담당</dt><dd>${esc(c.mgr)}${c.sales&&canSales()&&(!isBr()||c.branch===myBr())?` · 영업 ${esc(c.sales)}`:""}</dd>${c.pay?`<dt>월급일</dt><dd>${esc(c.pay)} (${esc(c.period)})</dd>`:""}
     ${t0?`<dt>모집</dt><dd>${c.to.map(t=>`${esc(t.job||"생산")} ${esc(t.sex)} ${t.to?t.to+"명":"상시"}`).join(" / ")}</dd><dt>나이·외국인</dt><dd>${esc(t0.age||"-")} · 외국인 ${esc(t0.foreign||"미정")}</dd>`:""}
-    ${CF.map(([k,l])=>`<dt>${l}</dt><dd class="${d[k]?"":"miss"}">${d[k]?esc(d[k]):"미입력"}</dd>`).join("")}</dl></div>`}).join("")||'<div class="empty">검색 결과가 없습니다.</div>'}</div>`;
+    ${CF.map(([k,l])=>`<dt>${l}</dt><dd class="${d[k]?"":"miss"}">${d[k]?esc(d[k]):"미입력"}</dd>`).join("")}</dl></div>`}).join("")}<div class="empty" id="condEmpty" ${list.some(c=>!q||(c.co+" "+c.mgr+" "+(c.sales||"")).toLowerCase().includes(q.toLowerCase()))?'style="display:none"':""}>검색 결과가 없습니다.</div></div>`;
 }
 
 /* ---------- 특이사항 ---------- */
@@ -1034,14 +1043,15 @@ function vLeave(){
   if(myAl!=null){const u=leaveUsed(me());html+=`<div class="card kpi" style="margin-bottom:14px">${ring(pct(myAl-u,myAl))}<div><span>${me()}님 잔여 연차</span><b>${myAl-u}일 / ${myAl}일</b><span>사용 ${u}일 · 대기 ${S.leave.reqs.filter(r=>r.name===me()&&r.status==="대기").reduce((s,r)=>s+r.days,0)}일</span></div></div>`;}
   if((isBoss()||isBr())&&pend.length)html+=`<div class="card" style="margin-bottom:14px"><h3>승인 대기 ${pend.length}건${isBr()?` <span class="sub">${myBr()} 지사 직원</span>`:""}</h3><div class="tw" style="border:0"><table class="x resp"><thead><tr><th>이름</th><th>종류</th><th>기간</th><th>일수</th><th>사유</th><th></th></tr></thead><tbody>${pend.map(r=>`<tr><td>${r.name}</td><td>${r.type}</td><td>${r.from}${r.to!==r.from?" ~ "+r.to:""}</td><td>${r.days}</td><td class="l">${esc(r.reason)}</td><td><button class="btn sm primary" data-act="lvOk" data-id="${r.id}">승인</button> <button class="btn sm danger" data-act="lvNo" data-id="${r.id}">반려</button></td></tr>`).join("")}</tbody></table></div></div>`;
   html+=`<div class="grid g2">${BRANCHES.filter(b=>STAFF.some(n=>brOf(n)===b)).map(b=>`<div class="card"><h3>${b}</h3><div class="mlist only-m">${STAFF.filter(n=>brOf(n)===b).map(n=>{const al=S.leave.alloc[n]||0,u=leaveUsed(n);return `<div class="mi"><div class="mt"><b>${n}</b> <span class="chip mute">${titleOf(n)}</span><div class="sub">부여 ${ceo?`<input type="number" step="0.5" data-set="leave.alloc.${n}" data-type="num" value="${al}" style="width:54px;border:1px solid var(--line);border-radius:4px;padding:1px 4px;background:var(--paper)" aria-label="${n} 부여 일수">`:al}일 · 사용 ${u}일</div></div><div class="mv"><b>${al-u}일</b><span class="sub">잔여</span>${bar(pct(al-u,al),pct(al-u,al)<30?"bad":"")}</div></div>`}).join("")}</div><div class="tw only-d" style="border:0"><table class="x"><thead><tr><th>이름</th><th>부여</th><th>사용</th><th>잔여</th><th style="min-width:120px">잔여율</th></tr></thead><tbody>${STAFF.filter(n=>brOf(n)===b).map(n=>{const a=S.leave.alloc[n]||0,u=leaveUsed(n);return `<tr><td class="l">${n} <span class="chip mute">${titleOf(n)}</span></td><td>${ceo?`<input type="number" step="0.5" data-set="leave.alloc.${n}" data-type="num" value="${a}" aria-label="${n} 부여 일수">`:a}</td><td>${u}</td><td class="cur">${a-u}</td><td>${bar(pct(a-u,a),pct(a-u,a)<30?"bad":"")}</td></tr>`}).join("")}</tbody></table></div></div>`).join("")}</div>
-  <div class="card" style="margin-top:14px"><h3>신청 내역</h3><div class="tw" style="border:0"><table class="x resp"><thead><tr><th>이름</th><th>종류</th><th>기간</th><th>일수</th><th>사유</th><th>상태</th></tr></thead><tbody>${[...S.leave.reqs].filter(r=>isBoss()||r.name===me()||r.status==="승인"||(isBr()&&brOf(r.name)===myBr())).sort((a,b)=>b.from.localeCompare(a.from)).map(r=>`<tr><td>${r.name}</td><td>${r.type}</td><td>${r.from}${r.to!==r.from?" ~ "+r.to:""}</td><td>${r.days}</td><td class="l">${isBoss()||r.name===me()?esc(r.reason):""}</td><td><span class="chip ${r.status==="승인"?"ok":r.status==="반려"?"late":"vis"}">${r.status}</span></td></tr>`).join("")}</tbody></table></div></div>`;
+  <div class="card" style="margin-top:14px"><h3>신청 내역</h3><div class="tw" style="border:0"><table class="x resp"><thead><tr><th>이름</th><th>종류</th><th>기간</th><th>일수</th><th>사유</th><th>상태</th></tr></thead><tbody>${[...S.leave.reqs].filter(r=>isBoss()||r.name===me()||r.status==="승인"||(isBr()&&brOf(r.name)===myBr())).sort((a,b)=>b.from.localeCompare(a.from)).map(r=>`<tr><td>${r.name}</td><td>${r.type}</td><td>${r.from}${r.to!==r.from?" ~ "+r.to:""}</td><td>${r.days}</td><td class="l">${isBoss()||r.name===me()?esc(r.reason):""}</td><td class="nowrap"><span class="chip ${r.status==="승인"?"ok":r.status==="반려"?"late":"vis"}">${r.status}</span>${(r.status==="대기"&&r.name===me())||isBoss()?` <button class="btn sm" data-act="lvEdit" data-id="${r.id}">수정</button>`:""}</td></tr>`).join("")}</tbody></table></div></div>`;
   return html;
 }
-function leaveForm(){
-  modal("연차 신청",`<div class="row3">${F("종류",`<select name="type"><option value="1">연차 (1일)</option><option value="0.5">반차 (0.5일)</option><option value="0.25">반반차 (0.25일)</option></select>`)}${F("시작일",inp("from",iso(addDays(TODAY,1)),"date","required"))}${F("종료일",inp("to",iso(addDays(TODAY,1)),"date","required"))}</div>${F("사유",inp("reason"))}<p class="sub">연차는 주말을 빼고 일수를 계산합니다.</p>`,
-   {submit:"신청",onSubmit:fd=>{const unit=+fd.get("type");const a=new Date(fd.get("from")),b=new Date(fd.get("to"));let d=0;
+function leaveForm(r){const ed=!!r;const ut=r?(r.type==="반차"?"0.5":r.type==="반반차"?"0.25":"1"):"1";
+  modal(ed?"연차 신청 수정":"연차 신청",`<div class="row3">${F("종류",`<select name="type">${[["1","연차 (1일)"],["0.5","반차 (0.5일)"],["0.25","반반차 (0.25일)"]].map(([v,l])=>`<option value="${v}" ${v===ut?"selected":""}>${l}</option>`).join("")}</select>`)}${F("시작일",inp("from",r?r.from:iso(addDays(TODAY,1)),"date","required"))}${F("종료일",inp("to",r?r.to:iso(addDays(TODAY,1)),"date","required"))}</div>${F("사유",inp("reason",r?r.reason||"":""))}<p class="sub">연차는 주말을 빼고 일수를 계산합니다.</p>`,
+   {submit:ed?"저장":"신청",extra:ed?`<button type="button" class="btn danger" data-act="lvDel" data-id="${r.id}">신청 취소</button>`:"",onSubmit:fd=>{const unit=+fd.get("type");const a=new Date(fd.get("from")),b=new Date(fd.get("to"));let d=0;
      if(unit<1)d=unit;else for(let x=new Date(a);x<=b;x=addDays(x,1))if(x.getDay()%6)d++;
-     S.leave.reqs.push({id:uid(),name:me(),type:unit===1?"연차":unit===0.5?"반차":"반반차",from:fd.get("from"),to:unit<1?fd.get("from"):fd.get("to"),days:d,reason:fd.get("reason"),status:"대기"});toast(`${d}일 신청했습니다`);}});
+     const o={type:unit===1?"연차":unit===0.5?"반차":"반반차",from:fd.get("from"),to:unit<1?fd.get("from"):fd.get("to"),days:d,reason:fd.get("reason")};
+     if(ed){Object.assign(r,o);toast(`수정했습니다 (${d}일)`);}else{S.leave.reqs.push({id:uid(),name:me(),...o,status:"대기"});toast(`${d}일 신청했습니다`);}}});
 }
 
 /* ---------- 계산서·명세표 ---------- */
@@ -1083,8 +1093,10 @@ function parsePay(text){const blocks=String(text||"").split(/\n\s*\n/);const out
         const day={date:md(dm[1]+"/"+dm[2]),start:tm?tm[1]:"",end:tm?tm[2]:"",note:tm?tm[3].trim():rest};day.h=tm?Math.round(workHours(tm[1],tm[2])*10)/10:0;
         (cur?cur.days:pend).push(day);return;}
       const amt=l.match(/([\d][\d,.]*)\s*(만)?\s*원/);if(amt&&cur){cur.amt=Math.round(parseFloat(amt[1].replace(/,/g,""))*(amt[2]?1e4:1));return;}
+      let amtH=0,tH="";if(amt){amtH=Math.round(parseFloat(amt[1].replace(/,/g,""))*(amt[2]?1e4:1));l=l.replace(amt[0],"").trim();}
+      const tw=l.match(/\s*(가불|주급)\s*/);if(tw){tH=tw[1];l=l.replace(tw[0]," ").trim();}if(!l){if(cur&&amtH)cur.amt=amtH;return;}
       let co="",name="";const sp=l.lastIndexOf(" ");if(sp>0){co=l.slice(0,sp).trim();name=l.slice(sp+1).trim();}else{const mm=l.match(/^(.*?)([가-힣]{3})$/);if(mm){co=mm[1];name=mm[2];}else{name=l;}}
-      cur={co,name,days:pend.splice(0),amt:0};out.push(cur);});
+      cur={co,name,days:pend.splice(0),amt:amtH};if(tH)cur.type=tH;out.push(cur);});
     if(pend.length&&out.length)out[out.length-1].days.push(...pend);});
   out.forEach(o=>{if(/^[a-z0-9 .&-]+$/i.test(o.co))o.co=o.co.toUpperCase();if(!o.type)o.type=typeHint||"주급";o.hours=Math.round(o.days.reduce((s,d)=>s+(d.h||0),0)*10)/10;o.workDays=o.days.filter(d=>d.h>0).length;});return out;}
 function payLine(p){const paid=p.status==="지급완료";
@@ -1092,7 +1104,73 @@ function payLine(p){const paid=p.status==="지급완료";
    <div class="sub">${p.days.map(d=>`${mdShort(d.date)} ${d.start?d.start+"~"+d.end:""}${d.note?" "+esc(d.note):""}`).join(" · ")}</div>
    <div class="sub">근무 ${p.workDays}일 · ${p.hours}시간 (휴게 포함)${paid?` · <span style="color:var(--ok)">${esc(p.paidBy)} ${mdShort(p.paidAt)} 지급완료</span>`:""}</div></div>
    <div class="jst">${paid?`<span class="chip ok">지급완료</span>${canPay()?`<button class="btn sm" data-act="payUndo" data-id="${p.id}">되돌리기</button>`:""}`:`<span class="chip mute">지급 대기</span>${canPay()?`<button class="btn sm primary" data-act="payDone" data-id="${p.id}">지급완료</button>`:""}`}
-   ${!paid&&(p.by===me()||canPay())?`<button class="btn sm" data-act="payEdit" data-id="${p.id}" aria-label="수정">✎</button>`:""}</div></div>`;}
+   ${!paid&&(p.by===me()||canPay())?`<button class="btn sm" data-act="payEdit" data-id="${p.id}">수정</button>`:""}</div></div>`;}
+/* 담당자별·주별 취합 시트 */
+const payWk=at=>{const d=new Date(String(at).slice(0,10));return iso(addDays(d,-((d.getDay()+6)%7)));};
+const payDaysTxt=p=>p.days.map(d=>`${mdShort(d.date)} ${d.start?d.start+"~"+d.end:""}${d.note?" "+d.note:""}`.trim()).join(", ");
+function paySheets(L){const g={};L.forEach(p=>{const k=p.by+"|"+payWk(p.at);(g[k]=g[k]||[]).push(p);});
+  return Object.entries(g).map(([k,ps])=>({k,by:ps[0].by,wk:payWk(ps[0].at),ps:ps.sort((a,b)=>(a.type===b.type?0:a.type==="가불"?-1:1)||String(a.co).localeCompare(String(b.co),"ko")||String(a.name).localeCompare(String(b.name),"ko"))}))
+   .sort((a,b)=>b.wk.localeCompare(a.wk)||a.by.localeCompare(b.by,"ko"));}
+function paySheetCard(sh){const ps=sh.ps,wait=ps.filter(p=>p.status!=="지급완료");const gb=ps.filter(p=>p.type==="가불"),jb=ps.filter(p=>p.type==="주급");
+  const sum=a=>a.reduce((t,p)=>t+(+p.amt||0),0);const nB=new Set(ps.map(p=>p.batch)).size;
+  return `<div class="card paysheet"><h3><span>${esc(sh.by)} <span class="sub">${wkLabel(sh.wk)} 주 · 신청 ${nB}회 · ${ps.length}명 (가불 ${gb.length} · 주급 ${jb.length})</span></span>
+   <span class="tools">${canPay()&&wait.length?`<button class="btn sm primary" data-act="paySheetDone" data-v="${wait.map(p=>p.id).join(",")}">대기 ${wait.length}명 모두 지급완료</button>`:""}<button class="btn sm" data-act="payCsv" data-v="${esc(sh.k)}">엑셀로 받기</button></span></h3>
+   <div class="tw" style="border:0"><table class="x resp paytbl"><thead><tr><th>구분</th><th>업체</th><th>이름</th><th>근무 내역</th><th>일·시간</th><th>금액</th><th>상태</th></tr></thead><tbody>
+   ${ps.map(p=>{const paid=p.status==="지급완료";return `<tr class="${paid?"paid":""}"><td><span class="chip ${p.type==="가불"?"vis":""}">${p.type}</span></td><td>${esc(p.co)}</td><td><b>${esc(p.name)}</b></td><td class="l"><span class="sub">${esc(payDaysTxt(p))}</span></td><td class="num">${p.workDays}일 · ${p.hours}h</td>
+     <td class="num">${p.type==="주급"&&canPay()&&!paid?`<input type="number" data-payamt="${p.id}" value="${p.amt||""}" placeholder="금액" step="1000" min="0" style="width:100px" aria-label="${esc(p.name)} 주급 금액">`:p.amt?won(p.amt):'<span class="sub">-</span>'}</td>
+     <td class="nowrap">${paid?`<span class="chip ok">지급완료</span>${canPay()?` <button class="btn sm" data-act="payUndo" data-id="${p.id}">되돌리기</button>`:""}`:`${canPay()?`<button class="btn sm primary" data-act="payDone" data-id="${p.id}">지급완료</button>`:'<span class="chip mute">대기</span>'}`}${!paid&&(p.by===me()||canPay())?` <button class="btn sm" data-act="payEdit" data-id="${p.id}">수정</button>`:""}</td></tr>`}).join("")}
+   <tr class="tot"><td colspan="4" class="l">합계 ${ps.length}명</td><td></td><td class="num">${gb.length?`가불 ${won(sum(gb))}`:""}${gb.length&&sum(jb)?"<br>":""}${sum(jb)?`주급 ${won(sum(jb))}`:""}</td><td>${wait.length?`대기 ${wait.length}`:"모두 완료"}</td></tr></tbody></table></div></div>`;}
+/* 간단한 엑셀(.xlsx) 만들기 — 외부 라이브러리 없이 */
+const CRC_T=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}return t;})();
+function crc32(u){let c=0xFFFFFFFF;for(let i=0;i<u.length;i++)c=CRC_T[(c^u[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+function zipStore(files){const enc=new TextEncoder();const parts=[],cen=[];let off=0;
+  files.forEach(([name,str])=>{const nm=enc.encode(name),data=enc.encode(str),crc=crc32(data);
+    const h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint32(14,crc,true);h.setUint32(18,data.length,true);h.setUint32(22,data.length,true);h.setUint16(26,nm.length,true);
+    parts.push(new Uint8Array(h.buffer),nm,data);
+    const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint32(16,crc,true);c.setUint32(20,data.length,true);c.setUint32(24,data.length,true);c.setUint16(28,nm.length,true);c.setUint32(42,off,true);
+    cen.push(new Uint8Array(c.buffer),nm);off+=30+nm.length+data.length;});
+  const cs=cen.reduce((t,x)=>t+x.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
+  return new Blob([...parts,...cen,new Uint8Array(e.buffer)],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});}
+const xe=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const colL=n=>{let s="";n++;while(n){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=(n-m-1)/26;}return s;};
+/* cells: [{r,c,v,s,f}] s=스타일번호, f=수식 */
+function xlsxBlob(sheet,cells,widths,freezeRow){const rows={};cells.forEach(x=>(rows[x.r]=rows[x.r]||[]).push(x));
+  const sd=Object.keys(rows).map(Number).sort((a,b)=>a-b).map(r=>`<row r="${r+1}">${rows[r].sort((a,b)=>a.c-b.c).map(x=>{const ref=colL(x.c)+(r+1),st=x.s?` s="${x.s}"`:"";
+    if(x.f)return `<c r="${ref}"${st}><f>${xe(x.f)}</f></c>`;if(typeof x.v==="number")return `<c r="${ref}"${st}><v>${x.v}</v></c>`;if(x.v==null||x.v==="")return `<c r="${ref}"${st}/>`;
+    return `<c r="${ref}"${st} t="inlineStr"><is><t xml:space="preserve">${xe(x.v)}</t></is></c>`;}).join("")}</row>`).join("");
+  const ws=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${freezeRow?`<sheetViews><sheetView workbookViewId="0"><pane ySplit="${freezeRow}" topLeftCell="A${freezeRow+1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`:""}<cols>${widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("")}</cols><sheetData>${sd}</sheetData></worksheet>`;
+  const B='<border><left style="thin"><color rgb="FFC9D1DA"/></left><right style="thin"><color rgb="FFC9D1DA"/></right><top style="thin"><color rgb="FFC9D1DA"/></top><bottom style="thin"><color rgb="FFC9D1DA"/></bottom><diagonal/></border>';
+  const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0;-#,##0;&quot;-&quot;"/></numFmts>
+<fonts count="4"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><name val="Arial"/></font><font><b/><sz val="14"/><name val="Arial"/></font><font><sz val="10"/><color rgb="FF5C6B7A"/><name val="Arial"/></font></fonts>
+<fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF2D2"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF7DB"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEEF2F6"/></patternFill></fill></fills>
+<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>${B}</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="11"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+<xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="top"/></xf>
+<xf numFmtId="164" fontId="0" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="top"/></xf>
+<xf numFmtId="164" fontId="1" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1"/>
+<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="1" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>
+<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="top"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+  const sn=xe(String(sheet).replace(/[\\\/?*\[\]:]/g," ").slice(0,31));
+  return zipStore([["[Content_Types].xml",'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
+    ["_rels/.rels",'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+    ["xl/workbook.xml",`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${sn}" sheetId="1" r:id="rId1"/></sheets><calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>`],
+    ["xl/_rels/workbook.xml.rels",'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
+    ["xl/styles.xml",styles],["xl/worksheets/sheet1.xml",ws]]);}
+function saveBlob(blob,name){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},800);}
+function payXlsx(k){const [by,wk]=k.split("|");const ps=(paySheets(S.pays.filter(p=>payVisBR().includes(p.branch))).find(x=>x.k===k)||{ps:[]}).ps;
+  const C=[];const put=(r,c,v,s,f)=>C.push({r,c,v,s,f});
+  put(0,0,`주급·가불 취합 — ${by} (${wkLabel(wk)} 주)`,7);put(1,0,`내려받은 시각 ${nowLocal().replace("T"," ").slice(0,16)} · 하랑 업무 허브`,8);
+  ["구분","업체","이름","근무 내역","근무일수","근무시간","금액(원)","상태","지급자","지급일"].forEach((h,i)=>put(3,i,h,1));
+  ps.forEach((p,i)=>{const r=4+i,g=p.type==="가불";const s=g?3:2,sn=g?5:4,sc=g?10:2;
+    put(r,0,p.type,sc);put(r,1,p.co,s);put(r,2,p.name,s);put(r,3,payDaysTxt(p),s);put(r,4,+p.workDays||0,sn);put(r,5,+p.hours||0,sn);put(r,6,p.amt?+p.amt:"",sn);put(r,7,p.status,sc);put(r,8,p.paidBy||"",s);put(r,9,p.paidAt||"",s);});
+  const e=4+ps.length,t=e+1;const R=n=>`${n}${4+1}:${n}${e}`;
+  [["가불 합계",`SUMIF(A5:A${e},"가불",G5:G${e})`],["주급 합계 (입력된 금액)",`SUMIF(A5:A${e},"주급",G5:G${e})`],["총 인원",`COUNTA(C5:C${e})`],["지급 대기",`COUNTIF(H5:H${e},"대기")`]].forEach(([l,f],i)=>{put(t+i,5,l,9);put(t+i,6,null,6,f);});
+  saveBlob(xlsxBlob(`${by} ${wk.slice(5)}`,C,[8,16,10,46,9,9,13,9,10,12],4),`주급가불_${by}_${wk}.xlsx`);toast("엑셀 파일로 내려받습니다");}
 function vPay(){const f=S.ui.payF||"wait";const brs=payVisBR();const L=S.pays.filter(p=>brs.includes(p.branch));
   const wait=L.filter(p=>p.status!=="지급완료"),mon=ym(TODAY);const doneM=L.filter(p=>p.status==="지급완료"&&(p.paidAt||"").startsWith(mon));
   const show=(f==="wait"?wait:f==="done"?L.filter(p=>p.status==="지급완료"):L);
@@ -1103,9 +1181,10 @@ function vPay(){const f=S.ui.payF||"wait";const brs=payVisBR();const L=S.pays.fi
   `<div class="grid g3" style="margin-bottom:14px"><div class="card"><span class="sub">지급 대기</span><div class="big ${wait.length?"up":""}">${wait.length}명</div><span class="sub">주급 ${wait.filter(p=>p.type==="주급").length} · 가불 ${wait.filter(p=>p.type==="가불").length}</span></div>
    <div class="card"><span class="sub">${TODAY.getMonth()+1}월 지급완료</span><div class="big" style="color:var(--ok)">${doneM.length}명</div>${doneM.some(p=>p.amt)?`<span class="sub">${won(doneM.reduce((s,p)=>s+(+p.amt||0),0))}원</span>`:""}</div>
    <div class="card"><span class="sub">업체별 대기</span>${Object.entries(wait.reduce((a,p)=>(a[p.co]=(a[p.co]||0)+1,a),{})).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([c,n])=>`<div class="prow"><span>${esc(c)}</span>${bar(pct(n,wait.length)," ")}<span class="v">${n}명</span></div>`).join("")||'<span class="sub">없음</span>'}</div></div>
-  <div class="subtabs">${[["wait","지급 대기"],["done","지급완료"],["all","전체"]].map(([k,l])=>`<button data-act="payF" data-v="${k}" aria-pressed="${f===k}">${l}</button>`).join("")}</div>
-  <div class="grid">${bl.map(ps=>{const p0=ps[0];const nw=ps.filter(p=>p.status!=="지급완료").length;
-    return `<div class="card"><h3><span>${esc(p0.by)} <span class="sub">${mdShort(p0.at.slice(0,10))} ${p0.at.slice(11,16)} · ${p0.branch} · ${ps.length}명</span></span>${canPay()&&nw>1?`<button class="btn sm primary" data-act="payBatch" data-v="${p0.batch}">${nw}명 모두 지급완료</button>`:""}</h3>${ps.map(payLine).join("")}</div>`;}).join("")||'<div class="empty">해당하는 신청이 없습니다.</div>'}</div>`;}
+  <div class="tools" style="justify-content:space-between;margin-bottom:10px"><div class="subtabs" style="margin:0">${[["wait","지급 대기"],["done","지급완료"],["all","전체"]].map(([k,l])=>`<button data-act="payF" data-v="${k}" aria-pressed="${f===k}">${l}</button>`).join("")}</div>
+   <div class="subtabs" style="margin:0">${[["sheet","담당자별 취합"],["list","신청한 순서대로"]].map(([k,l])=>`<button data-act="payView" data-v="${k}" aria-pressed="${(S.ui.payView||"sheet")===k}">${l}</button>`).join("")}</div></div>
+  ${(S.ui.payView||"sheet")==="sheet"?`<p class="sub" style="margin-top:0">한 사람이 그 주(월~일)에 올린 신청을 한 장으로 모았습니다. 가불이 위, 주급이 아래에 업체순으로 정리됩니다.</p><div class="grid">${paySheets(show).map(paySheetCard).join("")||'<div class="empty">해당하는 신청이 없습니다.</div>'}</div>`:`<div class="grid">${bl.map(ps=>{const p0=ps[0];const nw=ps.filter(p=>p.status!=="지급완료").length;
+    return `<div class="card"><h3><span>${esc(p0.by)} <span class="sub">${mdShort(p0.at.slice(0,10))} ${p0.at.slice(11,16)} · ${p0.branch} · ${ps.length}명</span></span>${canPay()&&nw>1?`<button class="btn sm primary" data-act="payBatch" data-v="${p0.batch}">${nw}명 모두 지급완료</button>`:""}</h3>${ps.map(payLine).join("")}</div>`;}).join("")||'<div class="empty">해당하는 신청이 없습니다.</div>'}</div>`}`;}
 function payNewForm(){modal("주급·가불 신청",`<div class="row2">${F("구분",sel("type",["주급","가불"],"주급"))}${F("지사",sel("branch",payVisBR(),myBr()))}</div>
   <label class="field"><span>카톡에 쓰던 그대로 붙여 넣기</span><textarea name="t" id="payT" style="min-height:200px" placeholder="세연기술 권대욱&#10;10/7 08:30 ~ 19:30&#10;10/8 08:30 ~ 19:30&#10;&#10;PCM 최도영&#10;10/6 9:00~18:00&#10;10/7 9:00~16:00"></textarea></label>
   <p class="sub">사람마다 빈 줄로 띄워 주세요. ‘업체 이름’ 줄은 날짜 위에 써도 되고 아래에 써도 됩니다. 가불은 금액(예: 30만원)을 같이 적어 주세요. 주급 금액은 경영지원팀이 넣습니다.</p><div id="payPv" class="sub"></div>`,
@@ -1392,12 +1471,12 @@ if(el.dataset.ui==="docMine"){S.ui.docMine=el.checked;save();render();return;}if
     setTimeout(()=>{const a=document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.set;const y=scrollY;render();scrollTo(0,y);if(a){const n=document.querySelector(`[data-set="${CSS.escape(a)}"]`);if(n)n.focus();}},0);}
   if(el.dataset.ui==="ttDate"){S.ui.ttDate=el.value;save();render();}
 });
-document.addEventListener("input",e=>{if(/^[ok]amt_/.test(e.target.name||"")){const c=e.target.form&&e.target.form.querySelector(`input[name="${e.target.name[0]}"][value="${CSS.escape(e.target.name.slice(5))}"]`);if(c)c.checked=!!e.target.value;return;}if(e.target.id==="payT"){payPreview(e.target);return;}if(e.target.id==="arMemoIn"){S.ui.arDraft=e.target.value;const pv=parseArMemo(e.target.value);const sel=document.getElementById("arCoSel");if(pv.coId&&sel&&!S.ui.arCo)sel.value=pv.coId;const L=arList();const v=e.target.value;document.getElementById("arPv").innerHTML=v?`읽은 내용: ${(pv.coId||sel.value)?`<b>${esc((L.find(r=>r.id===(pv.coId||sel.value))||{}).co)}</b>`:'<span class="up">거래처를 골라 주세요</span>'} · ${pv.due?`상환 예정일 <b>${mdShort(pv.due)}</b>`:"날짜 없음(일반 메모)"} · ${pv.amt?`<b>${won(pv.amt)}원</b>`:"금액 없음"}`:"";return;}if(e.target.name==="co"&&document.getElementById("qHcWrap")){document.getElementById("qHcWrap").innerHTML=candSel("hc",hcCands(e.target.value),"인원현황에는 반영 안 함");return;}if(e.target.id==="pasteT"){pastePreview(e.target);return;}if(e.target.dataset.ui==="condQ"){S.ui.condQ=e.target.value;const pos=e.target.selectionStart;render();const n=document.querySelector('[data-ui="condQ"]');n.focus();n.setSelectionRange(pos,pos);}});
+document.addEventListener("input",e=>{if(/^[ok]amt_/.test(e.target.name||"")){const c=e.target.form&&e.target.form.querySelector(`input[name="${e.target.name[0]}"][value="${CSS.escape(e.target.name.slice(5))}"]`);if(c)c.checked=!!e.target.value;return;}if(e.target.id==="payT"){payPreview(e.target);return;}if(e.target.id==="arMemoIn"){S.ui.arDraft=e.target.value;const pv=parseArMemo(e.target.value);const sel=document.getElementById("arCoSel");if(pv.coId&&sel&&!S.ui.arCo)sel.value=pv.coId;const L=arList();const v=e.target.value;document.getElementById("arPv").innerHTML=v?`읽은 내용: ${(pv.coId||sel.value)?`<b>${esc((L.find(r=>r.id===(pv.coId||sel.value))||{}).co)}</b>`:'<span class="up">거래처를 골라 주세요</span>'} · ${pv.due?`상환 예정일 <b>${mdShort(pv.due)}</b>`:"날짜 없음(일반 메모)"} · ${pv.amt?`<b>${won(pv.amt)}원</b>`:"금액 없음"}`:"";return;}if(e.target.name==="co"&&document.getElementById("qHcWrap")){document.getElementById("qHcWrap").innerHTML=candSel("hc",hcCands(e.target.value),"인원현황에는 반영 안 함");return;}if(e.target.id==="pasteT"){pastePreview(e.target);return;}if(e.target.dataset.ui==="condQ"){S.ui.condQ=e.target.value;condFilter(e.target.value);return;}});
 document.addEventListener("submit",e=>{if(e.target.id!=="mform")return;e.preventDefault();const fn=modalSubmit;const ttl=(e.target.querySelector("h2")||{}).textContent||"";const tab=S.tab;closeModal();if(fn)fn(new FormData(e.target));notifyCeoChange(ttl.replace(/\s+/g," ").trim(),tab);save();render();});
-document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="arMemoIn"){e.preventDefault();document.querySelector('[data-act="arMemoAdd"]').click();return;}if(e.key==="Escape"&&modalSubmit!==undefined&&document.querySelector(".overlay"))closeModal();});
+document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="arMemoIn"){e.preventDefault();document.querySelector('[data-act="arMemoAdd"]').click();return;}if(e.key==="Escape"&&modalSubmit!==undefined&&document.querySelector(".overlay"))guardClose();});
 document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(df){e.preventDefault();openDocFile(df.dataset.id,+df.dataset.i);return;}}
   const el=e.target.closest("[data-act]");if(!el)return;const a=el.dataset.act,v=el.dataset.v;
-  if(a==="closeBg"){if(e.target===el)closeModal();return;}
+  if(a==="closeBg"){if(e.target===el)guardClose();return;}
   const keepModal=["evDel","evEdit","arDel"];
   const H={
     close:()=>closeModal(),
@@ -1426,7 +1505,7 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
     evEdit:()=>{e.stopPropagation();evForm(S.events.find(x=>x.id===el.dataset.id));},
     evDel:()=>{S.events=S.events.filter(x=>x.id!==el.dataset.id);closeModal();toast("삭제했습니다");},
     condBr:()=>S.ui.condBr=v,
-    condEdit:()=>{const k=el.dataset.k;const c=condList().find(x=>x.key===k);const d=S.conds[k]||{};
+    condEdit:()=>{const k=el.dataset.k;const c=condList().find(x=>x.key===k);const d=condData(c);
       modal(`${esc(c.co)} 채용조건`,CF.map(([f,l])=>F(l,f==="caution"?`<textarea name="${f}">${esc(d[f]||"")}</textarea>`:inp(f,d[f]||""))).join(""),{onSubmit:fd=>{S.conds[k]=Object.fromEntries(CF.map(([f])=>[f,fd.get(f)]));toast("저장했습니다");}});},
     jPaste:()=>jPasteForm("join"),qPaste:()=>jPasteForm("quit"),
     jEdit:()=>jForm(S.joins.find(x=>x.id===el.dataset.id)),jDel:()=>{const jj=S.joins.find(x=>x.id===el.dataset.id);if(unlinkJoin(jj))toast("인원현황·TO 숫자도 되돌렸습니다");S.joins=S.joins.filter(x=>x.id!==el.dataset.id);closeModal();},
@@ -1450,7 +1529,8 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
     arMemoMiss:()=>{const r=S.ar.find(x=>x.id===el.dataset.r),m=r.memos.find(x=>x.id===el.dataset.m);m.done="미입금";if(r.stage<1)r.stage=1;toast(`${r.co} 미입금으로 표시했습니다`);},
     arMemoUndo:()=>{const r=S.ar.find(x=>x.id===el.dataset.r),m=r.memos.find(x=>x.id===el.dataset.m);if(m.done==="입금"&&m.added){r.paid=Math.max(0,r.paid-m.added);if(r.stage===3&&r.paid<r.billed)r.stage=2;}m.done=null;m.added=0;toast("되돌렸습니다");},arEdit:()=>arForm(S.ar.find(x=>x.id===el.dataset.id)),
     arDel:()=>{if(confirm("삭제할까요?")){S.ar=S.ar.filter(x=>x.id!==el.dataset.id);closeModal();}},
-    lvNew:()=>leaveForm(),
+    lvNew:()=>leaveForm(),lvEdit:()=>leaveForm(S.leave.reqs.find(r=>r.id===el.dataset.id)),
+    lvDel:()=>{const r=S.leave.reqs.find(r=>r.id===el.dataset.id);if(!r||!confirm(`${r.name} ${r.from} 연차 신청을 취소(삭제)할까요?`))return;S.leave.reqs=S.leave.reqs.filter(x=>x.id!==r.id);closeModal();toast("연차 신청을 취소했습니다");},
     lvOk:()=>{const r=S.leave.reqs.find(r=>r.id===el.dataset.id);r.status="승인";notify([r.name],`연차 승인: ${r.from}${r.to!==r.from?" ~ "+r.to:""} (${r.days}일)`,"leave");toast("승인했습니다");},
     lvNo:()=>{const r=S.leave.reqs.find(r=>r.id===el.dataset.id);r.status="반려";notify([r.name],`연차 반려: ${r.from}`,"leave");toast("반려했습니다");},
     invM:()=>{const [y,m]=S.ui.invYm.split("-").map(Number);S.ui.invYm=ym(new Date(y,m-1+(+v),1));},
@@ -1463,7 +1543,8 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
     docUndo:()=>{const d=S.docreqs.find(x=>x.id===el.dataset.id);d.status="대기";delete d.doneBy;delete d.doneAt;},
     docDel:()=>{if(confirm("이 요청을 취소할까요?"))S.docreqs=S.docreqs.filter(x=>x.id!==el.dataset.id);},
     docFileDel:()=>{const d=S.docreqs.find(x=>x.id===el.dataset.id);const f=d.files.splice(+el.dataset.i,1)[0];if(f&&f.path)sb.storage.from("hub-files").remove([f.path]);},
-    payNew:()=>payNewForm(),payF:()=>S.ui.payF=v,payEdit:()=>payEditForm(S.pays.find(p=>p.id===el.dataset.id)),
+    payNew:()=>payNewForm(),payF:()=>S.ui.payF=v,payView:()=>S.ui.payView=v,payCsv:()=>payXlsx(v),
+    paySheetDone:()=>{const ids=v.split(",");const ps=S.pays.filter(p=>ids.includes(p.id)&&p.status!=="지급완료");ps.forEach(p=>{p.status="지급완료";p.paidBy=me();p.paidAt=iso(TODAY);});const by=[...new Set(ps.map(p=>p.by))];by.forEach(b=>{const m=ps.filter(p=>p.by===b);notify([b],`주급·가불 ${m.length}명 지급완료 (${m.map(p=>p.name).slice(0,3).join(", ")}${m.length>3?" 외":""})`,"pay");});toast(`${ps.length}명 지급완료`);},payEdit:()=>payEditForm(S.pays.find(p=>p.id===el.dataset.id)),
     payDel:()=>{S.pays=S.pays.filter(p=>p.id!==el.dataset.id);closeModal();},
     payDone:()=>{const p=S.pays.find(x=>x.id===el.dataset.id);p.status="지급완료";p.paidBy=me();p.paidAt=iso(TODAY);notify([p.by],`${p.type} 지급완료: ${p.co} ${p.name}${p.amt?" "+won(p.amt)+"원":""}`,"pay");toast(`${p.name} 지급완료`);},
     payUndo:()=>{const p=S.pays.find(x=>x.id===el.dataset.id);p.status="대기";delete p.paidBy;delete p.paidAt;},
@@ -1473,8 +1554,8 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
     invNew:()=>modal("계산서 거래처 추가",`<div class="row2">${F("거래처",inp("co","","text","required"))}${F("지사",sel("branch",BRANCHES,"본사"))}</div><div class="row2">${F("발행 서류",sel("kind",["계산서","명세표","계산서+명세표"],"계산서"))}${F("매월 발행일",inp("due",10,"number",'min="1" max="31"'))}</div>`,
       {onSubmit:fd=>{S.inv.push({id:uid(),co:fd.get("co"),branch:fd.get("branch"),kind:fd.get("kind"),due:+fd.get("due")||10,status:{}});}}),
   };
-  const CHG={docUndo:"서류 전달 되돌리기",docDel:"서류 요청 취소",docFileDel:"서류 파일 빼기",hcAdd:"인원현황 줄 추가",hcDel:"인원현황 줄 삭제",hcBase:"기준 인원 저장",toAdd:"TO 줄 추가",toDel:"TO 줄 삭제",jSet:"입사예정자 결과 처리",jDel:"입사예정자 삭제",qDel:"퇴사자 삭제",postRead:"특이사항 확인",postDel:"특이사항 삭제",evDel:"일정 삭제",lvOk:"연차 승인",lvNo:"연차 반려",invSet:"계산서·명세표 O/X 표시",payDone:"주급·가불 지급완료",payUndo:"지급완료 취소",payBatch:"주급·가불 지급완료",payDel:"주급·가불 신청 삭제",arMemoAdd:"미수금 메모",arMemoPaid:"미수금 입금 확인",arMemoMiss:"미수금 미입금 표시",arMemoUndo:"미수금 되돌리기",arDel:"미수금 삭제",dlDel:"영업 건 삭제",adNewWk:"광고표 새 주 시작",adAddCo:"광고표 업체 추가"};
-  if(H[a]){if(CHG[a]&&S.role!=="ceo"){const t=S.tab;queueMicrotask(()=>{notifyCeoChange(CHG[a],t);save();renderHead();});}const opensModal=["pw","accounts","logout","budgetEdit","pushOn","hcPpl","docNew","docDone","invEdit","notif","payNew","payEdit","adPB","dlNew","dlEdit","dlDone","dlResult","arMemoFor","adUp","adCell","adAlias","jPaste","qPaste","jEdit","qNew","qEdit","calDay","evNew","evEdit","condEdit","postNew","arNew","arEdit","lvNew","invNew"].includes(a);H[a]();save();
+  const CHG={docUndo:"서류 전달 되돌리기",docDel:"서류 요청 취소",docFileDel:"서류 파일 빼기",hcAdd:"인원현황 줄 추가",hcDel:"인원현황 줄 삭제",hcBase:"기준 인원 저장",toAdd:"TO 줄 추가",toDel:"TO 줄 삭제",jSet:"입사예정자 결과 처리",jDel:"입사예정자 삭제",qDel:"퇴사자 삭제",postRead:"특이사항 확인",postDel:"특이사항 삭제",evDel:"일정 삭제",lvOk:"연차 승인",lvNo:"연차 반려",lvDel:"연차 신청 취소",invSet:"계산서·명세표 O/X 표시",payDone:"주급·가불 지급완료",payUndo:"지급완료 취소",payBatch:"주급·가불 지급완료",paySheetDone:"주급·가불 지급완료",payDel:"주급·가불 신청 삭제",arMemoAdd:"미수금 메모",arMemoPaid:"미수금 입금 확인",arMemoMiss:"미수금 미입금 표시",arMemoUndo:"미수금 되돌리기",arDel:"미수금 삭제",dlDel:"영업 건 삭제",adNewWk:"광고표 새 주 시작",adAddCo:"광고표 업체 추가"};
+  if(H[a]){if(CHG[a]&&S.role!=="ceo"){const t=S.tab;queueMicrotask(()=>{notifyCeoChange(CHG[a],t);save();renderHead();});}const opensModal=["pw","accounts","logout","budgetEdit","pushOn","lvEdit","hcPpl","docNew","docDone","invEdit","notif","payNew","payEdit","adPB","dlNew","dlEdit","dlDone","dlResult","arMemoFor","adUp","adCell","adAlias","jPaste","qPaste","jEdit","qNew","qEdit","calDay","evNew","evEdit","condEdit","postNew","arNew","arEdit","lvNew","invNew"].includes(a);H[a]();save();
     if(!opensModal&&a!=="close"&&!document.querySelector(".overlay")){const y=scrollY;render();if(a!=="tab")scrollTo(0,y);}
     void keepModal;}
 });
