@@ -1109,7 +1109,7 @@ function parsePay(text){const blocks=String(text||"").split(/\n\s*\n/);const out
 function payLine(p){const paid=p.status==="지급완료";
   return `<div class="jrow payrow ${paid?"paid":""}"><div class="jn"><b>${esc(p.co)}</b> ${esc(p.name)} <span class="chip ${p.type==="가불"?"vis":""}">${p.type}</span>${p.type==="주급"&&canPay()&&!paid?` <label class="payamt">주급 금액 <input type="number" data-payamt="${p.id}" value="${p.amt||""}" placeholder="경영지원팀 입력" step="1000" min="0" aria-label="${esc(p.name)} 주급 금액">원</label>`:p.amt?` <b>${won(p.amt)}원</b>`:p.type==="주급"?' <span class="sub">금액은 경영지원팀이 입력</span>':""}
    <div class="sub">${p.days.map(d=>`${mdShort(d.date)} ${d.start?d.start+"~"+d.end:""}${d.note?" "+esc(d.note):""}`).join(" · ")}</div>
-   <div class="sub">근무 ${p.workDays}일 · ${p.hours}시간 (휴게 포함)${paid?` · <span style="color:var(--ok)">${esc(p.paidBy)} ${mdShort(p.paidAt)} 지급완료</span>`:""}</div></div>
+   <div class="sub">근무 ${p.workDays}일${paid?` · <span style="color:var(--ok)">${esc(p.paidBy)} ${mdShort(p.paidAt)} 지급완료</span>`:""}</div></div>
    <div class="jst">${paid?`<span class="chip ok">지급완료</span>${canPay()?`<button class="btn sm" data-act="payUndo" data-id="${p.id}">되돌리기</button>`:""}`:`<span class="chip mute">지급 대기</span>${canPay()?`<button class="btn sm primary" data-act="payDone" data-id="${p.id}">지급완료</button>`:""}`}
    ${!paid&&(p.by===me()||canPay())?`<button class="btn sm" data-act="payEdit" data-id="${p.id}">수정</button>`:""}</div></div>`;}
 /* 담당자별·주별 취합 시트 */
@@ -1122,8 +1122,8 @@ function paySheetCard(sh){const ps=sh.ps,wait=ps.filter(p=>p.status!=="지급완
   const sum=a=>a.reduce((t,p)=>t+(+p.amt||0),0);const nB=new Set(ps.map(p=>p.batch)).size;
   return `<div class="card paysheet"><h3><span>${esc(sh.by)} <span class="sub">${wkLabel(sh.wk)} 주 · 신청 ${nB}회 · ${ps.length}명 (가불 ${gb.length} · 주급 ${jb.length})</span></span>
    <span class="tools">${canPay()&&wait.length?`<button class="btn sm primary" data-act="paySheetDone" data-v="${wait.map(p=>p.id).join(",")}">대기 ${wait.length}명 모두 지급완료</button>`:""}<button class="btn sm" data-act="payCsv" data-v="${esc(sh.k)}">엑셀로 받기</button></span></h3>
-   <div class="tw" style="border:0"><table class="x resp paytbl"><thead><tr><th>구분</th><th>업체</th><th>이름</th><th>근무 내역</th><th>일·시간</th><th>금액</th><th>상태</th></tr></thead><tbody>
-   ${ps.map(p=>{const paid=p.status==="지급완료";return `<tr class="${paid?"paid":""}"><td><span class="chip ${p.type==="가불"?"vis":""}">${p.type}</span></td><td>${esc(p.co)}</td><td><b>${esc(p.name)}</b></td><td class="l"><span class="sub">${esc(payDaysTxt(p))}</span></td><td class="num">${p.workDays}일 · ${p.hours}h</td>
+   <div class="tw" style="border:0"><table class="x resp paytbl"><thead><tr><th>구분</th><th>업체</th><th>이름</th><th>근무 내역</th><th>일수</th><th>금액</th><th>상태</th></tr></thead><tbody>
+   ${ps.map(p=>{const paid=p.status==="지급완료";return `<tr class="${paid?"paid":""}"><td><span class="chip ${p.type==="가불"?"vis":""}">${p.type}</span></td><td>${esc(p.co)}</td><td><b>${esc(p.name)}</b></td><td class="l"><span class="sub">${esc(payDaysTxt(p))}</span></td><td class="num">${p.workDays}일</td>
      <td class="num">${p.type==="주급"&&canPay()&&!paid?`<input type="number" data-payamt="${p.id}" value="${p.amt||""}" placeholder="금액" step="1000" min="0" style="width:100px" aria-label="${esc(p.name)} 주급 금액">`:p.amt?won(p.amt):'<span class="sub">-</span>'}</td>
      <td class="nowrap">${paid?`<span class="chip ok">지급완료</span>${canPay()?` <button class="btn sm" data-act="payUndo" data-id="${p.id}">되돌리기</button>`:""}`:`${canPay()?`<button class="btn sm primary" data-act="payDone" data-id="${p.id}">지급완료</button>`:'<span class="chip mute">대기</span>'}`}${!paid&&(p.by===me()||canPay())?` <button class="btn sm" data-act="payEdit" data-id="${p.id}">수정</button>`:""}</td></tr>`}).join("")}
    <tr class="tot"><td colspan="4" class="l">합계 ${ps.length}명</td><td></td><td class="num">${gb.length?`가불 ${won(sum(gb))}`:""}${gb.length&&sum(jb)?"<br>":""}${sum(jb)?`주급 ${won(sum(jb))}`:""}</td><td>${wait.length?`대기 ${wait.length}`:"모두 완료"}</td></tr></tbody></table></div></div>`;}
@@ -1172,12 +1172,12 @@ function saveBlob(blob,name){const a=document.createElement("a");a.href=URL.crea
 function payXlsx(k){const [by,wk]=k.split("|");const ps=(paySheets(S.pays.filter(p=>payVisBR().includes(p.branch))).find(x=>x.k===k)||{ps:[]}).ps;
   const C=[];const put=(r,c,v,s,f)=>C.push({r,c,v,s,f});
   put(0,0,`주급·가불 취합 — ${by} (${wkLabel(wk)} 주)`,7);put(1,0,`내려받은 시각 ${nowLocal().replace("T"," ").slice(0,16)} · 하랑 업무 허브`,8);
-  ["구분","업체","이름","근무 내역","근무일수","근무시간","금액(원)","상태","지급자","지급일"].forEach((h,i)=>put(3,i,h,1));
+  ["구분","업체","이름","근무 내역","근무일수","금액(원)","상태","지급자","지급일"].forEach((h,i)=>put(3,i,h,1));
   ps.forEach((p,i)=>{const r=4+i,g=p.type==="가불";const s=g?3:2,sn=g?5:4,sc=g?10:2;
-    put(r,0,p.type,sc);put(r,1,p.co,s);put(r,2,p.name,s);put(r,3,payDaysTxt(p),s);put(r,4,+p.workDays||0,sn);put(r,5,+p.hours||0,sn);put(r,6,p.amt?+p.amt:"",sn);put(r,7,p.status,sc);put(r,8,p.paidBy||"",s);put(r,9,p.paidAt||"",s);});
+    put(r,0,p.type,sc);put(r,1,p.co,s);put(r,2,p.name,s);put(r,3,payDaysTxt(p),s);put(r,4,+p.workDays||0,sn);put(r,5,p.amt?+p.amt:"",sn);put(r,6,p.status,sc);put(r,7,p.paidBy||"",s);put(r,8,p.paidAt||"",s);});
   const e=4+ps.length,t=e+1;const R=n=>`${n}${4+1}:${n}${e}`;
-  [["가불 합계",`SUMIF(A5:A${e},"가불",G5:G${e})`],["주급 합계 (입력된 금액)",`SUMIF(A5:A${e},"주급",G5:G${e})`],["총 인원",`COUNTA(C5:C${e})`],["지급 대기",`COUNTIF(H5:H${e},"대기")`]].forEach(([l,f],i)=>{put(t+i,5,l,9);put(t+i,6,null,6,f);});
-  saveBlob(xlsxBlob(`${by} ${wk.slice(5)}`,C,[8,16,10,46,9,9,13,9,10,12],4),`주급가불_${by}_${wk}.xlsx`);toast("엑셀 파일로 내려받습니다");}
+  [["가불 합계",`SUMIF(A5:A${e},"가불",F5:F${e})`],["주급 합계 (입력된 금액)",`SUMIF(A5:A${e},"주급",F5:F${e})`],["총 인원",`COUNTA(C5:C${e})`],["지급 대기",`COUNTIF(G5:G${e},"대기")`]].forEach(([l,f],i)=>{put(t+i,4,l,9);put(t+i,5,null,6,f);});
+  saveBlob(xlsxBlob(`${by} ${wk.slice(5)}`,C,[8,16,10,46,9,13,9,10,12],4),`주급가불_${by}_${wk}.xlsx`);toast("엑셀 파일로 내려받습니다");}
 function vPay(){const f=S.ui.payF||"wait";const brs=payVisBR();const L=S.pays.filter(p=>brs.includes(p.branch));
   const wait=L.filter(p=>p.status!=="지급완료"),mon=ym(TODAY);const doneM=L.filter(p=>p.status==="지급완료"&&(p.paidAt||"").startsWith(mon));
   const show=(f==="wait"?wait:f==="done"?L.filter(p=>p.status==="지급완료"):L);
@@ -1199,7 +1199,7 @@ function payNewForm(){modal("주급·가불 신청",`<div class="row2">${F("구�
     list.forEach(o=>S.pays.push({id:uid(),batch,at,by:me(),branch:fd.get("branch"),type:fd.get("type")==="가불"?"가불":(o.type||"주급"),co:o.co,name:o.name,days:o.days,hours:o.hours,workDays:o.workDays,amt:(fd.get("type")==="가불"||o.type==="가불")?(o.amt||0):0,status:"대기"}));
     notify(FIN_TEAM,`${fd.get("type")} 신청 ${list.length}명 (${list.map(x=>x.co+" "+x.name).slice(0,3).join(", ")}${list.length>3?" 외":""})`,"pay");toast(`${list.length}명 신청했습니다`);}});}
 function payPreview(ta){const L=parsePay(ta.value);const box=document.getElementById("payPv");if(!box)return;
-  box.innerHTML=L.length?`<div class="tw"><table class="x"><thead><tr><th>업체</th><th>이름</th><th>근무</th><th>시간</th><th>구분</th></tr></thead><tbody>${L.map(o=>`<tr><td>${esc(o.co)||'<span class="up">업체?</span>'}</td><td>${esc(o.name)}</td><td class="l">${o.days.map(d=>mdShort(d.date)+(d.start?"":" "+esc(d.note))).join(", ")}</td><td>${o.workDays}일 · ${o.hours}h</td><td>${o.type}${o.amt?" "+won(o.amt):""}</td></tr>`).join("")}</tbody></table></div><p class="sub">${L.length}명이 신청됩니다.</p>`:"";}
+  box.innerHTML=L.length?`<div class="tw"><table class="x"><thead><tr><th>업체</th><th>이름</th><th>근무</th><th>일수</th><th>구분</th></tr></thead><tbody>${L.map(o=>`<tr><td>${esc(o.co)||'<span class="up">업체?</span>'}</td><td>${esc(o.name)}</td><td class="l">${o.days.map(d=>mdShort(d.date)+(d.start?"":" "+esc(d.note))).join(", ")}</td><td>${o.workDays}일</td><td>${o.type}${o.amt?" "+won(o.amt):""}</td></tr>`).join("")}</tbody></table></div><p class="sub">${L.length}명이 신청됩니다.</p>`:"";}
 function payEditForm(p){modal(`${esc(p.name)} 신청 수정`,`<div class="row3">${F("업체",inp("co",p.co))}${F("이름",inp("name",p.name))}${F("구분",sel("type",["주급","가불"],p.type))}</div>${p.type==="가불"||canPay()?F(p.type==="가불"?"가불 금액 (원)":"주급 금액 (원, 경영지원팀)",inp("amt",p.amt||"","number")):""}
   <label class="field"><span>근무일 (한 줄에 하루)</span><textarea name="d" style="min-height:120px">${p.days.map(d=>`${mdShort(d.date)} ${d.start?d.start+"~"+d.end:""} ${d.note||""}`.trim()).join("\n")}</textarea></label>`,
   {onSubmit:fd=>{const o=parsePay("x y\n"+fd.get("d"))[0]||{days:[],hours:0,workDays:0};Object.assign(p,{co:fd.get("co"),name:fd.get("name"),type:fd.get("type"),amt:fd.has("amt")?(+fd.get("amt")||0):p.amt,days:o.days,hours:o.hours,workDays:o.workDays});toast("수정했습니다");},
