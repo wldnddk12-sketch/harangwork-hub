@@ -417,6 +417,12 @@ function setSyncState(t){const e=document.getElementById("syncst");if(e)e.textCo
 async function fetchAll(){const out=[];for(let from=0;;from+=1000){const {data,error}=await sb.from("hub_data").select("kind,key,branch,data,version").order("kind").order("key").range(from,from+999);
   if(error)throw error;out.push(...data);if(data.length<1000)break;}return out;}
 let loadT=null;
+/* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
+async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
+/* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
+const HUB_BUILD="1792488640";
+async function checkBuild(){if(!/^\d+$/.test(HUB_BUILD))return;try{const t=await (await fetch(location.pathname+"?v="+Date.now(),{cache:"no-store"})).text();const m=t.match(/const HUB_BUILD="(\d+)"/);
+  if(m&&m[1]!==HUB_BUILD){if(!document.querySelector(".overlay")&&!dirty&&!syncing){toast("새 버전으로 바꾸는 중…");setTimeout(()=>location.reload(),600);}}}catch(e){}}
 async function loadAll(force){if(!force&&(dirty||syncing)){clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),1500);return;}
   try{const rows=await fetchAll();const ver=new Map(rows.map(r=>[r.kind+"|"+r.key,r.version]));
     const y=scrollY;const keepModal=document.querySelector(".overlay");const tab=S.tab;const notifs=S.notifs||[];S=buildS(rows,S.ui);if(tab)S.tab=tab;S.notifs=notifs;
@@ -490,8 +496,9 @@ async function afterLogin(u){const {data:p}=await sb.from("profiles").select("*"
   await loadAll(true);loadNotifs();checkPush();
   sb.channel("hub").on("postgres_changes",{event:"*",schema:"public",table:"hub_data"},()=>{clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),800);})
     .on("postgres_changes",{event:"*",schema:"public",table:"hub_notifs",filter:`to_name=eq.${ME.name}`},()=>loadNotifs()).subscribe();
-  setInterval(()=>{if(document.visibilityState==="visible"){loadAll();loadNotifs();}},60000);
-  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){loadAll();loadNotifs();}});
+  setInterval(()=>{if(document.visibilityState==="visible"){loadAll();loadNotifs();checkBuild();}},60000);
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){loadAll();loadNotifs();checkBuild();}});
+  setTimeout(checkBuild,5000);
   if(navigator.serviceWorker)navigator.serviceWorker.addEventListener("message",e=>{if(e.data&&e.data.tab){S.tab=e.data.tab;render();}});}
 function passwordModal(){modal("비밀번호 변경",`${F("새 비밀번호 (8자 이상)",'<input type="password" name="a" autocomplete="new-password" required>')}${F("새 비밀번호 확인",'<input type="password" name="b" autocomplete="new-password" required>')}`,
   {submit:"변경",onSubmit:async fd=>{const a=fd.get("a"),b=fd.get("b");if(a.length<8){toast("8자 이상 입력하세요.");return;}if(a!==b){toast("두 비밀번호가 다릅니다.");return;}
@@ -940,8 +947,10 @@ function adMerge(ex,up){const U=adUpPeople(up);const out=clone(ex||[]);
   return out;}
 function adUploadForm(){
   modal("주간 광고표 엑셀 올리기",`<p class="sub" style="margin-top:0">‘하랑 주간광고현황 양식’을 올려 주세요. 시트 이름에 본사·천안·아산이 들어 있는 시트를 읽고, M점프·M지역·114114·당근마켓 줄을 나눠서 광고비까지 계산합니다. 여러 사람이 각자 올려도 덮어쓰지 않고 합쳐집니다 — 파일에 나온 사람의 기록만 새 내용으로 바뀝니다.</p>
-   <label class="field"><span>엑셀 파일 (.xlsx)</span><input type="file" id="adFile" accept=".xlsx"></label><div id="adPrev" class="sub"></div>`,{submit:"허브에 반영",onSubmit:fd=>{const P=window.__adParsed||[];if(!P.length){toast("먼저 파일을 골라 주세요");return;}
-    let n=0;P.forEach(p=>{if(p.error||!visBR().includes(p.br)||p.empty)return;S.adw[p.week]=S.adw[p.week]||{};const ex=S.adwSample[p.week]?null:S.adw[p.week][p.br];S.adw[p.week][p.br]=ex&&ex.length?adMerge(ex,p.rows):p.rows;delete S.adwSample[p.week];n++;S.ui.adWk=p.week;S.ui.adBr=p.br;});window.__adParsed=null;toast(`${n}개 시트를 반영했습니다`);}});}
+   <label class="field"><span>엑셀 파일 (.xlsx)</span><input type="file" id="adFile" accept=".xlsx"></label><div id="adPrev" class="sub"></div>`,{submit:"허브에 반영",onSubmit:fd=>{const P=window.__adParsed||[];if(!P.length){toast("먼저 파일을 골라 주세요");return;}window.__adParsed=null;
+    const go=()=>{let n=0;P.forEach(p=>{if(p.error||!visBR().includes(p.br)||p.empty)return;S.adw[p.week]=S.adw[p.week]||{};const ex=S.adwSample[p.week]?null:S.adw[p.week][p.br];S.adw[p.week][p.br]=ex&&ex.length?adMerge(ex,p.rows):p.rows;delete S.adwSample[p.week];n++;S.ui.adWk=p.week;S.ui.adBr=p.br;});toast(`${n}개 시트를 반영했습니다 (다른 사람 기록과 합침)`);};
+    /* 실제 허브: 합치기 직전에 서버의 최신 내용을 먼저 불러와서, 방금 다른 사람이 올린 기록도 빠짐없이 합칩니다 */
+    if(typeof hubRefresh==="function"){toast("최신 내용을 불러와 합치는 중…");hubRefresh().then(()=>{go();save();render();});}else go();}});}
 async function adFilePicked(f){const box=document.getElementById("adPrev");box.textContent="읽는 중…";
   try{const sheets=await readXlsx(await f.arrayBuffer());const P=sheets.map(parseAdSheet).filter(Boolean);window.__adParsed=P;
     if(!P.length){box.innerHTML='<p class="up">본사·천안·아산 이름이 들어간 시트가 없습니다.</p>';return;}
