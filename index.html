@@ -164,6 +164,15 @@ tr.dragging td{opacity:.45}tr.dropto td{box-shadow:inset 0 3px 0 var(--brand)}
 .checks{display:flex;flex-wrap:wrap;gap:6px 14px}
 .checks label{display:flex;align-items:center;gap:5px;font-size:13.5px}
 .field input[type=checkbox],.field input[type=radio]{width:auto;flex:none;padding:0;margin:0}
+.paycards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.paycard{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.paycard.gb{border-top:3px solid #E69A2E}.paycard.paid{opacity:.6}
+.pch{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:15px;border-bottom:1px dashed var(--line);padding-bottom:8px}.pch .pnm{font-size:16px}
+.pdays{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;font-variant-numeric:tabular-nums}
+.pdays li{display:grid;grid-template-columns:62px 1fr;column-gap:8px;font-size:14px;line-height:1.5}.pdays .pd{font-weight:600}.pdays .pd small{color:var(--muted);font-weight:400}.pdays .pn{grid-column:2;font-size:12.5px;color:var(--late)}.pdays .pn0{color:var(--late)}
+.pcf{display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px dashed var(--line);padding-top:8px}.pamt input{width:110px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:inherit;margin-right:3px;font:inherit}
+.pcb{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.paytot{display:flex;gap:14px;flex-wrap:wrap;justify-content:space-between;margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--brand-soft)}
 .paytbl tr.paid td{opacity:.6}.paytbl td{vertical-align:top}.paysheet h3{flex-wrap:wrap;gap:8px}
 .warncard{border-color:#F2B705!important;box-shadow:inset 4px 0 0 #F2B705}.latecard{border-color:#E9A3A3!important;box-shadow:inset 4px 0 0 #C62828}.soontxt{color:#9A6A00}
 .cttbl tr.ct-soon td{background:#FFF8E1}.cttbl tr.ct-late td{background:#FDECEC}.cttbl tr.ct-renew td{opacity:.6}.ivtbl tr.ivtoday td{background:#EEF4FD}.ivtbl td.nowrap{white-space:normal}.ivtbl .seg button{white-space:nowrap}
@@ -396,7 +405,7 @@ async function sync(){if(syncing){clearTimeout(syncT);syncT=setTimeout(sync,300)
       else{const {data,error}=await sb.from("hub_data").insert({...row,version:1}).select("version");
         if(error){if(/duplicate|23505/.test((error.message||"")+(error.code||"")))conflict=true;else denied=true;continue;}SNAP.set(k,{version:1,json:j,branch:d.branch,data:d.data});n++;}}
     for(const [k,old] of SNAP){if(now.has(k)||!old.version)continue;const [kind,...rest]=k.split("|");const key=rest.join("|");
-      if(!canWrite(kind,old.branch,old.data))continue;
+      if(!canWrite(kind,old.branch,old.data))continue;if(kind==="iv"&&!(ME.role==="ceo"||ME.role==="mgr"||(old.data&&old.data.by===ME.name)))continue;
       const {data,error}=await sb.from("hub_data").delete().eq("kind",kind).eq("key",key).eq("version",old.version).select("key");
       if(error){denied=true;continue;}if(!data||!data.length){conflict=true;continue;}SNAP.delete(k);n++;}
   }catch(e){denied=true;}
@@ -1022,6 +1031,7 @@ function ctPasteForm(){modal("근로계약 여러 명 붙여넣기",`<p class="s
 /* ---------- 지원 DB (면접 후 바로 쓰지 않은 지원자 모아두기) ---------- */
 const VISAS=["내국인","F-4 (재외동포)","F-5 (영주)","F-6 (결혼이민)","F-2 (거주)","H-2 (방문취업)","E-9 (비전문취업)","E-7","D-2/D-4 (유학·연수)","기타"];
 const GRADES=["최상","상","중","하","최하","상태미정"];const GCLS={"최상":"g5","상":"g4","중":"g3","하":"g2","최하":"g1","상태미정":"g0"};const gv=v=>GRADES.includes(v.grade)?v.grade:"상태미정";
+const ivCanDel=v=>isBoss()||(v&&v.by===me());
 function ivList(){return (S.interviews||[]).filter(v=>ctVisBR().includes(v.branch));}
 /* 지원 DB 담당자 (신입이 생기면 여기에 이름 추가) */
 const IV_MGRS=["전우성","박진호","김유균","추성운","장민혁","김태경","공병규"];
@@ -1049,7 +1059,7 @@ function ivForm(v,after){const n=!v||!v.id;v={branch:myBr()==="본사"?"본사":
    <div class="row3">${F("나이",inp("age",v.age||"","number",'min="15" max="90"'))}${F("핸드폰",inp("phone",v.phone||"","tel",'placeholder="010-0000-0000"'))}${F("비자",`<input name="visa" list="ivVisa" value="${esc(v.visa||"")}" placeholder="내국인 / F-4 …"><datalist id="ivVisa">${VISAS.map(x=>`<option value="${x}">`).join("")}</datalist>`)}</div>
    <div class="row2">${F("거주지",inp("addr",v.addr||"","text",'placeholder="예: 오산 원동, 천안 서북구"'))}${F("자차",sel("car",["","있음","없음"],v.car||""))}</div>
    <div class="row2">${F("특이사항",inp("note",v.note||""))}${F("담당",sel("mgr",[...new Set([...IV_MGRS,...PEOPLE()])],v.mgr||me()))}</div>`,
-   {submit:after?"지원 DB에 저장":"저장",extra:n?"":`<button type="button" class="btn danger" data-act="ivDel" data-id="${v.id}">삭제</button>`,
+   {submit:after?"지원 DB에 저장":"저장",extra:n?"":ivCanDel(v)?`<button type="button" class="btn danger" data-act="ivDel" data-id="${v.id}">삭제</button>`:'<span class="sub" style="margin-right:auto">🔒 삭제는 올린 사람·팀장만</span>',
     onSubmit:fd=>{const o={date:fd.get("date"),grade:fd.get("grade")||"상태미정",addr:String(fd.get("addr")||"").trim(),car:fd.get("car")||"",branch:fd.get("branch"),co:String(fd.get("co")).trim(),name:String(fd.get("name")).trim(),sex:fd.get("sex"),age:+fd.get("age")||"",phone:typeof fmtPhone==="function"?fmtPhone(fd.get("phone")):fd.get("phone"),visa:String(fd.get("visa")||"").trim(),note:fd.get("note"),mgr:fd.get("mgr")};
      S.interviews=S.interviews||[];if(n){const nv={id:uid(),...o,at:iso(TODAY),by:me()};if(v.from)nv.from=v.from;if(v.fromJoin)nv.fromJoin=v.fromJoin;S.interviews.push(nv);if(after)after(nv);}else Object.assign(S.interviews.find(x=>x.id===v.id),o);toast(after?"지원 DB로 넘겼습니다":"저장했습니다");}});}
 function ivJoinForm(v){modal(`${esc(v.name)} — 입사예정자로 넘기기`,`<p class="sub" style="margin-top:0">${esc(v.co)} 지원자를 '금주 입사예정자'에 올립니다. 업체는 바꿔서 넣어도 됩니다.</p><div class="row2">${F("입사 예정일",inp("date",iso(addDays(TODAY,1)),"date","required"))}${F("업체",inp("co",v.co))}</div>`,
@@ -1274,11 +1284,12 @@ function paySheetCard(sh){const ps=sh.ps,wait=ps.filter(p=>p.status!=="지급완
   const sum=a=>a.reduce((t,p)=>t+(+p.amt||0),0);const nB=new Set(ps.map(p=>p.batch)).size;
   return `<div class="card paysheet"><h3><span>${esc(sh.by)} <span class="sub">${wkLabel(sh.wk)} 주 · 신청 ${nB}회 · ${ps.length}명 (가불 ${gb.length} · 주급 ${jb.length})</span></span>
    <span class="tools">${canPay()&&wait.length?`<button class="btn sm primary" data-act="paySheetDone" data-v="${wait.map(p=>p.id).join(",")}">대기 ${wait.length}명 모두 지급완료</button>`:""}<button class="btn sm" data-act="payCsv" data-v="${esc(sh.k)}">엑셀로 받기</button></span></h3>
-   <div class="tw" style="border:0"><table class="x resp paytbl"><thead><tr><th>구분</th><th>업체</th><th>이름</th><th>근무 내역</th><th>일수</th><th>금액</th><th>상태</th></tr></thead><tbody>
-   ${ps.map(p=>{const paid=p.status==="지급완료";return `<tr class="${paid?"paid":""}"><td><span class="chip ${p.type==="가불"?"vis":""}">${p.type}</span></td><td>${esc(p.co)}</td><td><b>${esc(p.name)}</b></td><td class="l"><span class="sub">${esc(payDaysTxt(p))}</span></td><td class="num">${p.workDays}일</td>
-     <td class="num">${p.type==="주급"&&canPay()&&!paid?`<input type="number" data-payamt="${p.id}" value="${p.amt||""}" placeholder="금액" step="1000" min="0" style="width:100px" aria-label="${esc(p.name)} 주급 금액">`:p.amt?won(p.amt):'<span class="sub">-</span>'}</td>
-     <td class="nowrap">${paid?`<span class="chip ok">지급완료</span>${canPay()?` <button class="btn sm" data-act="payUndo" data-id="${p.id}">되돌리기</button>`:""}`:`${canPay()?`<button class="btn sm primary" data-act="payDone" data-id="${p.id}">지급완료</button>`:'<span class="chip mute">대기</span>'}`}${!paid&&(p.by===me()||canPay())?` <button class="btn sm" data-act="payEdit" data-id="${p.id}">수정</button>`:""}</td></tr>`}).join("")}
-   <tr class="tot"><td colspan="4" class="l">합계 ${ps.length}명</td><td></td><td class="num">${gb.length?`가불 ${won(sum(gb))}`:""}${gb.length&&sum(jb)?"<br>":""}${sum(jb)?`주급 ${won(sum(jb))}`:""}</td><td>${wait.length?`대기 ${wait.length}`:"모두 완료"}</td></tr></tbody></table></div></div>`;}
+   <div class="paycards">${ps.map(p=>{const paid=p.status==="지급완료";return `<div class="paycard ${paid?"paid":""} ${p.type==="가불"?"gb":""}">
+     <div class="pch"><span class="chip ${p.type==="가불"?"vis":""}">${p.type}</span><b>${esc(p.co)}</b> <b class="pnm">${esc(p.name)}</b></div>
+     <ol class="pdays">${p.days.map(d=>`<li><span class="pd">${mdShort(d.date)} <small>${d.date?DOW[new Date(d.date).getDay()]:""}</small></span>${d.start?`<span class="pt">${d.start} ~ ${d.end}</span>${d.note?`<span class="pn">${esc(d.note)}</span>`:""}`:`<span class="pt pn0">${esc(d.note||"")}</span>`}</li>`).join("")||'<li class="sub">근무 내역 없음</li>'}</ol>
+     <div class="pcf"><span class="sub">근무 <b>${p.workDays}</b>일</span><span class="pamt">${p.type==="주급"&&canPay()&&!paid?`<input type="number" data-payamt="${p.id}" value="${p.amt||""}" placeholder="금액" step="1000" min="0" aria-label="${esc(p.name)} 주급 금액">원`:p.amt?`<b>${won(p.amt)}원</b>`:'<span class="sub">금액 -</span>'}</span></div>
+     <div class="pcb">${paid?`<span class="chip ok">지급완료${p.paidBy?" · "+esc(p.paidBy):""}</span>${canPay()?` <button class="btn sm" data-act="payUndo" data-id="${p.id}">되돌리기</button>`:""}`:`${canPay()?`<button class="btn sm primary" data-act="payDone" data-id="${p.id}">지급완료</button>`:'<span class="chip mute">대기</span>'}`}${!paid&&(p.by===me()||canPay())?` <button class="btn sm" data-act="payEdit" data-id="${p.id}">수정</button>`:""}</div></div>`}).join("")}</div>
+   <div class="paytot"><b>합계 ${ps.length}명</b><span>${gb.length?`가불 ${won(sum(gb))}원`:""}${gb.length&&sum(jb)?" · ":""}${sum(jb)?`주급 ${won(sum(jb))}원`:""}</span><span>${wait.length?`대기 ${wait.length}`:"모두 완료"}</span></div></div>`;}
 /* 간단한 엑셀(.xlsx) 만들기 — 외부 라이브러리 없이 */
 const CRC_T=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}return t;})();
 function crc32(u){let c=0xFFFFFFFF;for(let i=0;i<u.length;i++)c=CRC_T[(c^u[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
@@ -1293,17 +1304,17 @@ function zipStore(files){const enc=new TextEncoder();const parts=[],cen=[];let o
 const xe=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 const colL=n=>{let s="";n++;while(n){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=(n-m-1)/26;}return s;};
 /* cells: [{r,c,v,s,f}] s=스타일번호, f=수식 */
-function xlsxBlob(sheet,cells,widths,freezeRow){const rows={};cells.forEach(x=>(rows[x.r]=rows[x.r]||[]).push(x));
+function xlsxBlob(sheet,cells,widths,freezeRow,opt){opt=opt||{};const rows={};cells.forEach(x=>(rows[x.r]=rows[x.r]||[]).push(x));
   const sd=Object.keys(rows).map(Number).sort((a,b)=>a-b).map(r=>`<row r="${r+1}">${rows[r].sort((a,b)=>a.c-b.c).map(x=>{const ref=colL(x.c)+(r+1),st=x.s?` s="${x.s}"`:"";
     if(x.f)return `<c r="${ref}"${st}><f>${xe(x.f)}</f></c>`;if(typeof x.v==="number")return `<c r="${ref}"${st}><v>${x.v}</v></c>`;if(x.v==null||x.v==="")return `<c r="${ref}"${st}/>`;
     return `<c r="${ref}"${st} t="inlineStr"><is><t xml:space="preserve">${xe(x.v)}</t></is></c>`;}).join("")}</row>`).join("");
-  const ws=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${freezeRow?`<sheetViews><sheetView workbookViewId="0"><pane ySplit="${freezeRow}" topLeftCell="A${freezeRow+1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`:""}<cols>${widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("")}</cols><sheetData>${sd}</sheetData></worksheet>`;
+  const ws=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${opt.fit?'<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>':""}${freezeRow?`<sheetViews><sheetView workbookViewId="0"><pane ySplit="${freezeRow}" topLeftCell="A${freezeRow+1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`:""}<cols>${widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("")}</cols><sheetData>${sd}</sheetData>${opt.merges&&opt.merges.length?`<mergeCells count="${opt.merges.length}">${opt.merges.map(m=>`<mergeCell ref="${m}"/>`).join("")}</mergeCells>`:""}${opt.fit?'<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>':""}</worksheet>`;
   const B='<border><left style="thin"><color rgb="FFC9D1DA"/></left><right style="thin"><color rgb="FFC9D1DA"/></right><top style="thin"><color rgb="FFC9D1DA"/></top><bottom style="thin"><color rgb="FFC9D1DA"/></bottom><diagonal/></border>';
   const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0;-#,##0;&quot;-&quot;"/></numFmts>
-<fonts count="4"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><name val="Arial"/></font><font><b/><sz val="14"/><name val="Arial"/></font><font><sz val="10"/><color rgb="FF5C6B7A"/><name val="Arial"/></font></fonts>
-<fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF2D2"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF7DB"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEEF2F6"/></patternFill></fill></fills>
+<fonts count="6"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><name val="Arial"/></font><font><b/><sz val="14"/><name val="Arial"/></font><font><sz val="10"/><color rgb="FF5C6B7A"/><name val="Arial"/></font><font><b/><sz val="12"/><name val="Arial"/></font><font><sz val="10"/><color rgb="FFC62828"/><name val="Arial"/></font></fonts>
+<fills count="7"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF2D2"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF7DB"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEEF2F6"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8F0FC"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFEBD2"/></patternFill></fill></fills>
 <borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>${B}</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="11"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<cellXfs count="19"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
 <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
 <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
 <xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
@@ -1313,7 +1324,15 @@ function xlsxBlob(sheet,cells,widths,freezeRow){const rows={};cells.forEach(x=>(
 <xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>
 <xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>
 <xf numFmtId="0" fontId="1" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"/>
-<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="top"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="top"/></xf>
+<xf numFmtId="0" fontId="4" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
+<xf numFmtId="0" fontId="4" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
+<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
+<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
+<xf numFmtId="0" fontId="5" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
+<xf numFmtId="0" fontId="3" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
+<xf numFmtId="164" fontId="1" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
+<xf numFmtId="0" fontId="1" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
   const sn=xe(String(sheet).replace(/[\\\/?*\[\]:]/g," ").slice(0,31));
   return zipStore([["[Content_Types].xml",'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
     ["_rels/.rels",'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
@@ -1321,15 +1340,25 @@ function xlsxBlob(sheet,cells,widths,freezeRow){const rows={};cells.forEach(x=>(
     ["xl/_rels/workbook.xml.rels",'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
     ["xl/styles.xml",styles],["xl/worksheets/sheet1.xml",ws]]);}
 function saveBlob(blob,name){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},800);}
+/* 엑셀도 화면처럼 사람별 카드(A4 용지 느낌)로: 한 줄에 카드 2장, 날짜는 세로로 */
 function payXlsx(k){const [by,wk]=k.split("|");const ps=(paySheets(S.pays.filter(p=>payVisBR().includes(p.branch))).find(x=>x.k===k)||{ps:[]}).ps;
-  const C=[];const put=(r,c,v,s,f)=>C.push({r,c,v,s,f});
-  put(0,0,`주급·가불 취합 — ${by} (${wkLabel(wk)} 주)`,7);put(1,0,`내려받은 시각 ${nowLocal().replace("T"," ").slice(0,16)} · 하랑 업무 허브`,8);
-  ["구분","업체","이름","근무 내역","근무일수","금액(원)","상태","지급자","지급일"].forEach((h,i)=>put(3,i,h,1));
-  ps.forEach((p,i)=>{const r=4+i,g=p.type==="가불";const s=g?3:2,sn=g?5:4,sc=g?10:2;
-    put(r,0,p.type,sc);put(r,1,p.co,s);put(r,2,p.name,s);put(r,3,payDaysTxt(p),s);put(r,4,+p.workDays||0,sn);put(r,5,p.amt?+p.amt:"",sn);put(r,6,p.status,sc);put(r,7,p.paidBy||"",s);put(r,8,p.paidAt||"",s);});
-  const e=4+ps.length,t=e+1;const R=n=>`${n}${4+1}:${n}${e}`;
-  [["가불 합계",`SUMIF(A5:A${e},"가불",F5:F${e})`],["주급 합계 (입력된 금액)",`SUMIF(A5:A${e},"주급",F5:F${e})`],["총 인원",`COUNTA(C5:C${e})`],["지급 대기",`COUNTIF(G5:G${e},"대기")`]].forEach(([l,f],i)=>{put(t+i,4,l,9);put(t+i,5,null,6,f);});
-  saveBlob(xlsxBlob(`${by} ${wk.slice(5)}`,C,[8,16,10,46,9,13,9,10,12],4),`주급가불_${by}_${wk}.xlsx`);toast("엑셀 파일로 내려받습니다");}
+  const C=[],M=[];const put=(r,c,v,s,f)=>C.push({r,c,v,s,f});const ref=(r,c)=>colL(c)+(r+1);const merge=(r,c1,c2)=>M.push(ref(r,c1)+":"+ref(r,c2));
+  const gb=ps.filter(p=>p.type==="가불"),jb=ps.filter(p=>p.type==="주급");const sum=a=>a.reduce((t,p)=>t+(+p.amt||0),0);const wait=ps.filter(p=>p.status!=="지급완료").length;
+  put(0,0,`주급·가불 취합 — ${by} (${wkLabel(wk)} 주)`,7);
+  put(1,0,`총 ${ps.length}명 · 가불 ${gb.length}명${gb.length?` ${won(sum(gb))}원`:""} · 주급 ${jb.length}명${sum(jb)?` ${won(sum(jb))}원`:""} · ${wait?`지급 대기 ${wait}명`:"모두 지급완료"}`,8);
+  put(2,0,`내려받은 시각 ${nowLocal().replace("T"," ").slice(0,16)} · 하랑 업무 허브`,8);
+  let r=4;
+  for(let i=0;i<ps.length;i+=2){const pair=ps.slice(i,i+2);const nd=Math.max(...pair.map(p=>Math.max(1,p.days.length)));
+    pair.forEach((p,k)=>{const c=k*4,g=p.type==="가불";const paid=p.status==="지급완료";
+      put(r,c,`[${p.type}]  ${p.co}   ${p.name}`,g?12:11);put(r,c+1,"",g?12:11);put(r,c+2,"",g?12:11);merge(r,c,c+2);
+      for(let d=0;d<nd;d++){const x=p.days[d];const rr=r+1+d;
+        if(!x){put(rr,c,"",14);put(rr,c+1,"",14);put(rr,c+2,"",14);continue;}
+        put(rr,c,`${mdShort(x.date)} (${x.date?DOW[new Date(x.date).getDay()]:""})`,13);
+        if(x.start){put(rr,c+1,`${x.start} ~ ${x.end}`,14);put(rr,c+2,x.note||"",15);}else{put(rr,c+1,x.note||"",15);put(rr,c+2,"",15);}}
+      const f=r+1+nd;put(f,c,`근무 ${p.workDays}일`,16);put(f,c+1,g?"가불 금액":"주급 금액",16);put(f,c+2,p.amt?+p.amt:"",17);
+      put(f+1,c,paid?`지급완료 · ${p.paidBy||""} · ${p.paidAt?mdShort(p.paidAt):""}`:"지급 대기",18);put(f+1,c+1,"",18);put(f+1,c+2,"",18);merge(f+1,c,c+2);});
+    r+=nd+4;}
+  saveBlob(xlsxBlob(`${by} ${wk.slice(5)}`,C,[12,17,15,3,12,17,15],0,{merges:M,fit:true}),`주급가불_${by}_${wk}.xlsx`);toast("엑셀 파일로 내려받습니다");}
 function vPay(){const f=S.ui.payF||"wait";const brs=payVisBR();const L=S.pays.filter(p=>brs.includes(p.branch));
   const wait=L.filter(p=>p.status!=="지급완료"),mon=ym(TODAY);const doneM=L.filter(p=>p.status==="지급완료"&&(p.paidAt||"").startsWith(mon));
   const show=(f==="wait"?wait:f==="done"?L.filter(p=>p.status==="지급완료"):L);
@@ -1709,7 +1738,7 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
     ctDel:()=>{const c=S.contracts.find(x=>x.id===el.dataset.id);if(!c||!ctCan(c)||!confirm(`${c.co} ${c.name} 계약을 삭제할까요?`))return;S.contracts=S.contracts.filter(x=>x!==c);S.contracts.forEach(x=>{if(x.renewedTo===c.id)delete x.renewedTo;});closeModal();toast("삭제했습니다");},
     ivNew:()=>ivForm(),blNew:()=>blForm(),blEdit:()=>{const x=(S.blacklist||[]).find(y=>y.id===el.dataset.id);if(x&&blCan(x))blForm(x);},blDel:()=>{const x=(S.blacklist||[]).find(y=>y.id===el.dataset.id);if(!x||!blCan(x)||!confirm(`${x.name}을(를) 블랙리스트에서 삭제할까요?`))return;S.blacklist=S.blacklist.filter(y=>y!==x);closeModal();toast("삭제했습니다");},jToDb:()=>{const j=S.joins.find(x=>x.id===el.dataset.id);if(!j)return;ivForm({co:j.co,name:j.name,phone:j.phone||"",date:j.date||iso(TODAY),note:j.memo||"",from:["입사"+j.status,j.date?mdShort(j.date):"",j.co].filter(Boolean).join(" · "),fromJoin:j.id},nv=>{j.dbId=nv.id;});},ivEdit:()=>ivForm(S.interviews.find(x=>x.id===el.dataset.id)),ivF:()=>S.ui.ivF=v,ivM:()=>S.ui.ivM=v,ivJoin:()=>ivJoinForm(S.interviews.find(x=>x.id===el.dataset.id)),
     ivGrade:()=>{const x=S.interviews.find(y=>y.id===el.dataset.id);x.grade=v;toast(`${x.name} — ${v}`);},
-    ivDel:()=>{const x=S.interviews.find(y=>y.id===el.dataset.id);if(!x||!confirm(`${x.name} 지원자를 지원 DB에서 삭제할까요?`))return;S.interviews=S.interviews.filter(y=>y!==x);closeModal();toast("삭제했습니다");},lvEdit:()=>leaveForm(S.leave.reqs.find(r=>r.id===el.dataset.id)),
+    ivDel:()=>{const x=S.interviews.find(y=>y.id===el.dataset.id);if(!x||!ivCanDel(x)){toast("삭제는 올린 사람과 팀장만 할 수 있습니다");return;}if(!confirm(`${x.name} 지원자를 지원 DB에서 삭제할까요?`))return;S.interviews=S.interviews.filter(y=>y!==x);closeModal();toast("삭제했습니다");},lvEdit:()=>leaveForm(S.leave.reqs.find(r=>r.id===el.dataset.id)),
     lvDel:()=>{const r=S.leave.reqs.find(r=>r.id===el.dataset.id);if(!r||!confirm(`${r.name} ${r.from} 연차 신청을 취소(삭제)할까요?`))return;S.leave.reqs=S.leave.reqs.filter(x=>x.id!==r.id);closeModal();toast("연차 신청을 취소했습니다");},
     lvOk:()=>{const r=S.leave.reqs.find(r=>r.id===el.dataset.id);r.status="승인";notify([r.name],`연차 승인: ${r.from}${r.to!==r.from?" ~ "+r.to:""} (${r.days}일)`,"leave");toast("승인했습니다");},
     lvNo:()=>{const r=S.leave.reqs.find(r=>r.id===el.dataset.id);r.status="반려";notify([r.name],`연차 반려: ${r.from}`,"leave");toast("반려했습니다");},
