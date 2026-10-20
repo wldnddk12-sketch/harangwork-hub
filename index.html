@@ -337,7 +337,7 @@ const monthRange=()=>({from:iso(new Date(TODAY.getFullYear(),TODAY.getMonth(),1)
 function emptyS(){return {role:ME.role,tab:"home",ui:{joinWk:0,quitYm:ym(TODAY),hcBr:"본사",toBr:"본사",hcEdit:false,toEdit:false,ttView:"day",ttDate:iso(TODAY),calYm:ym(TODAY),condBr:"전체",condQ:"",noteF:"all",invYm:ym(TODAY)},
   hc:Object.fromEntries(HC_TABS.map(t=>[t,[]])),baseLabel:"기준",to:Object.fromEntries(BRANCHES.map(b=>[b,[]])),ad:{rows:[]},events:[],conds:{},posts:[],ar:[],
   leave:{alloc:{},reqs:[]},inv:[],goal:{total:0,net:0,fill:0,collect:0,salesG:{meet:0,to:0,deal:0,...monthRange()}},joins:[],quits:[],
-  adw:{},adwSample:{},adPrice:{j:35200,r:146000,rDays:3,o:220000,oDays:30},adAlias:{},adPersonBudget:{},adMembers:{},sales:[],pays:[],docreqs:[],contracts:[],interviews:[],blacklist:[],notifs:[]};}
+  adw:{},adwSample:{},adPrice:{j:35200,jDays:2,r:146000,rDays:3,o:220000,oDays:30},adAlias:{},adPersonBudget:{},adMembers:{},sales:[],pays:[],docreqs:[],contracts:[],interviews:[],blacklist:[],notifs:[]};}
 /* 화면 상태(S) → 저장 단위(문서) */
 function docsOf(s){const D=new Map();const put=(kind,key,branch,data)=>D.set(kind+"|"+key,{kind,key:String(key),branch:branch||null,data});
   HC_TABS.forEach(t=>(s.hc[t]||[]).forEach((g,i)=>put("hcg",g.name,g.branch,{...g,tab:t,idx:i})));
@@ -773,12 +773,12 @@ function wkLabel(w){const d=new Date(w);return `${d.getMonth()+1}/${d.getDate()}
    M지역: 한 번 올리면 rDays일(기본 3일: 첫날 무료 + 2일 결제) 동안 이어짐 → 그 안의 체크는 한 번만 계산.
    114114: 최초 결제일에 o원(기본 22만원), oDays일(기본 30일) 동안 유지 → 그 안의 체크는 추가 비용 없음.
    지난 주들에 올린 것이 이번 주까지 이어지는 것도 따져서 두 번 계산하지 않음 */
-const SPAN_M=["r","o"];
-function spanDays(m){const P=S.adPrice;return m==="r"?(+P.rDays||3):(+P.oDays||30);}
-function spanPrice(m){const P=S.adPrice;return m==="r"?(+P.r||0):(+P.o||0);}
+const SPAN_M=["j","r","o"];
+function spanDays(m){const P=S.adPrice;return m==="j"?(+P.jDays||2):m==="r"?(+P.rDays||3):(+P.oDays||30);}
+function spanPrice(m){const P=S.adPrice;return m==="j"?(+P.j||0):m==="r"?(+P.r||0):(+P.o||0);}
 /* 같은 날 같은 사람이 n개 올리면 n개가 동시에 노출됨. 노출 중인 개수보다 많이 적힌 만큼만 새로 결제 */
 const cntBy=arr=>{const o={};arr.forEach(p=>o[p]=(o[p]||0)+1);return o;};
-function adCarry(w,b,co){const out={r:{},o:{}};if(!w||!b)return out;const ev={};
+function adCarry(w,b,co){const out={j:{},r:{},o:{}};if(!w||!b)return out;const ev={};
   for(let k=8;k>=1;k--){const pw=iso(addDays(new Date(w),-7*k));const pr=((S.adw[pw]||{})[b]||[]).find(x=>coMatch(x.co,co));if(!pr)continue;
     pr.d.forEach((x,i)=>SPAN_M.forEach(m=>Object.entries(cntBy(ppl(x,m))).forEach(([p,n])=>{const key=m+"|"+p;(ev[key]=ev[key]||[]).push([i-7*k,n]);})));}
   Object.entries(ev).forEach(([key,L])=>{const [m,p]=key.split("|");let slots=[];L.sort((a,b)=>a[0]-b[0]).forEach(([d,n])=>{slots=slots.filter(e=>e>=d);for(let q=slots.length;q<n;q++)slots.push(d+spanDays(m)-1);});
@@ -786,7 +786,7 @@ function adCarry(w,b,co){const out={r:{},o:{}};if(!w||!b)return out;const ev={};
 function rowCost(r,w,b){const P=S.adPrice;const carry=adCarry(w,b,r.co);const out={j:0,r:0,o:0,k:0,u:0,cost:{j:0,r:0,o:0,k:0},by:{},missing:0,cover:{}};
   out.ch=[];const add=(p,m,amt,i)=>{const b=out.by[p]=out.by[p]||{j:0,r:0,o:0,k:0,u:0,cost:0};b[m]++;b.cost+=amt;out.ch.push({p,m,amt,i});};
   const slots={};SPAN_M.forEach(m=>Object.entries(carry[m]||{}).forEach(([p,L])=>{slots[m+"|"+p]=[...L];L.forEach(last=>{for(let k=0;k<=Math.min(6,last);k++)out.cover[m+"|"+k+"|"+p]=true;});}));
-  r.d.forEach((x,i)=>{LS(x,"j").forEach(p=>{out.j++;out.cost.j+=P.j;add(p,"j",P.j,i);});
+  r.d.forEach((x,i)=>{
     SPAN_M.forEach(m=>Object.entries(cntBy(ppl(x,m))).forEach(([p,n])=>{const key=m+"|"+p;const act=(slots[key]||[]).filter(e=>e>=i);
       for(let q=act.length;q<n;q++){const pr=spanPrice(m);out[m]++;out.cost[m]+=pr;add(p,m,pr,i);const end=i+spanDays(m)-1;act.push(end);for(let k=i+1;k<=Math.min(6,end);k++)out.cover[m+"|"+k+"|"+p]=true;}
       slots[key]=act;}));
@@ -845,7 +845,7 @@ function vADweek(){const [weeks,w,brs,br]=adWeekPick();
         return `<td class="adc ${dayIso(di)===iso(TODAY)?"tday":""}" data-act="adCell" data-r="${ri}" data-d="${di}" tabindex="0" aria-label="${esc(r.co)} ${mdShort(dayIso(di))} ${lab} 수정">${inner}</td>`;}).join("")+
       (mi===0?`<td class="num" rowspan="${rm.length}"><div class="dots">${r.d.map(x=>`<i class="${nAll(x)?"on":""}"></i>`).join("")}</div>${c.days}/7</td><td class="num cur" rowspan="${rm.length}">${c.total?won(c.total):""}${c.missing?'<div class="up sub">금액?</div>':""}</td>`:"")+`</tr>`;});});
   h+=meds.map(([m],i)=>`<tr class="tot"><td class="l" colspan="2">${i===0?"합계":""}</td><td><span class="mtag m${m}">${MSHORT[m]}</span></td>${[0,1,2,3,4,5,6].map(d=>{const n=rows.reduce((q,r)=>q+ppl(r.d[d],m).length,0);return `<td>${n||""}</td>`}).join("")}<td>${tot[m]}회</td><td>${m==="u"?"":won(tot.cost[m])}</td></tr>`).join("")+`<tr class="tot"><td class="l" colspan="10">이번 주 광고비 합계</td><td colspan="2">${won(tot.total)}원</td></tr></tbody></table></div>
-  <div class="tools" style="margin-top:10px"><button class="btn sm" data-act="adAddCo">+ 업체 추가</button><span class="sub">칸을 누르면 누가 올렸는지 체크합니다. M지역은 첫날만 체크하면 ${S.adPrice.rDays}일 노출(첫날 무료+2일 결제) 1건(같은 날 2개면 2), 114114는 최초 결제일만 체크하면 ${won(S.adPrice.o)}원으로 ${S.adPrice.oDays}일 유지(↳ 표시, 주를 넘어가도 이어짐). 당근은 금액을 같이 적습니다.</span></div>`;
+  <div class="tools" style="margin-top:10px"><button class="btn sm" data-act="adAddCo">+ 업체 추가</button><span class="sub">칸을 누르면 누가 올렸는지 체크합니다. M점프는 ${S.adPrice.jDays}일(첫날 무료+다음날 결제), M지역은 ${S.adPrice.rDays}일(첫날 무료+2일 결제) 동안 이어져 첫날만 체크하면 1건(같은 날 2개면 2), 114114는 최초 결제일만 체크하면 ${won(S.adPrice.o)}원으로 ${S.adPrice.oDays}일 유지(↳ 표시, 주를 넘어가도 이어짐). 당근은 금액을 같이 적습니다.</span></div>`;
   if(missing.length)h+=`<div class="banner" style="margin-top:12px">TO 현황에는 있는데 광고표에 없는 업체: ${missing.map(c=>`<button class="chip vis" style="border:0;cursor:pointer" data-act="adAddCo" data-v="${esc(c)}">+ ${esc(c)}</button>`).join(" ")}</div>`;
   h+=`<div class="card" style="margin-top:14px"><h3>${br} 주별 추이</h3><div class="tw" style="border:0"><table class="x"><thead><tr><th>주</th><th style="min-width:200px">광고 횟수</th><th>M점프</th><th>M지역</th><th>114114</th><th>당근</th>${trend.some(t=>t.u)?"<th>미구분</th>":""}<th>광고비</th></tr></thead><tbody>${trend.map(t=>`<tr class="${t.wk===w?"selw":""}"><td>${wkLabel(t.wk)}${S.adwSample[t.wk]?' <span class="chip vis">예시</span>':""}</td><td><div class="prow" style="grid-template-columns:1fr auto;margin:0">${mbar(t,tmax)}<span class="v">${t.cnt}회</span></div></td><td>${t.j}</td><td>${t.r}</td><td>${t.o}</td><td>${t.k}</td>${trend.some(x=>x.u)?`<td>${t.u}</td>`:""}<td class="cur">${t.total?won(t.total):"-"}</td></tr>`).join("")}</tbody></table></div>
    ${trend.some(t=>t.u)?'<p class="sub">‘미구분’은 매체 없이 적던 예전 엑셀 기록이라 금액이 계산되지 않습니다. 새 양식으로 올리는 주부터 M점프·M지역·114114·당근으로 나뉘고 광고비가 자동으로 잡힙니다.</p>':""}</div>`;
@@ -857,7 +857,7 @@ function vADcost(){const [weeks,w]=adWeekPick();const t=weekCost(w,visBR());
   rows.forEach(r=>{r.c={j:0,r:0,o:0,k:0,cost:0};r.ppl.forEach(([a,o])=>["j","r","o","k","cost"].forEach(k=>r.c[k]+=o[k]));});
   const legacyRep=w===AD_SEED_WEEK;const W=rows.reduce((s,r)=>s+r.week,0),U=rows.reduce((s,r)=>s+r.c.cost,0),M=rows.reduce((s,r)=>s+r.month,0);
   return `<div class="tools" style="margin-bottom:10px;justify-content:flex-end"><button class="btn sm" data-act="adWk" data-v="-1" aria-label="이전 주" ${weeks.indexOf(w)===0?"disabled":""}>◀</button><b>${wkLabel(w)}${S.adwSample[w]?' <span class="chip vis">예시</span>':""}</b><button class="btn sm" data-act="adWk" data-v="1" aria-label="다음 주" ${weeks.indexOf(w)===weeks.length-1?"disabled":""}>▶</button><button class="btn sm" data-act="adAlias">약칭·단가 설정</button>${S.role==="ceo"||S.role==="mgr"?'<button class="btn sm" data-act="budgetEdit">팀 예산 설정</button>':""}</div>
-  <div class="banner">광고표에 올린 기록으로 자동 계산합니다 — M점프 ${won(S.adPrice.j)}원/건 · M지역 ${won(S.adPrice.r)}원/${S.adPrice.rDays}일 · 114114 ${won(S.adPrice.o)}원/${S.adPrice.oDays}일 · 당근은 적은 금액 그대로.${legacyRep?" 이 주는 매체 구분 전 기록이라 자동 계산이 0원이고, 오른쪽에 엑셀 보고액을 같이 보여 드립니다.":""}</div>
+  <div class="banner">광고표에 올린 기록으로 자동 계산합니다 — M점프 ${won(S.adPrice.j)}원/${S.adPrice.jDays}일 · M지역 ${won(S.adPrice.r)}원/${S.adPrice.rDays}일 · 114114 ${won(S.adPrice.o)}원/${S.adPrice.oDays}일 · 당근은 적은 금액 그대로.${legacyRep?" 이 주는 매체 구분 전 기록이라 자동 계산이 0원이고, 오른쪽에 엑셀 보고액을 같이 보여 드립니다.":""}</div>
   <div class="grid g3" style="margin-bottom:14px"><div class="card kpi">${ring(pct(U,W))}<div><span>주 예산 사용률</span><b>${won(U)}원</b><span>주 예산 ${won(W)}원</span></div></div>
   <div class="card"><span class="sub">매체별 광고비</span><div class="prow"><span><span class="mtag mj">M점프</span> ${t.j}건</span>${bar(pct(t.cost.j,t.total)," ")}<span class="v">${won(t.cost.j)}</span></div><div class="prow"><span><span class="mtag mr">M지역</span> ${t.r}건</span>${bar(pct(t.cost.r,t.total)," ")}<span class="v">${won(t.cost.r)}</span></div><div class="prow"><span><span class="mtag mo">114114</span> ${t.o}건</span>${bar(pct(t.cost.o,t.total)," ")}<span class="v">${won(t.cost.o)}</span></div><div class="prow"><span><span class="mtag mk">당근</span> ${t.k}건</span>${bar(pct(t.cost.k,t.total)," ")}<span class="v">${won(t.cost.k)}</span></div></div>
   <div class="card"><span class="sub">주 예산 초과 담당</span><div class="big ${rows.some(r=>r.week&&r.c.cost>r.week)?"up":""}">${rows.filter(r=>r.week&&r.c.cost>r.week).length}명</div><span class="sub">월 예산 합계 ${won(M)}원</span>${t.missing?`<div class="up sub">당근 금액 빠진 곳 ${t.missing}건 — 광고표에서 채워 주세요</div>`:""}</div></div>
@@ -876,11 +876,11 @@ function adCellForm(ri,di){const w=S.ui.adWk,br=S.ui.adBr;const r=S.adw[w][br][r
   const cntOf=(m,p)=>LS(x,m).filter(q=>q===p).length;
   const cntG=(m,lab,note)=>`<div class="field"><span><span class="mtag m${m}">${lab}</span> ${note} <small class="sub">· 같은 날 2개 올렸으면 2</small></span><div class="cgrid">${opts.map(p=>{const n=cntOf(m,p);return `<label class="cnt ${n?"on":""}">${pChip(p)} ${esc(pName(p))}<span class="stp"><button type="button" onclick="cntStep(this,-1)" aria-label="빼기">−</button><input type="number" name="${m}n_${esc(p)}" value="${n||""}" placeholder="0" min="0" max="9" aria-label="${esc(pName(p))} ${lab} 개수"><button type="button" onclick="cntStep(this,1)" aria-label="더하기">+</button></span></label>`}).join("")}</div></div>`;
   const amtG=(m,lab)=>`<div class="field"><span><span class="mtag m${m}">${lab}</span> 올린 사람과 금액 <small class="sub">· 같은 날 2개면 금액을 쉼표로 (예: 15000, 8000)</small></span><div class="kgrid">${opts.map(p=>{const es=LS(x,m).filter(e=>e.p===p);return `<label><input type="checkbox" name="${m}" value="${esc(p)}" ${es.length?"checked":""}>${pChip(p)} ${esc(pName(p))}</label><input type="text" inputmode="numeric" name="${m}amt_${esc(p)}" value="${es.map(e=>e.amt||"").filter(Boolean).join(", ")}" placeholder="금액(원)" aria-label="${esc(pName(p))} ${lab} 금액">`}).join("")}</div></div>`;
-  modal(`${esc(r.co)} · ${mdShort(day)} (${DOW[new Date(day).getDay()]})`,cntG("j","M점프",`${won(S.adPrice.j)}원/건`)+cntG("r","M지역",`${won(S.adPrice.r)}원 · ${S.adPrice.rDays}일`)+grp("o","114114",`${won(S.adPrice.o)}원 · ${S.adPrice.oDays}일 유지 <small class="sub">· 최초 결제일에만 체크</small>`)+amtG("k","당근마켓")+(LS(x,"u").length?grp("u","매체 미구분","")+'<p class="sub">예전 기록입니다. 맞는 매체로 옮겨 체크하고 여기서 빼 주세요.</p>':""),
+  modal(`${esc(r.co)} · ${mdShort(day)} (${DOW[new Date(day).getDay()]})`,cntG("j","M점프",`${won(S.adPrice.j)}원 · ${S.adPrice.jDays}일`)+cntG("r","M지역",`${won(S.adPrice.r)}원 · ${S.adPrice.rDays}일`)+grp("o","114114",`${won(S.adPrice.o)}원 · ${S.adPrice.oDays}일 유지 <small class="sub">· 최초 결제일에만 체크</small>`)+amtG("k","당근마켓")+(LS(x,"u").length?grp("u","매체 미구분","")+'<p class="sub">예전 기록입니다. 맞는 매체로 옮겨 체크하고 여기서 빼 주세요.</p>':""),
    {wide:true,onSubmit:fd=>{const jj=[];opts.forEach(p=>{const n=Math.max(0,Math.min(9,+fd.get("jn_"+p)||0));for(let k=0;k<n;k++)jj.push(p);});const rr=[];opts.forEach(p=>{const n=Math.max(0,Math.min(9,+fd.get("rn_"+p)||0));for(let k=0;k<n;k++)rr.push(p);});r.d[di]={j:jj,r:rr,u:fd.getAll("u"),o:fd.getAll("o").map(p=>({p,amt:0})),k:fd.getAll("k").flatMap(p=>{const a=parseAmts(fd.get("kamt_"+p));return a.length?a.map(amt=>({p,amt})):[{p,amt:0}];})};toast("저장했습니다");}});}
-function adAliasForm(){const P=S.adPrice;modal("약칭·단가 설정",`<h3 style="margin:0 0 8px;font-size:15px">광고 단가</h3><div class="row3">${F("M점프 (원/건)",inp("pj",P.j,"number"))}${F("M지역 (원/회)",inp("pr",P.r,"number"))}${F("M지역 노출 일수",inp("pd",P.rDays,"number",'min="1"'))}</div><div class="row2">${F("114114 (원/회)",inp("po",P.o,"number"))}${F("114114 유지 일수",inp("pod",P.oDays,"number",'min="1"'))}</div><p class="sub">당근마켓은 매번 금액이 달라서 올릴 때마다 적습니다.</p>
+function adAliasForm(){const P=S.adPrice;modal("약칭·단가 설정",`<h3 style="margin:0 0 8px;font-size:15px">광고 단가</h3><div class="row2">${F("M점프 (원/회)",inp("pj",P.j,"number"))}${F("M점프 노출 일수",inp("pjd",P.jDays,"number",'min="1"'))}</div><div class="row2">${F("M지역 (원/회)",inp("pr",P.r,"number"))}${F("M지역 노출 일수",inp("pd",P.rDays,"number",'min="1"'))}</div><div class="row2">${F("114114 (원/회)",inp("po",P.o,"number"))}${F("114114 유지 일수",inp("pod",P.oDays,"number",'min="1"'))}</div><p class="sub">당근마켓은 매번 금액이 달라서 올릴 때마다 적습니다.</p>
   <h3 style="margin:14px 0 8px;font-size:15px">담당자 약칭</h3>${Object.entries(S.adAlias).map(([k,v])=>`<div class="row2">${F("약칭",`<input name="k" value="${esc(k)}">`)}${F("이름",sel("v",["",...STAFF,CEO_NAME],v))}</div>`).join("")}<div class="row2">${F("새 약칭",'<input name="k" value="">')}${F("이름",sel("v",["",...STAFF,CEO_NAME],""))}</div>`,
-  {onSubmit:fd=>{S.adPrice={j:+fd.get("pj")||0,r:+fd.get("pr")||0,rDays:Math.max(1,+fd.get("pd")||1),o:+fd.get("po")||0,oDays:Math.max(1,+fd.get("pod")||1)};const ks=fd.getAll("k"),vs=fd.getAll("v");const m={};ks.forEach((k,i)=>{if(k.trim())m[k.trim()]=vs[i]||k.trim();});S.adAlias=m;toast("저장했습니다");}});}
+  {onSubmit:fd=>{S.adPrice={j:+fd.get("pj")||0,jDays:Math.max(1,+fd.get("pjd")||1),r:+fd.get("pr")||0,rDays:Math.max(1,+fd.get("pd")||1),o:+fd.get("po")||0,oDays:Math.max(1,+fd.get("pod")||1)};const ks=fd.getAll("k"),vs=fd.getAll("v");const m={};ks.forEach((k,i)=>{if(k.trim())m[k.trim()]=vs[i]||k.trim();});S.adAlias=m;toast("저장했습니다");}});}
 function vAD(){const v=S.ui.adView||"week";
   return ph("광고 보고","TO 있는 업체에 주별로 누가 언제 M점프·M지역·114114·당근마켓에 광고를 올렸는지, 그 광고비가 얼마인지 봅니다.")+
   `<div class="subtabs"><button data-act="adView" data-v="week" aria-pressed="${v==="week"}">업체별 주간 광고표</button><button data-act="adView" data-v="cost" aria-pressed="${v==="cost"}">광고비 사용내역</button></div>`+(v==="week"?vADweek():vADcost());}
@@ -930,16 +930,24 @@ function parseAdSheet(sh){const grid={};let maxR=0;
       ts.forEach(t=>{if(mm==="o"){if(!cur.d[i].o.some(e=>e.p===t.p))cur.d[i].o.push({p:t.p,amt:0});}else if(mm==="k"){if(!t.amt)warn.push(`${cur.co} ${mdShort(day)} ${MSHORT[mm]} ${t.p} 금액 없음`);cur.d[i][mm].push(t);}else if(mm==="j"||mm==="r"){const n=t.amt>0&&t.amt<10?t.amt:1;for(let q=0;q<n;q++)cur.d[i][mm].push(t.p);}else if(!cur.d[i][mm].includes(t.p))cur.d[i][mm].push(t.p);});});}
   const empty=!rows.some(r=>r.d.some(x=>nAll(x)));
   return {br,week:mon,rows,warn,empty};}
+/* 엑셀 올리기는 덮어쓰지 않고 합칩니다: 이 파일에 나온 사람의 기록만 새 내용으로 바꾸고, 다른 사람이 올린 기록은 그대로 둡니다 */
+const AD_MS=["j","r","o","k","u"];const adP=e=>typeof e==="string"?e:e&&e.p;
+function adUpPeople(rows){const U=new Set();rows.forEach(r=>r.d.forEach(x=>AD_MS.forEach(m=>LS(x,m).forEach(e=>U.add(pName(adP(e)))))));return U;}
+function adMerge(ex,up){const U=adUpPeople(up);const out=clone(ex||[]);
+  out.forEach(r=>r.d.forEach(x=>AD_MS.forEach(m=>{if(x[m])x[m]=x[m].filter(e=>!U.has(pName(adP(e))));})));
+  up.forEach(u=>{let t=out.find(r=>coMatch(r.co,u.co));if(!t){t={co:u.co,d:Array.from({length:7},emptyDay)};out.push(t);}
+    u.d.forEach((x,i)=>{t.d[i]=t.d[i]||emptyDay();AD_MS.forEach(m=>{const add=LS(x,m);if(add.length)t.d[i][m]=[...(t.d[i][m]||[]),...clone(add)];});});});
+  return out;}
 function adUploadForm(){
-  modal("주간 광고표 엑셀 올리기",`<p class="sub" style="margin-top:0">‘하랑 주간광고현황 양식’을 올려 주세요. 시트 이름에 본사·천안·아산이 들어 있는 시트를 읽고, M점프·M지역·114114·당근마켓 줄을 나눠서 광고비까지 계산합니다.</p>
+  modal("주간 광고표 엑셀 올리기",`<p class="sub" style="margin-top:0">‘하랑 주간광고현황 양식’을 올려 주세요. 시트 이름에 본사·천안·아산이 들어 있는 시트를 읽고, M점프·M지역·114114·당근마켓 줄을 나눠서 광고비까지 계산합니다. 여러 사람이 각자 올려도 덮어쓰지 않고 합쳐집니다 — 파일에 나온 사람의 기록만 새 내용으로 바뀝니다.</p>
    <label class="field"><span>엑셀 파일 (.xlsx)</span><input type="file" id="adFile" accept=".xlsx"></label><div id="adPrev" class="sub"></div>`,{submit:"허브에 반영",onSubmit:fd=>{const P=window.__adParsed||[];if(!P.length){toast("먼저 파일을 골라 주세요");return;}
-    let n=0;P.forEach(p=>{if(p.error||!visBR().includes(p.br)||p.empty)return;S.adw[p.week]=S.adw[p.week]||{};S.adw[p.week][p.br]=p.rows;delete S.adwSample[p.week];n++;S.ui.adWk=p.week;S.ui.adBr=p.br;});window.__adParsed=null;toast(`${n}개 시트를 반영했습니다`);}});}
+    let n=0;P.forEach(p=>{if(p.error||!visBR().includes(p.br)||p.empty)return;S.adw[p.week]=S.adw[p.week]||{};const ex=S.adwSample[p.week]?null:S.adw[p.week][p.br];S.adw[p.week][p.br]=ex&&ex.length?adMerge(ex,p.rows):p.rows;delete S.adwSample[p.week];n++;S.ui.adWk=p.week;S.ui.adBr=p.br;});window.__adParsed=null;toast(`${n}개 시트를 반영했습니다`);}});}
 async function adFilePicked(f){const box=document.getElementById("adPrev");box.textContent="읽는 중…";
   try{const sheets=await readXlsx(await f.arrayBuffer());const P=sheets.map(parseAdSheet).filter(Boolean);window.__adParsed=P;
     if(!P.length){box.innerHTML='<p class="up">본사·천안·아산 이름이 들어간 시트가 없습니다.</p>';return;}
     box.innerHTML=`<div class="tw"><table class="x"><thead><tr><th>시트</th><th>주</th><th>업체</th><th>M점프</th><th>M지역</th><th>114114</th><th>당근</th><th>광고비</th><th>결과</th></tr></thead><tbody>${P.map(p=>{if(p.error)return `<tr><td>${p.br}</td><td colspan="7" class="l up">${esc(p.error)}</td><td>건너뜀</td></tr>`;
       const s=p.rows.map(r=>rowCost(r,p.week,p.br)).reduce((a,c)=>({j:a.j+c.j,r:a.r+c.r,o:a.o+c.o,k:a.k+c.k,u:a.u+c.u,t:a.t+c.total}),{j:0,r:0,o:0,k:0,u:0,t:0});const ex=(S.adw[p.week]||{})[p.br];const own=visBR().includes(p.br);
-      return `<tr><td>${p.br}</td><td>${wkLabel(p.week)}</td><td>${p.rows.length}곳</td><td>${s.j}</td><td>${s.r}</td><td>${s.o}</td><td>${s.k}</td><td>${won(s.t)}원${s.u?`<div class="sub">미구분 ${s.u}</div>`:""}</td><td>${p.empty?'<span class="chip mute">빈 시트 · 건너뜀</span>':!own?'<span class="chip mute">권한 없음 · 건너뜀</span>':ex?'<span class="chip vis">기존 내용 덮어씀</span>':'<span class="chip ok">새로 추가</span>'}</td></tr>`}).join("")}</tbody></table></div>
+      return `<tr><td>${p.br}</td><td>${wkLabel(p.week)}</td><td>${p.rows.length}곳</td><td>${s.j}</td><td>${s.r}</td><td>${s.o}</td><td>${s.k}</td><td>${won(s.t)}원${s.u?`<div class="sub">미구분 ${s.u}</div>`:""}</td><td>${p.empty?'<span class="chip mute">빈 시트 · 건너뜀</span>':!own?'<span class="chip mute">권한 없음 · 건너뜀</span>':ex&&!S.adwSample[p.week]?`<span class="chip vis">기존 내용과 합침</span><div class="sub">이 파일에 나온 ${[...adUpPeople(p.rows)].map(esc).join("·")||"사람"} 기록만 새로 바뀌고, 다른 사람 기록은 그대로</div>`:'<span class="chip ok">새로 추가</span>'}</td></tr>`}).join("")}</tbody></table></div>
       ${P.some(p=>p.warn&&p.warn.length)?`<p class="sub">확인할 점: ${P.flatMap(p=>p.warn||[]).slice(0,6).map(esc).join(" · ")}</p>`:""}`;}
   catch(err){box.innerHTML=`<p class="up">읽지 못했습니다: ${esc(err.message)}</p>`;window.__adParsed=null;}}
 
