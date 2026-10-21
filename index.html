@@ -424,10 +424,10 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1792569910";
+const HUB_BUILD="1792572114";
 async function checkBuild(){if(!/^\d+$/.test(HUB_BUILD))return;try{const t=await (await fetch(location.pathname+"?v="+Date.now(),{cache:"no-store"})).text();const m=t.match(/const HUB_BUILD="(\d+)"/);
   if(m&&m[1]!==HUB_BUILD){if(!document.querySelector(".overlay")&&!dirty&&!syncing){toast("새 버전으로 바꾸는 중…");setTimeout(()=>location.reload(),600);}}}catch(e){}}
-async function loadAll(force){if(!force&&(dirty||syncing)){clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),1500);return;}
+async function loadAll(force){if(!force&&(dirty||syncing||document.querySelector(".overlay"))){clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),1500);return;}
   try{const rows=await fetchAll();const ver=new Map(rows.map(r=>[r.kind+"|"+r.key,r.version]));
     const y=scrollY;const keepModal=document.querySelector(".overlay");const tab=S.tab;const notifs=S.notifs||[];S=buildS(rows,S.ui);if(tab)S.tab=tab;S.notifs=notifs;
     /* 기준점: 불러온 직후의 화면 상태 (기본값으로 채운 칸은 '바뀐 것'으로 보지 않음) */
@@ -1700,9 +1700,10 @@ function rosterParse(sheets){const out={};let found=false;
   return found?Object.values(out):null;}
 function rosterUpForm(){modal("근무자 명단 엑셀 올리기",`<p class="sub" style="margin-top:0">‘하랑_근무자명단_양식’의 <b>명단</b> 시트를 읽어 업체별 근무자 명단에 넣습니다. 이미 있는 이름은 전화번호·입사일·4대보험만 고치고, 없는 이름은 추가합니다. 명단을 넣으면 그 업체 합계인원은 명단 인원 수로 바뀝니다.</p>
   <label class="field"><span>엑셀 파일 (.xlsx)</span><input type="file" id="rosterFile" accept=".xlsx"></label><div id="rosterPrev" class="sub"></div>`,{wide:true,submit:"명단 반영",onSubmit:()=>{const L=(window.__roster||[]).filter(x=>x.tg);window.__roster=null;if(!L.length){toast("반영할 업체가 없습니다");return;}
-    let nA=0,nU=0;L.forEach(x=>{const r=x.tg.r;r.people=r.people||[];x.ppl.forEach(a=>{const ex=r.people.find(y=>!y.out&&norm(y.name)===norm(a.name));
+    const go=()=>{let nA=0,nU=0;L.forEach(x=>{const tg=rosterTarget(x.br,x.gb,x.co);if(!tg)return;const r=tg.r;r.people=r.people||[];x.ppl.forEach(a=>{const ex=r.people.find(y=>!y.out&&norm(y.name)===norm(a.name));
       if(ex){["phone","in","ins","insDate","memo"].forEach(k=>{if(a[k])ex[k]=a[k];});nU++;}else{const o={id:uid(),name:a.name};["phone","in","ins","insDate","memo"].forEach(k=>{if(a[k])o[k]=a[k];});r.people.push(o);nA++;}});rosterSync(r);});
-    toast(`${L.length}개 업체 · ${nA}명 추가${nU?` · ${nU}명 정보 수정`:""}`);}});}
+    toast(`${L.length}개 업체 · ${nA}명 추가${nU?` · ${nU}명 정보 수정`:""}`);};
+    if(typeof hubRefresh==="function"){toast("최신 내용을 불러와 명단을 넣는 중…");hubRefresh().then(()=>{go();save();render();});}else go();}});}
 async function rosterFilePicked(f){const box=document.getElementById("rosterPrev");box.textContent="읽는 중…";
   try{const L=rosterParse(await readXlsx(await f.arrayBuffer()));if(!L){box.innerHTML='<p class="up">‘업체’·‘이름’ 제목줄이 있는 명단 시트를 찾지 못했습니다.</p>';return;}
     L.forEach(x=>{x.tg=rosterTarget(x.br,x.gb,x.co);if(x.tg){const ex=rosterAct(x.tg.r);const add=x.ppl.filter(a=>!ex.some(y=>norm(y.name)===norm(a.name)));x.nAdd=new Set(add.map(a=>norm(a.name))).size;x.nUp=x.ppl.length-add.length;x.after=ex.length+x.nAdd;}});
