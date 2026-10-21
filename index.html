@@ -398,24 +398,24 @@ let SNAP=new Map(),syncT=null,syncing=false,dirty=false;
 const docJson=d=>stable(d.data)+"#"+(d.branch||"");
 function save(){try{localStorage.setItem("harang-ui-"+ME.id,JSON.stringify({ui:S.ui,tab:S.tab}));}catch(e){}if(!ME.id)return;dirty=true;clearTimeout(syncT);syncT=setTimeout(sync,350);}
 async function sync(){if(syncing){clearTimeout(syncT);syncT=setTimeout(sync,300);return;}syncing=true;dirty=false;setSyncState("저장 중…");
-  const now=docsOf(S);let conflict=false,denied=false,n=0;
+  const now=docsOf(S);let conflict=false,denied=false,n=0,why="";
   try{
     for(const [k,d] of now){const old=SNAP.get(k);const j=docJson(d);if(old&&old.json===j)continue;
       if(!old){const empty=d.data&&Array.isArray(d.data.rows)&&!d.data.rows.length;if(empty&&d.kind!=="adw")continue;}
       if(!canWrite(d.kind,d.branch,d.data)||(old&&old.version&&["ct","bl"].includes(d.kind)&&!canWrite(d.kind,old.branch,old.data))){if(old)old.skip=true;continue;}
       const row={kind:d.kind,key:d.key,branch:d.branch,data:d.data,updated_by:ME.id,updated_at:new Date().toISOString()};
       if(old&&old.version){const {data,error}=await sb.from("hub_data").update({...row,version:old.version+1}).eq("kind",d.kind).eq("key",d.key).eq("version",old.version).select("version");
-        if(error){denied=true;continue;}if(!data||!data.length){conflict=true;continue;}SNAP.set(k,{version:data[0].version,json:j,branch:d.branch,data:d.data});n++;}
+        if(error){denied=true;why=why||(d.kind+": "+(error.message||error.code||""));continue;}if(!data||!data.length){conflict=true;continue;}SNAP.set(k,{version:data[0].version,json:j,branch:d.branch,data:d.data});n++;}
       else{const {data,error}=await sb.from("hub_data").insert({...row,version:1}).select("version");
-        if(error){if(/duplicate|23505/.test((error.message||"")+(error.code||"")))conflict=true;else denied=true;continue;}SNAP.set(k,{version:1,json:j,branch:d.branch,data:d.data});n++;}}
+        if(error){if(/duplicate|23505/.test((error.message||"")+(error.code||"")))conflict=true;else{denied=true;why=why||(d.kind+": "+(error.message||error.code||""));}continue;}SNAP.set(k,{version:1,json:j,branch:d.branch,data:d.data});n++;}}
     for(const [k,old] of SNAP){if(now.has(k)||!old.version)continue;const [kind,...rest]=k.split("|");const key=rest.join("|");
       if(!canWrite(kind,old.branch,old.data))continue;if(kind==="iv"&&!(ME.role==="ceo"||ME.role==="mgr"||(old.data&&old.data.by===ME.name)))continue;
       const {data,error}=await sb.from("hub_data").delete().eq("kind",kind).eq("key",key).eq("version",old.version).select("key");
       if(error){denied=true;continue;}if(!data||!data.length){conflict=true;continue;}SNAP.delete(k);n++;}
-  }catch(e){denied=true;}
+  }catch(e){denied=true;why=why||String(e&&e.message||e);}
   syncing=false;
   if(conflict){toast("다른 사람이 먼저 바꾼 내용이 있어 최신 내용으로 불러왔습니다. 방금 바꾼 부분을 다시 확인해 주세요.");await loadAll(true);}
-  else if(denied){toast("권한이 없거나 연결이 끊겨 저장하지 못한 내용이 있습니다. 최신 내용으로 다시 불러옵니다.");await loadAll(true);}
+  else if(denied){toast("권한이 없거나 연결이 끊겨 저장하지 못한 내용이 있습니다. 최신 내용으로 다시 불러옵니다."+(why?" ("+why.slice(0,80)+")":""));console.warn("sync denied",why);await loadAll(true);}
   else setSyncState(n?"저장됨":"");}
 function setSyncState(t){const e=document.getElementById("syncst");if(e)e.textContent=t;if(t==="저장됨")setTimeout(()=>{if(e&&e.textContent==="저장됨")e.textContent="";},1500);}
 async function fetchAll(){const out=[];for(let from=0;;from+=1000){const {data,error}=await sb.from("hub_data").select("kind,key,branch,data,version").order("kind").order("key").range(from,from+999);
@@ -424,7 +424,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1792572114";
+const HUB_BUILD="1792572677";
 async function checkBuild(){if(!/^\d+$/.test(HUB_BUILD))return;try{const t=await (await fetch(location.pathname+"?v="+Date.now(),{cache:"no-store"})).text();const m=t.match(/const HUB_BUILD="(\d+)"/);
   if(m&&m[1]!==HUB_BUILD){if(!document.querySelector(".overlay")&&!dirty&&!syncing){toast("새 버전으로 바꾸는 중…");setTimeout(()=>location.reload(),600);}}}catch(e){}}
 async function loadAll(force){if(!force&&(dirty||syncing||document.querySelector(".overlay"))){clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),1500);return;}
