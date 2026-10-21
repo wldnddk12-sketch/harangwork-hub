@@ -179,7 +179,12 @@ tr.dragging td{opacity:.45}tr.dropto td{box-shadow:inset 0 3px 0 var(--brand)}
 .paytot{display:flex;gap:14px;flex-wrap:wrap;justify-content:space-between;margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--brand-soft)}
 .paytbl tr.paid td{opacity:.6}.paytbl td{vertical-align:top}.paysheet h3{flex-wrap:wrap;gap:8px}
 .warncard{border-color:#F2B705!important;box-shadow:inset 4px 0 0 #F2B705}.latecard{border-color:#E9A3A3!important;box-shadow:inset 4px 0 0 #C62828}.soontxt{color:#9A6A00}
-.cttbl tr.ct-soon td{background:#FFF8E1}.cttbl tr.ct-late td{background:#FDECEC}.cttbl tr.ct-renew td{opacity:.6}.ivtbl tr.ivtoday td{background:#EEF4FD}.ivtbl td.nowrap{white-space:normal}.ivtbl .seg button{white-space:nowrap}
+.cttbl tr.ct-soon td{background:#FFF8E1}.cttbl tr.ct-late td{background:#FDECEC}.cttbl tr.ct-renew td{opacity:.6}.ivtbl tr.ivtoday td{background:#EEF4FD}.ivtbl .seg button{white-space:nowrap}
+@media (min-width:821px){.ivtbl{font-size:12.5px}.ivtbl th,.ivtbl td{padding:5px 6px}.ivtbl th{white-space:nowrap}
+ .ivtbl .gseg button{padding:3px 5px;font-size:11.5px}.ivtbl td:nth-child(8) a{white-space:nowrap}.ivtbl td.nowrap{white-space:nowrap}
+ .ivtbl .ivact{white-space:nowrap}.ivtbl .ivact .btn,.ivtbl .ivact .chip{padding:2px 5px;font-size:11.5px;margin:0 1px}
+ .ivtbl td:nth-child(9){white-space:normal;max-width:90px}.ivtbl td:nth-child(11),.ivtbl td:nth-child(12){white-space:nowrap}
+ .ivtbl td:nth-child(10) .sub{font-size:12px}.ivtbl td:nth-child(10){min-width:120px;white-space:normal}}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .cttbl tr.ct-soon td{background:#3A3010}:root:not([data-theme="light"]) .cttbl tr.ct-late td{background:#3E1E1E}:root:not([data-theme="light"]) .ivtbl tr.ivtoday td{background:#1E2F4A}}
 :root[data-theme="dark"] .cttbl tr.ct-soon td{background:#3A3010}:root[data-theme="dark"] .cttbl tr.ct-late td{background:#3E1E1E}:root[data-theme="dark"] .ivtbl tr.ivtoday td{background:#1E2F4A}
 .gradebar{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}.gcard{padding:10px 12px!important}.gcard .big{font-size:22px}
@@ -424,7 +429,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1792572677";
+const HUB_BUILD="1792572943";
 async function checkBuild(){if(!/^\d+$/.test(HUB_BUILD))return;try{const t=await (await fetch(location.pathname+"?v="+Date.now(),{cache:"no-store"})).text();const m=t.match(/const HUB_BUILD="(\d+)"/);
   if(m&&m[1]!==HUB_BUILD){if(!document.querySelector(".overlay")&&!dirty&&!syncing){toast("새 버전으로 바꾸는 중…");setTimeout(()=>location.reload(),600);}}}catch(e){}}
 async function loadAll(force){if(!force&&(dirty||syncing||document.querySelector(".overlay"))){clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),1500);return;}
@@ -1097,7 +1102,7 @@ function vIV(){const f=S.ui.ivF||"all",q=(S.ui.ivQ||"").trim();const full=ivList
    <td class="l">${esc(v.co)}</td><td><b>${esc(v.name)}</b>${blTag(v.phone)}${v.from?`<div class="sub">${esc(v.from)}</div>`:""}</td><td>${esc(v.sex||"")}</td><td>${v.age||""}</td><td class="l">${esc(v.addr||"")}</td><td>${v.car?`<span class="chip ${v.car==="있음"?"ok":"mute"}">${esc(v.car)}</span>`:""}</td>
    <td class="nowrap">${v.phone?`<a href="tel:${esc(String(v.phone).replace(/\D/g,""))}">${esc(v.phone)}</a>`:""}</td><td>${esc(v.visa||"")}</td><td class="l"><span class="sub">${esc(v.note||"")}</span></td>
    <td class="nowrap">${v.date?mdShort(v.date):""}</td><td>${esc(v.mgr||"")}</td>
-   <td class="nowrap">${v.joinId?'<span class="chip ok">입사예정 등록됨</span> ':`<button class="btn sm" data-act="ivJoin" data-id="${v.id}">입사예정자</button> `}${blHit(v.phone)?"":`<button class="btn sm danger" data-act="ivBl" data-id="${v.id}">블랙리스트</button> `}<button class="btn sm" data-act="ivEdit" data-id="${v.id}">수정</button></td></tr>`).join("")}</tbody></table></div>`:`<div class="empty">해당하는 지원자가 없습니다.</div>`}`;}
+   <td class="ivact">${v.joinId?'<span class="chip ok" title="입사예정자 등록됨">입사예정</span>':`<button class="btn sm" data-act="ivJoin" data-id="${v.id}" title="입사예정자로 넘기기">입사예정자</button>`}${blHit(v.phone)?"":`<button class="btn sm danger" data-act="ivBl" data-id="${v.id}" title="블랙리스트로 옮기기">블랙리스트</button>`}<button class="btn sm" data-act="ivEdit" data-id="${v.id}">수정</button></td></tr>`).join("")}</tbody></table></div>`:`<div class="empty">해당하는 지원자가 없습니다.</div>`}`;}
 function ivForm(v,after){const n=!v||!v.id;v={branch:myBr()==="본사"?"본사":myBr(),date:iso(TODAY),time:"",grade:"상태미정",co:"",name:"",sex:"",age:"",addr:"",car:"",phone:"",visa:"내국인",note:"",mgr:me(),...(v||{})};
   const cos=[...new Set([...HC_TABS.flatMap(t=>(S.hc[t]||[]).flatMap(g=>g.rows.map(r=>r.co))),...BRANCHES.flatMap(b=>(S.to[b]||[]).map(r=>r.co))])];
   modal(n?(after?`${esc(v.name)} — 지원 DB로 넘기기`:"지원자 등록"):"지원자 수정",`${after?`<p class="banner" style="margin-top:0">입사예정자에서 넘어온 사람입니다. 성별·나이·거주지·자차 등을 채워 두면 나중에 찾기 쉽습니다.</p>`:""}<div class="row3">${F("상태",sel("grade",GRADES,gv(v)))}${F("면접일",inp("date",v.date||"","date"))}${F("지사",sel("branch",ctVisBR(),v.branch))}</div>
