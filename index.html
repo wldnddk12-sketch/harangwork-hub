@@ -171,7 +171,7 @@ tr.dragging td{opacity:.45}tr.dropto td{box-shadow:inset 0 3px 0 var(--brand)}
 .paycards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
 .paycard{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
 .paycard.gb{border-top:3px solid #E69A2E}.paycard.paid{opacity:.6}
-.pch{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:15px;border-bottom:1px dashed var(--line);padding-bottom:8px}.pch .pnm{font-size:16px}
+.pch{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:15px;border-bottom:1px dashed var(--line);padding-bottom:8px}.pch .pnm{font-size:16px}.pch .pat{margin-left:auto;font-size:12px;color:var(--muted);font-weight:400}
 .pdays{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;font-variant-numeric:tabular-nums}
 .pdays li{display:grid;grid-template-columns:62px 1fr;column-gap:8px;font-size:14px;line-height:1.5}.pdays .pd{font-weight:600}.pdays .pd small{color:var(--muted);font-weight:400}.pdays .pn{grid-column:2;font-size:12.5px;color:var(--late)}.pdays .pn0{color:var(--late)}
 .pcf{display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px dashed var(--line);padding-top:8px}.pamt input{width:110px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:inherit;margin-right:3px;font:inherit}
@@ -424,7 +424,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1792545097";
+const HUB_BUILD="1792546642";
 async function checkBuild(){if(!/^\d+$/.test(HUB_BUILD))return;try{const t=await (await fetch(location.pathname+"?v="+Date.now(),{cache:"no-store"})).text();const m=t.match(/const HUB_BUILD="(\d+)"/);
   if(m&&m[1]!==HUB_BUILD){if(!document.querySelector(".overlay")&&!dirty&&!syncing){toast("새 버전으로 바꾸는 중…");setTimeout(()=>location.reload(),600);}}}catch(e){}}
 async function loadAll(force){if(!force&&(dirty||syncing)){clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),1500);return;}
@@ -914,24 +914,29 @@ async function unzipXlsx(buf){const dv=new DataView(buf),u8=new Uint8Array(buf);
   const read=async name=>{const f=files[name];if(!f)return null;if(f.m===0)return td.decode(f.data);
     const s=new Blob([f.data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));return await new Response(s).text();};
   return read;}
-async function readXlsx(buf){const read=await unzipXlsx(buf);const P=s=>new DOMParser().parseFromString(s,"application/xml");
-  const ss=[];const sst=await read("xl/sharedStrings.xml");if(sst)[...P(sst).getElementsByTagName("si")].forEach(si=>ss.push([...si.getElementsByTagName("t")].map(t=>t.textContent).join("")));
-  const wbx=P(await read("xl/workbook.xml"));const rels=P(await read("xl/_rels/workbook.xml.rels"));const rmap={};[...rels.getElementsByTagName("Relationship")].forEach(r=>rmap[r.getAttribute("Id")]=r.getAttribute("Target"));
-  const out=[];for(const sh of wbx.getElementsByTagName("sheet")){const rid=sh.getAttribute("r:id")||sh.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","id");
-    let t=rmap[rid]||"";t=t.startsWith("/")?t.slice(1):"xl/"+t.replace(/^\.\//,"");const x=await read(t);if(!x)continue;const cells={};
-    for(const c of P(x).getElementsByTagName("c")){const ref=c.getAttribute("r"),ty=c.getAttribute("t");const v=c.getElementsByTagName("v")[0];let val=null;
-      if(ty==="s")val=v?ss[+v.textContent]:null;else if(ty==="inlineStr")val=[...c.getElementsByTagName("t")].map(t=>t.textContent).join("");else if(ty==="str"||ty==="e")val=v?v.textContent:null;else if(ty==="b")val=v?v.textContent==="1":null;else val=v&&v.textContent!==""?+v.textContent:null;
-      if(val!==null&&val!=="")cells[ref]=val;}
-    out.push({name:sh.getAttribute("name"),cells});}
+async function readXlsx(buf){const read=await unzipXlsx(buf);const P=s=>new DOMParser().parseFromString(s,"application/xml");const T=(n,tag)=>[...n.getElementsByTagNameNS("*",tag)];
+  const ss=[];const sst=await read("xl/sharedStrings.xml");if(sst)T(P(sst),"si").forEach(si=>ss.push(T(si,"t").map(t=>t.textContent).join("")));
+  const wbx=P(await read("xl/workbook.xml"));const rels=P(await read("xl/_rels/workbook.xml.rels")||"<r/>");const rmap={};T(rels,"Relationship").forEach(r=>rmap[r.getAttribute("Id")]=r.getAttribute("Target"));
+  const out=[];let k=0;for(const sh of T(wbx,"sheet")){k++;const rid=sh.getAttribute("r:id")||sh.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","id")||[...sh.attributes].find(a=>a.localName==="id"&&a.name!=="sheetId")?.value;
+    let t=rmap[rid]||`worksheets/sheet${k}.xml`;t=t.startsWith("/")?t.slice(1):(t.startsWith("xl/")?t:"xl/"+t.replace(/^\.\//,""));const x=await read(t);if(!x)continue;const cells={};
+    let rn=0;for(const row of T(P(x),"row")){rn=+row.getAttribute("r")||rn+1;let cn=0;
+     for(const c of T(row,"c")){let ref=c.getAttribute("r");if(ref){cn=colN(ref.replace(/\d+/g,""));}else{cn++;ref=colL(cn-1)+rn;}const ty=c.getAttribute("t");const v=T(c,"v")[0];let val=null;
+      if(ty==="s")val=v?ss[+v.textContent]:null;else if(ty==="inlineStr")val=T(c,"t").map(t=>t.textContent).join("");else if(ty==="str"||ty==="e")val=v?v.textContent:null;else if(ty==="b")val=v?v.textContent==="1":null;else val=v&&v.textContent!==""?+v.textContent:null;
+      if(val!==null&&val!=="")cells[ref]=val;}}
+    out.push({name:sh.getAttribute("name")||"",cells});}
   return out;}
 const colN=s=>s.split("").reduce((a,ch)=>a*26+ch.charCodeAt(0)-64,0);
 const serial2iso=n=>{const d=new Date(Date.UTC(1899,11,30)+Math.round(n)*864e5);return d.getUTCFullYear()+"-"+pad(d.getUTCMonth()+1)+"-"+pad(d.getUTCDate());};
-function parseAdSheet(sh){const grid={};let maxR=0;
+function parseAdSheet(sh,forceBr){const grid={};let maxR=0;
   Object.entries(sh.cells).forEach(([ref,v])=>{const m=ref.match(/^([A-Z]+)(\d+)$/);const r=+m[2],c=colN(m[1]);(grid[r]=grid[r]||{})[c]=v;maxR=Math.max(maxR,r);});
-  const br=BRANCHES.find(b=>sh.name.includes(b));if(!br)return null;
+  const top=[1,2,3].map(r=>Object.values(grid[r]||{}).filter(v=>typeof v==="string").join(" ")).join(" ");
+  let br=BRANCHES.find(b=>sh.name.includes(b))||BRANCHES.find(b=>top.includes("— "+b)||top.includes("현황 "+b)||top.includes("- "+b));let guessed=false;
+  if(!br){if(!forceBr)return null;br=forceBr;guessed=true;}
   let hr=0,dcols=[];for(let r=1;r<=maxR&&!hr;r++){const row=grid[r]||{};if(!Object.values(row).some(v=>typeof v==="string"&&v.replace(/\s/g,"").startsWith("업체")))continue;
-    const ds=Object.entries(row).filter(([c,v])=>typeof v==="number"&&v>30000&&v<80000).map(([c,v])=>[+c,serial2iso(v)]);if(ds.length>=4){hr=r;dcols=ds.sort((a,b)=>a[0]-b[0]);}}
-  if(!hr)return {br,error:"날짜가 있는 제목줄(업체 · 날짜)을 찾지 못했습니다"};
+    const ds=Object.entries(row).filter(([c,v])=>typeof v==="number"&&v>30000&&v<80000).map(([c,v])=>[+c,serial2iso(v)]);if(ds.length>=4){hr=r;dcols=ds.sort((a,b)=>a[0]-b[0]);}
+    else{/* 날짜 칸이 글자로 저장된 파일: B2의 주 시작일(월)로 C~I열 날짜를 정함 */const b2=(grid[2]||{})[2];let st=null;if(typeof b2==="number"&&b2>30000&&b2<80000)st=serial2iso(b2);else if(typeof b2==="string"){const m=b2.match(/(\d{4})\D(\d{1,2})\D(\d{1,2})/);if(m)st=iso(new Date(+m[1],+m[2]-1,+m[3]));}
+      if(st){hr=r;dcols=[0,1,2,3,4,5,6].map(i=>[3+i,iso(addDays(new Date(st),i))]);}}}
+  if(!hr)return {br,guessed,error:"날짜가 있는 제목줄(업체 · 날짜)을 찾지 못했습니다"};
   const d0=new Date(dcols[0][1]);const mon=iso(addDays(d0,-((d0.getDay()+6)%7)));
   const LAB=v=>{if(v===114114)return "o";if(typeof v!=="string")return null;const s=v.replace(/\s/g,"").toLowerCase();if(/^(m|엠)점프$/.test(s))return "j";if(/^(m|엠)지역$/.test(s))return "r";if(s==="114114"||s==="114")return "o";if(s==="당근"||s==="당근마켓")return "k";if(s==="광고"||s==="알바몬")return "u";if(s==="면접"||s==="입사")return "x";return null;};
   const toks=v=>{if(v==null||typeof v==="number")return [];const out=[];let last="";
@@ -948,7 +953,7 @@ function parseAdSheet(sh){const grid={};let maxR=0;
       const mm=m==="x"?"u":m;if(m==="x")warn.push(`${cur.co} ${mdShort(day)} ${le[1]}칸에 '${row[c]}' → 광고로 처리`);
       ts.forEach(t=>{if(mm==="o"){if(!cur.d[i].o.some(e=>e.p===t.p))cur.d[i].o.push({p:t.p,amt:0});}else if(mm==="k"){if(!t.amt)warn.push(`${cur.co} ${mdShort(day)} ${MSHORT[mm]} ${t.p} 금액 없음`);cur.d[i][mm].push(t);}else if(mm==="j"||mm==="r"){const n=t.amt>0&&t.amt<10?t.amt:1;for(let q=0;q<n;q++)cur.d[i][mm].push(t.p);}else if(!cur.d[i][mm].includes(t.p))cur.d[i][mm].push(t.p);});});}
   const empty=!rows.some(r=>r.d.some(x=>nAll(x)));
-  return {br,week:mon,rows,warn,empty};}
+  return {br,week:mon,rows,warn,empty,guessed,sheet:sh.name};}
 /* 엑셀 올리기는 덮어쓰지 않고 합칩니다: 이 파일에 나온 사람의 기록만 새 내용으로 바꾸고, 다른 사람이 올린 기록은 그대로 둡니다 */
 const AD_MS=["j","r","o","k","u"];const adP=e=>typeof e==="string"?e:e&&e.p;
 function adUpPeople(rows){const U=new Set();rows.forEach(r=>r.d.forEach(x=>AD_MS.forEach(m=>LS(x,m).forEach(e=>U.add(pName(adP(e)))))));return U;}
@@ -964,12 +969,15 @@ function adUploadForm(){
     /* 실제 허브: 합치기 직전에 서버의 최신 내용을 먼저 불러와서, 방금 다른 사람이 올린 기록도 빠짐없이 합칩니다 */
     if(typeof hubRefresh==="function"){toast("최신 내용을 불러와 합치는 중…");hubRefresh().then(()=>{go();save();render();});}else go();}});}
 async function adFilePicked(f){const box=document.getElementById("adPrev");box.textContent="읽는 중…";
-  try{const sheets=await readXlsx(await f.arrayBuffer());const P=sheets.map(parseAdSheet).filter(Boolean);window.__adParsed=P;
-    if(!P.length){box.innerHTML='<p class="up">본사·천안·아산 이름이 들어간 시트가 없습니다.</p>';return;}
+  try{const sheets=await readXlsx(await f.arrayBuffer());let P=sheets.map(s=>parseAdSheet(s)).filter(Boolean);
+    /* 시트 이름에 지사가 없으면 (예: Sheet1) 지금 보고 있는 지사 탭으로 읽음 */
+    if(!P.length){const fb=visBR().includes(S.ui.adBr)?S.ui.adBr:visBR()[0];P=sheets.map(s=>parseAdSheet(s,fb)).filter(p=>p&&!p.error&&!p.empty);if(P.length>1)P=P.slice(0,1);}
+    window.__adParsed=P;
+    if(!P.length){box.innerHTML=`<p class="up">광고표를 찾지 못했습니다. ‘하랑 주간광고현황 양식’이 맞는지, ‘업체 · 매체 · 날짜’ 제목줄이 있는지 확인해 주세요.</p><p class="sub">읽은 시트: ${sheets.map(s=>esc(s.name)).join(", ")||"없음"}</p>`;return;}
     box.innerHTML=`<div class="tw"><table class="x"><thead><tr><th>시트</th><th>주</th><th>업체</th><th>M점프</th><th>M지역</th><th>114114</th><th>당근</th><th>광고비</th><th>결과</th></tr></thead><tbody>${P.map(p=>{if(p.error)return `<tr><td>${p.br}</td><td colspan="7" class="l up">${esc(p.error)}</td><td>건너뜀</td></tr>`;
       const s=p.rows.map(r=>rowCost(r,p.week,p.br)).reduce((a,c)=>({j:a.j+c.j,r:a.r+c.r,o:a.o+c.o,k:a.k+c.k,u:a.u+c.u,t:a.t+c.total}),{j:0,r:0,o:0,k:0,u:0,t:0});const ex=(S.adw[p.week]||{})[p.br];const own=visBR().includes(p.br);
       return `<tr><td>${p.br}</td><td>${wkLabel(p.week)}</td><td>${p.rows.length}곳</td><td>${s.j}</td><td>${s.r}</td><td>${s.o}</td><td>${s.k}</td><td>${won(s.t)}원${s.u?`<div class="sub">미구분 ${s.u}</div>`:""}</td><td>${p.empty?'<span class="chip mute">빈 시트 · 건너뜀</span>':!own?'<span class="chip mute">권한 없음 · 건너뜀</span>':ex&&!S.adwSample[p.week]?`<span class="chip vis">기존 내용과 합침</span><div class="sub">이 파일에 나온 ${[...adUpPeople(p.rows)].map(esc).join("·")||"사람"} 기록만 새로 바뀌고, 다른 사람 기록은 그대로</div>`:'<span class="chip ok">새로 추가</span>'}</td></tr>`}).join("")}</tbody></table></div>
-      ${P.some(p=>p.warn&&p.warn.length)?`<p class="sub">확인할 점: ${P.flatMap(p=>p.warn||[]).slice(0,6).map(esc).join(" · ")}</p>`:""}`;}
+      ${P.some(p=>p.guessed)?`<p class="banner" style="margin:8px 0 0">시트 이름(${P.filter(p=>p.guessed).map(p=>esc(p.sheet||"")).join(", ")})에 지사 이름이 없어서 지금 보고 있는 <b>${P.find(p=>p.guessed).br}</b> 광고표로 읽었습니다. 다른 지사면 닫고 그 지사 탭을 고른 뒤 다시 올려 주세요.</p>`:""}${P.some(p=>p.warn&&p.warn.length)?`<p class="sub">확인할 점: ${P.flatMap(p=>p.warn||[]).slice(0,6).map(esc).join(" · ")}</p>`:""}`;}
   catch(err){box.innerHTML=`<p class="up">읽지 못했습니다: ${esc(err.message)}</p>`;window.__adParsed=null;}}
 
 /* ---------- 타임트리 ---------- */
@@ -1314,6 +1322,7 @@ function payLine(p){const paid=p.status==="지급완료";
    ${!paid&&(p.by===me()||canPay())?`<button class="btn sm" data-act="payEdit" data-id="${p.id}">수정</button>`:""}</div></div>`;}
 /* 담당자별·주별 취합 시트 */
 const payWk=at=>{const d=new Date(String(at).slice(0,10));return iso(addDays(d,-((d.getDay()+6)%7)));};
+const payAtTxt=(p,full)=>{const d=String(p.at||"").slice(0,10);if(!d)return "";return `${mdShort(d)}(${DOW[new Date(d).getDay()]})${full?" "+String(p.at).slice(11,16):""}`;};
 const payDaysTxt=p=>p.days.map(d=>`${mdShort(d.date)} ${d.start?d.start+"~"+d.end:""}${d.note?" "+d.note:""}`.trim()).join(", ");
 function paySheets(L){const g={};L.forEach(p=>{const k=p.by+"|"+payWk(p.at);(g[k]=g[k]||[]).push(p);});
   return Object.entries(g).map(([k,ps])=>({k,by:ps[0].by,wk:payWk(ps[0].at),ps:ps.sort((a,b)=>(a.type===b.type?0:a.type==="가불"?-1:1)||String(a.co).localeCompare(String(b.co),"ko")||String(a.name).localeCompare(String(b.name),"ko"))}))
@@ -1321,11 +1330,11 @@ function paySheets(L){const g={};L.forEach(p=>{const k=p.by+"|"+payWk(p.at);(g[k
 function paySheetCard(sh){const ps=sh.ps,wait=ps.filter(p=>p.status!=="지급완료");const gb=ps.filter(p=>p.type==="가불"),jb=ps.filter(p=>p.type==="주급");
   const sum=a=>a.reduce((t,p)=>t+(+p.amt||0),0);const nB=new Set(ps.map(p=>p.batch)).size;
   return `<div class="card paysheet"><h3><span>${esc(sh.by)} <span class="sub">${wkLabel(sh.wk)} 주 · 신청 ${nB}회 · ${ps.length}명 (가불 ${gb.length} · 주급 ${jb.length})</span></span>
-   <span class="tools">${canPay()&&wait.length?`<button class="btn sm primary" data-act="paySheetDone" data-v="${wait.map(p=>p.id).join(",")}">대기 ${wait.length}명 모두 지급완료</button>`:""}<button class="btn sm" data-act="payCsv" data-v="${esc(sh.k)}">엑셀로 받기</button></span></h3>
+   <span class="tools">${canPay()&&wait.length?`<button class="btn sm primary" data-act="paySheetDone" data-v="${wait.map(p=>p.id).join(",")}">대기 ${wait.length}명 모두 지급완료</button>`:""}<button class="btn sm" data-act="payCsv" data-v="${esc(sh.k)}">엑셀로 받기</button>${canPay()?'<button class="btn sm" data-act="payUp">금액 엑셀 올리기</button>':""}</span></h3>
    <div class="paycards">${ps.map(p=>{const paid=p.status==="지급완료";return `<div class="paycard ${paid?"paid":""} ${p.type==="가불"?"gb":""}">
-     <div class="pch"><span class="chip ${p.type==="가불"?"vis":""}">${p.type}</span><b>${esc(p.co)}</b> <b class="pnm">${esc(p.name)}</b></div>
-     <ol class="pdays">${p.days.map(d=>`<li><span class="pd">${mdShort(d.date)} <small>${d.date?DOW[new Date(d.date).getDay()]:""}</small></span>${d.start?`<span class="pt">${d.start} ~ ${d.end}</span>${d.note?`<span class="pn">${esc(d.note)}</span>`:""}`:`<span class="pt pn0">${esc(d.note||"")}</span>`}</li>`).join("")||'<li class="sub">근무 내역 없음</li>'}</ol>
-     <div class="pcf"><span class="sub">근무 <b>${p.workDays}</b>일</span><span class="pamt">${p.type==="주급"&&canPay()&&!paid?`<input type="number" data-payamt="${p.id}" value="${p.amt||""}" placeholder="금액" step="1000" min="0" aria-label="${esc(p.name)} 주급 금액">원`:p.amt?`<b>${won(p.amt)}원</b>`:'<span class="sub">금액 -</span>'}</span></div>
+     <div class="pch"><span class="chip ${p.type==="가불"?"vis":""}">${p.type}</span><b>${esc(p.co)}</b> <b class="pnm">${esc(p.name)}</b><span class="pat">${payAtTxt(p)} 신청</span></div>
+     <ol class="pdays">${p.days.map(d=>`<li><span class="pd">${mdShort(d.date)} <small>${d.date?DOW[new Date(d.date).getDay()]:""}</small></span>${d.start?`<span class="pt">${d.start} ~ ${d.end}</span>${d.note?`<span class="pn">${esc(d.note)}</span>`:""}`:`<span class="pt pn0">${esc(d.note||"")}</span>`}</li>`).join("")||(p.type==="가불"?`<li class="sub">가불 신청 ${payAtTxt(p,1)}</li>`:'<li class="sub">근무 내역 없음</li>')}</ol>
+     <div class="pcf"><span class="sub">${p.type==="가불"&&!p.days.length?`신청 <b>${mdShort(String(p.at).slice(0,10))}</b>`:`근무 <b>${p.workDays}</b>일`}</span><span class="pamt">${p.type==="주급"&&canPay()&&!paid?`<input type="number" data-payamt="${p.id}" value="${p.amt||""}" placeholder="금액" step="1000" min="0" aria-label="${esc(p.name)} 주급 금액">원`:p.amt?`<b>${won(p.amt)}원</b>`:'<span class="sub">금액 -</span>'}</span></div>
      <div class="pcb">${paid?`<span class="chip ok">지급완료${p.paidBy?" · "+esc(p.paidBy):""}</span>${canPay()?` <button class="btn sm" data-act="payUndo" data-id="${p.id}">되돌리기</button>`:""}`:`${canPay()?`<button class="btn sm primary" data-act="payDone" data-id="${p.id}">지급완료</button>`:'<span class="chip mute">대기</span>'}`}${!paid&&(p.by===me()||canPay())?` <button class="btn sm" data-act="payEdit" data-id="${p.id}">수정</button>`:""}</div></div>`}).join("")}</div>
    <div class="paytot"><b>합계 ${ps.length}명</b><span>${gb.length?`가불 ${won(sum(gb))}원`:""}${gb.length&&sum(jb)?" · ":""}${sum(jb)?`주급 ${won(sum(jb))}원`:""}</span><span>${wait.length?`대기 ${wait.length}`:"모두 완료"}</span></div></div>`;}
 /* 간단한 엑셀(.xlsx) 만들기 — 외부 라이브러리 없이 */
@@ -1346,13 +1355,13 @@ function xlsxBlob(sheet,cells,widths,freezeRow,opt){opt=opt||{};const rows={};ce
   const sd=Object.keys(rows).map(Number).sort((a,b)=>a-b).map(r=>`<row r="${r+1}">${rows[r].sort((a,b)=>a.c-b.c).map(x=>{const ref=colL(x.c)+(r+1),st=x.s?` s="${x.s}"`:"";
     if(x.f)return `<c r="${ref}"${st}><f>${xe(x.f)}</f></c>`;if(typeof x.v==="number")return `<c r="${ref}"${st}><v>${x.v}</v></c>`;if(x.v==null||x.v==="")return `<c r="${ref}"${st}/>`;
     return `<c r="${ref}"${st} t="inlineStr"><is><t xml:space="preserve">${xe(x.v)}</t></is></c>`;}).join("")}</row>`).join("");
-  const ws=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${opt.fit?'<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>':""}${freezeRow?`<sheetViews><sheetView workbookViewId="0"><pane ySplit="${freezeRow}" topLeftCell="A${freezeRow+1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`:""}<cols>${widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("")}</cols><sheetData>${sd}</sheetData>${opt.merges&&opt.merges.length?`<mergeCells count="${opt.merges.length}">${opt.merges.map(m=>`<mergeCell ref="${m}"/>`).join("")}</mergeCells>`:""}${opt.fit?'<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>':""}</worksheet>`;
+  const ws=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${opt.fit?'<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>':""}${freezeRow?`<sheetViews><sheetView workbookViewId="0"><pane ySplit="${freezeRow}" topLeftCell="A${freezeRow+1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`:""}<cols>${widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w||1}" customWidth="1"${w===0?' hidden="1"':""}/>`).join("")}</cols><sheetData>${sd}</sheetData>${opt.merges&&opt.merges.length?`<mergeCells count="${opt.merges.length}">${opt.merges.map(m=>`<mergeCell ref="${m}"/>`).join("")}</mergeCells>`:""}${opt.fit?'<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>':""}</worksheet>`;
   const B='<border><left style="thin"><color rgb="FFC9D1DA"/></left><right style="thin"><color rgb="FFC9D1DA"/></right><top style="thin"><color rgb="FFC9D1DA"/></top><bottom style="thin"><color rgb="FFC9D1DA"/></bottom><diagonal/></border>';
   const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0;-#,##0;&quot;-&quot;"/></numFmts>
 <fonts count="6"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><name val="Arial"/></font><font><b/><sz val="14"/><name val="Arial"/></font><font><sz val="10"/><color rgb="FF5C6B7A"/><name val="Arial"/></font><font><b/><sz val="12"/><name val="Arial"/></font><font><sz val="10"/><color rgb="FFC62828"/><name val="Arial"/></font></fonts>
-<fills count="7"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF2D2"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF7DB"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEEF2F6"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8F0FC"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFEBD2"/></patternFill></fill></fills>
+<fills count="8"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF2D2"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF7DB"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEEF2F6"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8F0FC"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFEBD2"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFF59D"/></patternFill></fill></fills>
 <borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>${B}</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="19"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<cellXfs count="20"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
 <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
 <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
 <xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
@@ -1370,7 +1379,8 @@ function xlsxBlob(sheet,cells,widths,freezeRow,opt){opt=opt||{};const rows={};ce
 <xf numFmtId="0" fontId="5" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
 <xf numFmtId="0" fontId="3" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>
 <xf numFmtId="164" fontId="1" fillId="4" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
-<xf numFmtId="0" fontId="1" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+<xf numFmtId="0" fontId="1" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="164" fontId="1" fillId="7" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
   const sn=xe(String(sheet).replace(/[\\\/?*\[\]:]/g," ").slice(0,31));
   return zipStore([["[Content_Types].xml",'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
     ["_rels/.rels",'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
@@ -1378,25 +1388,40 @@ function xlsxBlob(sheet,cells,widths,freezeRow,opt){opt=opt||{};const rows={};ce
     ["xl/_rels/workbook.xml.rels",'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
     ["xl/styles.xml",styles],["xl/worksheets/sheet1.xml",ws]]);}
 function saveBlob(blob,name){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},800);}
-/* 엑셀도 화면처럼 사람별 카드(A4 용지 느낌)로: 한 줄에 카드 2장, 날짜는 세로로 */
+/* 엑셀도 화면처럼 사람별 카드(A4 용지 느낌)로: 한 줄에 카드 2장, 날짜는 세로로.
+   노란 칸에 금액을 적어 '금액 엑셀 올리기'로 다시 올리면 허브에 들어감 (숨긴 D·I열에 신청 번호) */
+const PAY_MARK="HARANG-PAY";
 function payXlsx(k){const [by,wk]=k.split("|");const ps=(paySheets(S.pays.filter(p=>payVisBR().includes(p.branch))).find(x=>x.k===k)||{ps:[]}).ps;
   const C=[],M=[];const put=(r,c,v,s,f)=>C.push({r,c,v,s,f});const ref=(r,c)=>colL(c)+(r+1);const merge=(r,c1,c2)=>M.push(ref(r,c1)+":"+ref(r,c2));
   const gb=ps.filter(p=>p.type==="가불"),jb=ps.filter(p=>p.type==="주급");const sum=a=>a.reduce((t,p)=>t+(+p.amt||0),0);const wait=ps.filter(p=>p.status!=="지급완료").length;
-  put(0,0,`주급·가불 취합 — ${by} (${wkLabel(wk)} 주)`,7);
+  put(0,0,`주급·가불 취합 — ${by} (${wkLabel(wk)} 주)`,7);put(0,3,PAY_MARK);
   put(1,0,`총 ${ps.length}명 · 가불 ${gb.length}명${gb.length?` ${won(sum(gb))}원`:""} · 주급 ${jb.length}명${sum(jb)?` ${won(sum(jb))}원`:""} · ${wait?`지급 대기 ${wait}명`:"모두 지급완료"}`,8);
-  put(2,0,`내려받은 시각 ${nowLocal().replace("T"," ").slice(0,16)} · 하랑 업무 허브`,8);
+  put(2,0,`내려받은 시각 ${nowLocal().replace("T"," ").slice(0,16)} · 노란 칸에 금액을 적어 허브 '금액 엑셀 올리기'로 올리면 그대로 들어갑니다`,8);
   let r=4;
   for(let i=0;i<ps.length;i+=2){const pair=ps.slice(i,i+2);const nd=Math.max(...pair.map(p=>Math.max(1,p.days.length)));
-    pair.forEach((p,k)=>{const c=k*4,g=p.type==="가불";const paid=p.status==="지급완료";
-      put(r,c,`[${p.type}]  ${p.co}   ${p.name}`,g?12:11);put(r,c+1,"",g?12:11);put(r,c+2,"",g?12:11);merge(r,c,c+2);
+    pair.forEach((p,k)=>{const c=k*5,g=p.type==="가불";const paid=p.status==="지급완료";const at=payAtTxt(p);
+      put(r,c,`[${p.type}]  ${p.co}   ${p.name}   · ${at} 신청`,g?12:11);put(r,c+1,"",g?12:11);put(r,c+2,"",g?12:11);merge(r,c,c+2);
       for(let d=0;d<nd;d++){const x=p.days[d];const rr=r+1+d;
-        if(!x){put(rr,c,"",14);put(rr,c+1,"",14);put(rr,c+2,"",14);continue;}
+        if(!x){if(d===0&&g&&!p.days.length){put(rr,c,"가불 신청",13);put(rr,c+1,payAtTxt(p,1),14);put(rr,c+2,"",15);}else{put(rr,c,"",14);put(rr,c+1,"",14);put(rr,c+2,"",14);}continue;}
         put(rr,c,`${mdShort(x.date)} (${x.date?DOW[new Date(x.date).getDay()]:""})`,13);
         if(x.start){put(rr,c+1,`${x.start} ~ ${x.end}`,14);put(rr,c+2,x.note||"",15);}else{put(rr,c+1,x.note||"",15);put(rr,c+2,"",15);}}
-      const f=r+1+nd;put(f,c,`근무 ${p.workDays}일`,16);put(f,c+1,g?"가불 금액":"주급 금액",16);put(f,c+2,p.amt?+p.amt:"",17);
+      const f=r+1+nd;put(f,c,g&&!p.days.length?`신청 ${mdShort(String(p.at).slice(0,10))}`:`근무 ${p.workDays}일`,16);put(f,c+1,g?"가불 금액":"주급 금액",16);put(f,c+2,p.amt?+p.amt:"",19);put(f,c+3,p.id);
       put(f+1,c,paid?`지급완료 · ${p.paidBy||""} · ${p.paidAt?mdShort(p.paidAt):""}`:"지급 대기",18);put(f+1,c+1,"",18);put(f+1,c+2,"",18);merge(f+1,c,c+2);});
     r+=nd+4;}
-  saveBlob(xlsxBlob(`${by} ${wk.slice(5)}`,C,[12,17,15,3,12,17,15],0,{merges:M,fit:true}),`주급가불_${by}_${wk}.xlsx`);toast("엑셀 파일로 내려받습니다");}
+  saveBlob(xlsxBlob(`${by} ${wk.slice(5)}`,C,[12,17,15,0,3,12,17,15,0],0,{merges:M,fit:true}),`주급가불_${by}_${wk}.xlsx`);toast("엑셀 파일로 내려받습니다");}
+/* 노란 칸에 금액을 적은 엑셀을 다시 올리기 */
+function payUpForm(){modal("주급 금액 엑셀 올리기",`<p class="sub" style="margin-top:0">'엑셀로 받기'로 내려받은 파일의 <b>노란 칸</b>에 금액을 적어서 그대로 올려 주세요. 여러 사람 파일을 하나씩 올려도 됩니다. 비어 있는 칸은 건너뜁니다.</p>
+  <label class="field"><span>엑셀 파일 (.xlsx)</span><input type="file" id="payFile" accept=".xlsx"></label><div id="payUpPrev" class="sub"></div>`,{wide:true,submit:"금액 반영",onSubmit:()=>{const L=(window.__payUp||[]).filter(x=>x.ch);window.__payUp=null;if(!L.length){toast("바뀐 금액이 없습니다");return;}
+    L.forEach(x=>{const p=S.pays.find(y=>y.id===x.id);if(p)p.amt=x.amt;});notifyCeoChange&&0;toast(`${L.length}명 금액을 넣었습니다`);}});}
+async function payFilePicked(f){const box=document.getElementById("payUpPrev");box.textContent="읽는 중…";
+  try{const sheets=await readXlsx(await f.arrayBuffer());const L=[];let mark=false;
+    sheets.forEach(sh=>{if(sh.cells.D1===PAY_MARK)mark=true;Object.entries(sh.cells).forEach(([ref,v])=>{const m=ref.match(/^([DI])(\d+)$/);if(!m||typeof v!=="string")return;const p=S.pays.find(y=>y.id===v);if(!p)return;
+      const raw=sh.cells[(m[1]==="D"?"C":"H")+m[2]];let amt=typeof raw==="number"?Math.round(raw):(parseAmts(raw)[0]||0);
+      if(!amt)return;L.push({id:p.id,co:p.co,name:p.name,type:p.type,old:+p.amt||0,amt,ch:amt!==(+p.amt||0),paid:p.status==="지급완료"});});});
+    window.__payUp=L;
+    if(!L.length){box.innerHTML=`<p class="up">${mark?"노란 칸에 적힌 금액이 없습니다.":"허브에서 '엑셀로 받기'로 내려받은 파일이 아닙니다. 그 파일의 노란 칸에 금액을 적어서 올려 주세요."}</p>`;return;}
+    box.innerHTML=`<div class="tw"><table class="x"><thead><tr><th>구분</th><th>업체</th><th>이름</th><th>지금</th><th>새 금액</th><th></th></tr></thead><tbody>${L.map(x=>`<tr><td>${x.type}</td><td>${esc(x.co)}</td><td><b>${esc(x.name)}</b></td><td class="num">${x.old?won(x.old):"-"}</td><td class="num"><b>${won(x.amt)}</b></td><td>${x.ch?'<span class="chip ok">반영</span>':'<span class="chip mute">같음</span>'}${x.paid?' <span class="chip mute">지급완료 건</span>':""}</td></tr>`).join("")}</tbody></table></div><p class="sub">바뀌는 사람 <b>${L.filter(x=>x.ch).length}명</b> · 합계 ${won(L.reduce((t,x)=>t+x.amt,0))}원</p>`;}
+  catch(e){box.innerHTML=`<p class="up">파일을 읽지 못했습니다: ${esc(e.message||String(e))}</p>`;}}
 function vPay(){const f=S.ui.payF||"wait";const brs=payVisBR();const L=S.pays.filter(p=>brs.includes(p.branch));
   const wait=L.filter(p=>p.status!=="지급완료"),mon=ym(TODAY);const doneM=L.filter(p=>p.status==="지급완료"&&(p.paidAt||"").startsWith(mon));
   const show=(f==="wait"?wait:f==="done"?L.filter(p=>p.status==="지급완료"):L);
@@ -1728,7 +1753,7 @@ function setPath(path,val,type){const ks=path.split(".");let o=S;for(let i=0;i<k
   const k=ks[ks.length-1];if(type==="num")val=val===""?0:+val;else if(type==="numnull")val=val===""||+val===0?null:+val;else if(type==="bool")val=!!val;
   if(ks.includes("splits")&&val===0&&type==="num"){}o[k]=val;}
 document.addEventListener("change",e=>{const el=e.target;if(el.dataset.docfile){const d=S.docreqs.find(x=>x.id===el.dataset.docfile);uploadDocFiles(d,[...el.files]);return;}
-if(el.dataset.ui==="docMine"){S.ui.docMine=el.checked;save();render();return;}if(el.dataset.payamt){const p=S.pays.find(x=>x.id===el.dataset.payamt);if(p){p.amt=+el.value||0;notifyCeoChange("주급 금액 입력","pay");save();toast(`${p.name} 주급 ${won(p.amt)}원`);setTimeout(()=>{const y=scrollY;render();scrollTo(0,y);},0);}return;}if(el.id==="arCoSel"){S.ui.arCo=el.value;return;}if(el.id==="arMemoIn")return;if(el.id==="adFile"&&el.files[0]){adFilePicked(el.files[0]);return;}
+if(el.dataset.ui==="docMine"){S.ui.docMine=el.checked;save();render();return;}if(el.dataset.payamt){const p=S.pays.find(x=>x.id===el.dataset.payamt);if(p){p.amt=+el.value||0;notifyCeoChange("주급 금액 입력","pay");save();toast(`${p.name} 주급 ${won(p.amt)}원`);setTimeout(()=>{const y=scrollY;render();scrollTo(0,y);},0);}return;}if(el.id==="arCoSel"){S.ui.arCo=el.value;return;}if(el.id==="arMemoIn")return;if(el.id==="adFile"&&el.files[0]){adFilePicked(el.files[0]);return;}if(el.id==="payFile"&&el.files[0]){payFilePicked(el.files[0]);return;}
   if(el.dataset.set){setPath(el.dataset.set,el.type==="checkbox"?el.checked:el.value,el.dataset.type);notifyCeoChange(`${(TABS.find(t=>t[0]===S.tab)||[,""])[1]} 수정`,S.tab);save();
     setTimeout(()=>{const a=document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.set;const y=scrollY;render();scrollTo(0,y);if(a){const n=document.querySelector(`[data-set="${CSS.escape(a)}"]`);if(n)n.focus();}},0);}
   if(el.dataset.ui==="ttDate"){S.ui.ttDate=el.value;save();render();}if(el.dataset.ui==="attDate"){S.ui.attDate=el.value||iso(TODAY);save();render();}
@@ -1813,7 +1838,7 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
     docUndo:()=>{const d=S.docreqs.find(x=>x.id===el.dataset.id);d.status="대기";delete d.doneBy;delete d.doneAt;},
     docDel:()=>{if(confirm("이 요청을 취소할까요?"))S.docreqs=S.docreqs.filter(x=>x.id!==el.dataset.id);},
     docFileDel:()=>{const d=S.docreqs.find(x=>x.id===el.dataset.id);const f=d.files.splice(+el.dataset.i,1)[0];if(f&&f.path)sb.storage.from("hub-files").remove([f.path]);},
-    payNew:()=>payNewForm(),payF:()=>S.ui.payF=v,payView:()=>S.ui.payView=v,payCsv:()=>payXlsx(v),
+    payNew:()=>payNewForm(),payF:()=>S.ui.payF=v,payView:()=>S.ui.payView=v,payCsv:()=>payXlsx(v),payUp:()=>payUpForm(),
     paySheetDone:()=>{const ids=v.split(",");const ps=S.pays.filter(p=>ids.includes(p.id)&&p.status!=="지급완료");ps.forEach(p=>{p.status="지급완료";p.paidBy=me();p.paidAt=iso(TODAY);});const by=[...new Set(ps.map(p=>p.by))];by.forEach(b=>{const m=ps.filter(p=>p.by===b);notify([b],`주급·가불 ${m.length}명 지급완료 (${m.map(p=>p.name).slice(0,3).join(", ")}${m.length>3?" 외":""})`,"pay");});toast(`${ps.length}명 지급완료`);},payEdit:()=>payEditForm(S.pays.find(p=>p.id===el.dataset.id)),
     payDel:()=>{S.pays=S.pays.filter(p=>p.id!==el.dataset.id);closeModal();},
     payDone:()=>{const p=S.pays.find(x=>x.id===el.dataset.id);p.status="지급완료";p.paidBy=me();p.paidAt=iso(TODAY);notify([p.by],`${p.type} 지급완료: ${p.co} ${p.name}${p.amt?" "+won(p.amt)+"원":""}`,"pay");toast(`${p.name} 지급완료`);},
@@ -1825,7 +1850,7 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
       {onSubmit:fd=>{S.inv.push({id:uid(),co:fd.get("co"),branch:fd.get("branch"),kind:fd.get("kind"),due:+fd.get("due")||10,status:{}});}}),
   };
   const CHG={blDel:"블랙리스트 삭제",docUndo:"서류 전달 되돌리기",docDel:"서류 요청 취소",docFileDel:"서류 파일 빼기",hcAdd:"인원현황 줄 추가",hcDel:"인원현황 줄 삭제",hcBase:"기준 인원 저장",toAdd:"TO 줄 추가",toDel:"TO 줄 삭제",jSet:"입사예정자 결과 처리",jDel:"입사예정자 삭제",qDel:"퇴사자 삭제",postRead:"특이사항 확인",postDel:"특이사항 삭제",evDel:"일정 삭제",lvOk:"연차 승인",lvNo:"연차 반려",lvDel:"연차 신청 취소",ctDel:"근로계약 삭제",ivDel:"지원 DB 삭제",ivGrade:"지원 DB 상태 변경",invSet:"계산서·명세표 O/X 표시",payDone:"주급·가불 지급완료",payUndo:"지급완료 취소",payBatch:"주급·가불 지급완료",paySheetDone:"주급·가불 지급완료",payDel:"주급·가불 신청 삭제",arMemoAdd:"미수금 메모",arMemoPaid:"미수금 입금 확인",arMemoMiss:"미수금 미입금 표시",arMemoUndo:"미수금 되돌리기",arDel:"미수금 삭제",dlDel:"영업 건 삭제",adNewWk:"광고표 새 주 시작",adAddCo:"광고표 업체 추가"};
-  if(H[a]){if(CHG[a]&&S.role!=="ceo"){const t=S.tab;queueMicrotask(()=>{notifyCeoChange(CHG[a],t);save();renderHead();});}const opensModal=["pw","accounts","logout","budgetEdit","pushOn","att","ivBl","ctNew","ctEdit","ctRenew","ctPaste","ivNew","ivEdit","ivJoin","jToDb","blNew","blEdit","lvEdit","hcPpl","docNew","docDone","invEdit","notif","payNew","payEdit","adPB","dlNew","dlEdit","dlDone","dlResult","arMemoFor","adUp","adCell","adAlias","jPaste","qPaste","jEdit","qNew","qEdit","calDay","evNew","evEdit","condEdit","postNew","arNew","arEdit","lvNew","invNew"].includes(a);H[a]();save();
+  if(H[a]){if(CHG[a]&&S.role!=="ceo"){const t=S.tab;queueMicrotask(()=>{notifyCeoChange(CHG[a],t);save();renderHead();});}const opensModal=["pw","accounts","logout","budgetEdit","pushOn","payUp","att","ivBl","ctNew","ctEdit","ctRenew","ctPaste","ivNew","ivEdit","ivJoin","jToDb","blNew","blEdit","lvEdit","hcPpl","docNew","docDone","invEdit","notif","payNew","payEdit","adPB","dlNew","dlEdit","dlDone","dlResult","arMemoFor","adUp","adCell","adAlias","jPaste","qPaste","jEdit","qNew","qEdit","calDay","evNew","evEdit","condEdit","postNew","arNew","arEdit","lvNew","invNew"].includes(a);H[a]();save();
     if(!opensModal&&a!=="close"&&!document.querySelector(".overlay")){const y=scrollY;render();if(a!=="tab")scrollTo(0,y);}
     void keepModal;}
 });
