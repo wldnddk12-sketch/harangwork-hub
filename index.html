@@ -345,7 +345,7 @@ const TITLE_RANK={"대표":0,"지사장":1,"팀장":2,"직원":3};
 const monthRange=()=>({from:iso(new Date(TODAY.getFullYear(),TODAY.getMonth(),1)),due:iso(new Date(TODAY.getFullYear(),TODAY.getMonth()+1,0))});
 function emptyS(){return {role:ME.role,tab:"home",ui:{joinWk:0,quitYm:ym(TODAY),hcBr:"본사",toBr:"본사",hcEdit:false,toEdit:false,ttView:"day",ttDate:iso(TODAY),calYm:ym(TODAY),condBr:"전체",condQ:"",noteF:"all",invYm:ym(TODAY)},
   hc:Object.fromEntries(HC_TABS.map(t=>[t,[]])),baseLabel:"기준",to:Object.fromEntries(BRANCHES.map(b=>[b,[]])),ad:{rows:[]},events:[],conds:{},posts:[],ar:[],
-  leave:{alloc:{},reqs:[]},inv:[],goal:{total:0,net:0,fill:0,collect:0,salesG:{meet:0,to:0,deal:0,...monthRange()}},joins:[],quits:[],
+  leave:{alloc:{},reqs:[]},inv:[],goal:{total:0,net:0,fill:0,collect:0,salesG:{meet:0,to:0,deal:0,...monthRange()}},goalM:{},goalRes:{},baseYm:"",joins:[],quits:[],
   adw:{},adwSample:{},adPrice:{j:35200,jDays:2,r:146000,rDays:3,o:220000,oDays:30},adAlias:{},adAliasBr:{"천안":{"김":"김태경"}},adPersonBudget:{},adMembers:{},sales:[],pays:[],docreqs:[],contracts:[],interviews:[],blacklist:[],notifs:[]};}
 /* 화면 상태(S) → 저장 단위(문서) */
 function docsOf(s){const D=new Map();const put=(kind,key,branch,data)=>D.set(kind+"|"+key,{kind,key:String(key),branch:branch||null,data});
@@ -359,13 +359,13 @@ function docsOf(s){const D=new Map();const put=(kind,key,branch,data)=>D.set(kin
   s.inv.forEach(it=>put("inv",it.id,it.branch,it));Object.entries(s.conds).forEach(([k,v])=>put("cond",k,k.split("|")[0],v));
   Object.entries(s.leave.alloc).forEach(([n,d])=>put("leave_alloc",n,brOf(n),{days:d}));s.leave.reqs.forEach(r=>put("leave_req",r.id,brOf(r.name),r));
   s.sales.forEach(d=>put("sale",d.id,d.branch,d));s.pays.forEach(p=>put("pay",p.id,p.branch,p));s.docreqs.forEach(d=>put("docreq",d.id,d.branch,d));(s.contracts||[]).forEach(c=>put("ct",c.id,c.branch,c));(s.interviews||[]).forEach(v=>put("iv",v.id,v.branch,v));(s.blacklist||[]).forEach(x=>put("bl",x.id,null,x));
-  const g=s.goal;put("goal","cur",null,{total:g.total,net:g.net,fill:g.fill,salesG:g.salesG});put("goal_money","cur",null,{collect:g.collect});
+  const g=s.goal;put("goal","cur",null,{total:g.total,net:g.net,fill:g.fill,salesG:g.salesG});put("goal_money","cur",null,{collect:g.collect});Object.entries(s.goalM||{}).forEach(([m,x])=>{put("goal","m:"+m,null,{ym:m,total:+x.total||0,net:+x.net||0,fill:+x.fill||0});if(x.collect!=null)put("goal_money","m:"+m,null,{ym:m,collect:+x.collect||0});});put("cfg","goalRes",null,{v:s.goalRes||{}});if(s.baseYm)put("cfg","baseYm",null,{v:s.baseYm});
   return D;}
 /* 문서 → 화면 상태 */
 function buildS(rows,ui){const s=emptyS();if(ui)s.ui={...s.ui,...ui};const gs=[];
   rows.forEach(({kind,key,data})=>{const d=data||{};switch(kind){
     case "hcg":gs.push(d);break;
-    case "cfg":if(key==="baseLabel")s.baseLabel=d.v||"기준";if(key==="adAlias")s.adAlias=d.v||{};if(key==="adAliasBr")s.adAliasBr=d.v||{};if(key==="adPrice"){s.adPrice={...s.adPrice,...(d.v||{})};if(s.adPrice.rDays===2)s.adPrice.rDays=3;}if(key==="adPersonBudget")s.adPersonBudget=d.v||{};if(key==="adMembers")s.adMembers=d.v||{};break;
+    case "cfg":if(key==="baseLabel")s.baseLabel=d.v||"기준";if(key==="adAlias")s.adAlias=d.v||{};if(key==="adAliasBr")s.adAliasBr=d.v||{};if(key==="goalRes")s.goalRes=d.v||{};if(key==="baseYm")s.baseYm=d.v||"";if(key==="adPrice"){s.adPrice={...s.adPrice,...(d.v||{})};if(s.adPrice.rDays===2)s.adPrice.rDays=3;}if(key==="adPersonBudget")s.adPersonBudget=d.v||{};if(key==="adMembers")s.adMembers=d.v||{};break;
     case "to":s.to[key]=d.rows||[];break;
     case "adw":{const [w,b]=key.split("|");(s.adw[w]=s.adw[w]||{})[b]=d.rows||[];break;}
     case "adbudget":s.ad.rows.push(d);break;
@@ -373,7 +373,7 @@ function buildS(rows,ui){const s=emptyS();if(ui)s.ui={...s.ui,...ui};const gs=[]
     case "join":s.joins.push(d);break;case "quit":s.quits.push(d);break;case "inv":s.inv.push(d);break;
     case "sale":s.sales.push(d);break;case "pay":s.pays.push(d);break;case "docreq":s.docreqs.push({files:[],...d});break;case "ct":s.contracts.push(d);break;case "iv":s.interviews.push(d);break;case "bl":s.blacklist.push(d);break;
     case "cond":s.conds[key]=d;break;case "leave_alloc":s.leave.alloc[key]=+d.days||0;break;case "leave_req":s.leave.reqs.push(d);break;
-    case "goal":Object.assign(s.goal,d);if(!s.goal.salesG)s.goal.salesG={meet:0,to:0,deal:0,...monthRange()};break;case "goal_money":Object.assign(s.goal,d);break;}});
+    case "goal":if(String(key).startsWith("m:")){const m=d.ym||key.slice(2);s.goalM[m]={...(s.goalM[m]||{}),total:d.total,net:d.net,fill:d.fill};break;}Object.assign(s.goal,d);if(!s.goal.salesG)s.goal.salesG={meet:0,to:0,deal:0,...monthRange()};break;case "goal_money":if(String(key).startsWith("m:")){const m=d.ym||key.slice(2);s.goalM[m]={...(s.goalM[m]||{}),collect:d.collect};break;}Object.assign(s.goal,d);break;}});
   gs.sort((a,b)=>HC_TABS.indexOf(a.tab)-HC_TABS.indexOf(b.tab)||(a.idx||0)-(b.idx||0)).forEach(g=>{const {tab,idx,...rest}=g;(s.hc[tab]=s.hc[tab]||[]).push(rest);});
   s.ad.rows.sort((a,b)=>BRANCHES.indexOf(a.branch)-BRANCHES.indexOf(b.branch)||(a.sort||0)-(b.sort||0));
   s.inv.sort((a,b)=>BRANCHES.indexOf(a.branch)-BRANCHES.indexOf(b.branch)||(a.sort||0)-(b.sort||0));
@@ -429,7 +429,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1792572943";
+const HUB_BUILD="1792573612";
 async function checkBuild(){if(!/^\d+$/.test(HUB_BUILD))return;try{const t=await (await fetch(location.pathname+"?v="+Date.now(),{cache:"no-store"})).text();const m=t.match(/const HUB_BUILD="(\d+)"/);
   if(m&&m[1]!==HUB_BUILD){if(!document.querySelector(".overlay")&&!dirty&&!syncing){toast("새 버전으로 바꾸는 중…");setTimeout(()=>location.reload(),600);}}}catch(e){}}
 async function loadAll(force){if(!force&&(dirty||syncing||document.querySelector(".overlay"))){clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),1500);return;}
@@ -654,9 +654,21 @@ function renderHead(){
   document.getElementById("tabs").innerHTML=TABS.filter(t=>!t[2]||t[2].includes(S.role)).map(([k,l,r])=>`<button data-act="tab" data-v="${k}" ${S.tab===k?'aria-current="page"':""}>${l}${r?'<span class="lock" aria-label="권한 필요">🔒</span>':""}</button>`).join("");
 }
 
+/* ---------- 월별 목표 · 매달 자동 시작 ---------- */
+const YM=()=>ym(TODAY);
+function goalOf(m){S.goalM=S.goalM||{};if(!S.goalM[m]){const prev=Object.keys(S.goalM).filter(k=>k<m&&S.goalM[k]).sort().pop();const src=prev?S.goalM[prev]:(S.goal||{});S.goalM[m]={total:+src.total||0,net:+src.net||0,fill:+src.fill||0,collect:+src.collect||0};}return S.goalM[m];}
+function arPaidLog(r,delta){delta=Math.round(+delta||0);if(!delta)return;(r.paidLog=r.paidLog||[]).push({d:iso(TODAY),amt:delta});}
+function arCollectIn(m){return (S.ar||[]).filter(r=>!limited()||r.branch===myBr()).reduce((s,r)=>s+(r.paidLog||[]).filter(x=>String(x.d).startsWith(m)).reduce((t,x)=>t+(+x.amt||0),0),0);}
+function goalNow(m){const all=hcAll(),ts=toStat();return {total:all.cur,net:all.cur-all.base,fill:pct(ts.placed,ts.to),collect:arCollectIn(m)};}
+/* 대표·팀장이 그달 처음 들어올 때: 지난달 실적을 기록하고, 기준 인원을 지금 인원으로 저장 (순증 0부터) */
+function monthRoll(){if(typeof SNAP!=="undefined"&&!SNAP.size)return;const m=YM();if(!S.baseYm){S.baseYm=m;save();return;}if(S.baseYm>=m||!isBoss())return;
+  const prev=S.baseYm;S.goalRes=S.goalRes||{};if(!S.goalRes[prev]){const n=goalNow(prev);S.goalRes[prev]={total:n.total,net:n.net,fill:n.fill,at:iso(TODAY)};}
+  HC_TABS.forEach(b=>(S.hc[b]||[]).forEach(g=>g.rows.forEach(r=>{r.base=r.cur;if(r.splits)r.bsplits=clone(r.splits);})));
+  S.baseLabel=`${pad(TODAY.getMonth()+1)}월 ${pad(TODAY.getDate())}일 기준`;S.baseYm=m;if(S.role==="ceo")goalOf(m);save();setTimeout(()=>toast(`${TODAY.getMonth()+1}월이 시작돼 기준 인원을 새로 저장했습니다 (순증 0부터)`),300);}
+
 /* ---------- 홈 ---------- */
 function vHome(){
-  const all=hcAll(),ts=toStat(),ar=arStat(),g=S.goal;const net=all.cur-all.base;
+  const all=hcAll(),ts=toStat(),ar=arStat(),g=goalOf(YM());const net=all.cur-all.base;
   const fill=pct(ts.placed,ts.to);
   const goals=[["총 투입 인원",all.cur,g.total,"명",pct(all.cur,g.total)],["신규 투입(순증)",net,g.net,"명",pct(Math.max(net,0),g.net)],["TO 충원율",fill,g.fill,"%",pct(fill,g.fill)]];
   const sst=salesStat(),sg=SG();goals.push([`영업 성사 (기한 ${mdShort(sg.due)})`,sst.deal,sg.deal,"건",pct(sst.deal,sg.deal)]);
@@ -1249,7 +1261,7 @@ function arForm(r){r=r||{co:"",branch:"본사",billed:0,paid:0,billDate:iso(TODA
    <div class="row3">${F("청구일",inp("billDate",r.billDate,"date"))}${F("회수 약속일",inp("promise",r.promise,"date"))}${F("진행 단계",`<select name="stage">${STAGES.map((l,i)=>`<option value="${i}" ${i===r.stage?"selected":""}>${l}</option>`).join("")}</select>`)}</div>
    ${F("결과",inp("result",r.result))}${r.memos.length?`<div class="field"><span>메모 기록 (지우려면 체크)</span><div class="armemos">${[...r.memos].reverse().map(m=>`<label class="armdel"><input type="checkbox" name="delm" value="${m.id}">${arMemoLine(r,m)}</label>`).join("")}</div></div>`:""}`,
    {onSubmit:fd=>{const o=r.id?S.ar.find(x=>x.id===r.id):(S.ar.push({id:uid(),memos:[]}),S.ar[S.ar.length-1]);
-     Object.assign(o,{co:fd.get("co"),branch:fd.get("branch"),billed:+fd.get("billed")||0,paid:+fd.get("paid")||0,billDate:fd.get("billDate"),promise:fd.get("promise"),stage:+fd.get("stage"),result:fd.get("result")});
+     const paid0=+o.paid||0;Object.assign(o,{co:fd.get("co"),branch:fd.get("branch"),billed:+fd.get("billed")||0,paid:+fd.get("paid")||0,billDate:fd.get("billDate"),promise:fd.get("promise"),stage:+fd.get("stage"),result:fd.get("result")});if(r.id)arPaidLog(o,(+o.paid||0)-paid0);
      const del=fd.getAll("delm");if(del.length)o.memos=o.memos.filter(m=>!del.includes(m.id));toast("저장했습니다");},
     extra:r.id?`<button type="button" class="btn danger" data-act="arDel" data-id="${r.id}">삭제</button>`:""});
 }
@@ -1496,12 +1508,16 @@ function docDoneForm(d){modal(`${esc(d.co)} 서류 전달`,`<p class="sub" style
 /* ---------- 목표 ---------- */
 function vGoal(){
   if(S.role!=="ceo")return `<div class="lockview card"><h3 style="justify-content:center">🔒 대표 전용</h3><p class="sub">목표 설정은 대표만 할 수 있습니다. 결과는 홈에서 보입니다.</p></div>`;
-  const g=S.goal,all=hcAll(),ts=toStat(),ar=arStat();
-  const row=(k,l,u,cur,note)=>`<tr><td class="l"><b>${l}</b><div class="sub">${note}</div></td><td><input type="number" data-set="goal.${k}" data-type="num" value="${g[k]}" style="width:140px" aria-label="${l} 목표"> ${u}</td><td class="num cur">${u==="원"?won(cur):num(cur)} ${u}</td><td style="min-width:160px">${bar(pct(Math.max(cur,0),g[k]))}<span class="sub">${pct(Math.max(cur,0),g[k])}%</span></td></tr>`;
-  return ph(`${TODAY.getMonth()+1}월 목표 설정`,"여기서 정한 목표 대비 실적이 홈 화면에 원형 그래프로 나옵니다. 미수금 목표는 대표·팀장에게만 보입니다.")+
-  `<div class="tw"><table class="x resp"><thead><tr><th>항목</th><th>이번 달 목표</th><th>현재 실적</th><th>달성률</th></tr></thead><tbody>
-  ${row("total","총 투입 인원","명",all.cur,"인원현황 합계에서 자동")}${row("net","신규 투입(순증)","명",all.cur-all.base,`${esc(S.baseLabel)} 대비 증감`)}${row("fill","TO 충원율","%",pct(ts.placed,ts.to),"TO 현황의 실제 투입 ÷ TO")}
-  ${row("collect","미수금 회수","원",ar.p,"미수금 현황의 회수액 합계")}</tbody></table></div>
+  const cm=YM(),m=S.ui.goalYm&&S.ui.goalYm<=cm?S.ui.goalYm:cm,g=goalOf(m),isCur=m===cm;const res=(S.goalRes||{})[m];
+  const now=isCur?goalNow(m):{...(res||{}),collect:arCollectIn(m)};const mo=+m.slice(5,7);
+  const row=(k,l,u,note)=>{const cur=now[k];const has=cur!=null;return `<tr><td class="l"><b>${l}</b><div class="sub">${note}</div></td><td><input type="number" data-set="goalM.${m}.${k}" data-type="num" value="${g[k]}" style="width:140px" aria-label="${l} 목표"> ${u}</td><td class="num cur">${has?(u==="원"?won(cur):num(cur))+" "+u:'<span class="sub">기록 없음</span>'}</td><td style="min-width:160px">${has?`${bar(pct(Math.max(cur,0),g[k]))}<span class="sub">${pct(Math.max(cur,0),g[k])}%</span>`:""}</td></tr>`;};
+  const months=[...new Set([...Object.keys(S.goalM||{}),...Object.keys(S.goalRes||{})])].filter(x=>x<cm).sort().reverse().slice(0,6);
+  return ph(`${mo}월 목표 설정`,"매달 1일에 지난달 목표를 이어받아 새 달 목표가 자동으로 생깁니다. 고치면 그달에만 적용됩니다. 대표·팀장이 그달 처음 들어올 때 기준 인원도 자동 저장되어 순증이 0부터 시작합니다.")+
+  `<div class="tools" style="margin-bottom:10px"><button class="btn sm" data-act="goalYm" data-v="-1" aria-label="이전 달">◀</button><b>${m.slice(0,4)}년 ${mo}월</b><button class="btn sm" data-act="goalYm" data-v="1" aria-label="다음 달" ${isCur?"disabled":""}>▶</button>${isCur?'<span class="chip ok">이번 달</span>':'<span class="chip mute">지난 달 · 실적은 그달 말 기록</span>'}</div>
+  <div class="tw"><table class="x resp"><thead><tr><th>항목</th><th>${mo}월 목표</th><th>${isCur?"현재 실적":"그달 실적"}</th><th>달성률</th></tr></thead><tbody>
+  ${row("total","총 투입 인원","명","인원현황 합계에서 자동")}${row("net","신규 투입(순증)","명",`${isCur?esc(S.baseLabel):mo+"월 기준 인원"} 대비 증감`)}${row("fill","TO 충원율","%","TO 현황의 실제 투입 ÷ TO")}
+  ${row("collect","미수금 회수","원",`${mo}월에 입금 처리한 회수액만`)}</tbody></table></div>
+  ${months.length?`<div class="card" style="margin-top:14px"><h3>지난 달 기록</h3><div class="tw" style="border:0"><table class="x resp"><thead><tr><th>월</th><th>총 투입</th><th>순증</th><th>TO 충원율</th><th>미수금 회수</th></tr></thead><tbody>${months.map(x=>{const gg=(S.goalM||{})[x]||{},rr=(S.goalRes||{})[x]||{};const c=(k,u)=>rr[k]!=null||k==="collect"?`${k==="collect"?won(arCollectIn(x)):num(rr[k])}${u} <span class="sub">/ ${k==="collect"?won(gg[k]||0):num(gg[k]||0)}${u}</span>`:'<span class="sub">-</span>';return `<tr><td><button class="colink" data-act="goalYmSet" data-v="${x}">${+x.slice(5,7)}월</button></td><td>${c("total","명")}</td><td>${c("net","명")}</td><td>${c("fill","%")}</td><td>${c("collect","원")}</td></tr>`;}).join("")}</tbody></table></div></div>`:""}
   <div class="card" style="margin-top:14px"><h3>영업 목표 <span class="sub">영업은 시간이 걸리니 기한을 따로 정합니다 · 결과는 '영업성과' 메뉴와 홈에 나옵니다</span></h3>
    <div class="row2" style="max-width:520px">${F("목표 시작일",`<input type="date" data-set="goal.salesG.from" value="${SG().from}">`)}${F("목표 기한",`<input type="date" data-set="goal.salesG.due" value="${SG().due}">`)}</div>
    <div class="tw" style="border:0"><table class="x resp"><thead><tr><th>항목</th><th>목표</th><th>현재 실적</th><th>달성률</th></tr></thead><tbody>
@@ -1785,7 +1801,7 @@ function qForm(q){const n=!q;q=q||{co:"",branch:"본사",name:"",inDate:"",outDa
 
 /* ---------- 렌더 ---------- */
 const VIEWS={ct:vCT,iv:vIV,bl:vBL,docs:vDocs,pay:vPay,home:vHome,hc:vHC,join:vJoin,quit:vQuit,to:vTO,sales:vSales,ad:vAD,tt:vTT,cond:vCond,notes:vNotes,ar:vAR,leave:vLeave,inv:vInv,goal:vGoal};
-function render(){if(!ME.id){return;}if(!visHC().includes(S.ui.hcBr))S.ui.hcBr=visHC()[0];if(!visBR().includes(S.ui.toBr))S.ui.toBr=visBR()[0];const t=TABS.find(x=>x[0]===S.tab);if(!t)S.tab="home";if(t&&t[2]&&!t[2].includes(S.role))S.tab="home";renderHead();document.getElementById("main").innerHTML=VIEWS[S.tab]();labelTables();const at=document.querySelector('nav.tabs [aria-current="page"]');if(at&&at.scrollIntoView)at.scrollIntoView({block:"nearest",inline:"nearest"});}
+function render(){if(!ME.id){return;}if(typeof monthRoll==="function")monthRoll();if(!visHC().includes(S.ui.hcBr))S.ui.hcBr=visHC()[0];if(!visBR().includes(S.ui.toBr))S.ui.toBr=visBR()[0];const t=TABS.find(x=>x[0]===S.tab);if(!t)S.tab="home";if(t&&t[2]&&!t[2].includes(S.role))S.tab="home";renderHead();document.getElementById("main").innerHTML=VIEWS[S.tab]();labelTables();const at=document.querySelector('nav.tabs [aria-current="page"]');if(at&&at.scrollIntoView)at.scrollIntoView({block:"nearest",inline:"nearest"});}
 function labelTables(){document.querySelectorAll("table.resp").forEach(t=>{const hs=[...t.querySelectorAll("thead th")].map(th=>th.textContent.trim());t.querySelectorAll("tbody tr").forEach(tr=>{if(tr.classList.contains("tot"))return;[...tr.children].forEach((td,i)=>{if(hs[i]&&!td.hasAttribute("colspan"))td.setAttribute("data-label",hs[i]);});});});}
 function setPath(path,val,type){const ks=path.split(".");let o=S;for(let i=0;i<ks.length-1;i++){if(o[ks[i]]==null)o[ks[i]]={};o=o[ks[i]];}
   const k=ks[ks.length-1];if(type==="num")val=val===""?0:+val;else if(type==="numnull")val=val===""||+val===0?null:+val;else if(type==="bool")val=!!val;
@@ -1808,12 +1824,12 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
     pw:()=>passwordModal(),accounts:()=>accountsModal(),logout:()=>logout(),budgetEdit:()=>budgetModal(),pushOn:()=>pushSetup(),
     role:()=>{S.viewer=v;S.role=ROLES[v].role||v;S.ui.showSales=false;S.ui.hcEdit=false;S.ui.toEdit=false;if(isBr())S.ui.condBr=myBr();toast(`${ROLES[v].label} 화면으로 바꿨습니다`);},
     tab:()=>{S.tab=v;scrollTo(0,0);},
-    hcBr:()=>S.ui.hcBr=v,rosterUp:()=>rosterUpForm(),att:()=>attModal(el.dataset.p),attDay:()=>{S.ui.attDate=+v===0?iso(TODAY):iso(addDays(new Date(attDate()),+v));},hcPpl:()=>hcPeopleModal(el.dataset.p),hcSales:()=>{S.ui.showSales=!S.ui.showSales;},hcEdit:()=>S.ui.hcEdit=!S.ui.hcEdit,
+    hcBr:()=>S.ui.hcBr=v,goalYm:()=>{const [y,mm]=(S.ui.goalYm||YM()).split("-").map(Number);const d=new Date(y,mm-1+(+v),1);const x=ym(d);S.ui.goalYm=x>YM()?YM():x;},goalYmSet:()=>{S.ui.goalYm=v;},rosterUp:()=>rosterUpForm(),att:()=>attModal(el.dataset.p),attDay:()=>{S.ui.attDate=+v===0?iso(TODAY):iso(addDays(new Date(attDate()),+v));},hcPpl:()=>hcPeopleModal(el.dataset.p),hcSales:()=>{S.ui.showSales=!S.ui.showSales;},hcEdit:()=>S.ui.hcEdit=!S.ui.hcEdit,
     hcAdd:()=>{S.hc[S.ui.hcBr][+el.dataset.g].rows.push({id:uid(),gubun:"도급",period:P,pay:"",sales:"",mgr:"",co:"새 업체",cur:0,base:0});S.ui.hcEdit=true;},
     hcDel:()=>{if(confirm("이 줄을 삭제할까요?")){const b=S.ui.hcBr,gi=+el.dataset.g,d=+el.dataset.i;const n=S.hc[b][gi].rows.length;S.hc[b][gi].rows.splice(d,1);const map={};for(let i=0;i<n;i++)map[i]=i<d?i:i===d?-1:i-1;hcReindex(b,gi,map);}},
     hcMv:()=>hcMoveRow(S.ui.hcBr,+el.dataset.g,+el.dataset.i,+el.dataset.i+(+v)),
     hcBase:()=>{const lbl=`${pad(TODAY.getMonth()+1)}월 ${pad(TODAY.getDate())}일 기준`;if(!confirm(`지금 인원을 '${lbl}' 기준 인원으로 저장할까요?\n(보통 매달 1일에 누릅니다. 증감이 0부터 다시 시작합니다.)`))return;
-      HC_TABS.forEach(b=>S.hc[b].forEach(g=>g.rows.forEach(r=>{r.base=r.cur;if(r.splits)r.bsplits=clone(r.splits);})));S.baseLabel=lbl;toast("기준 인원을 저장했습니다");},
+      HC_TABS.forEach(b=>S.hc[b].forEach(g=>g.rows.forEach(r=>{r.base=r.cur;if(r.splits)r.bsplits=clone(r.splits);})));S.baseLabel=lbl;S.baseYm=YM();toast("기준 인원을 저장했습니다");},
     toBr:()=>S.ui.toBr=v,toEdit:()=>S.ui.toEdit=!S.ui.toEdit,
     toAdd:()=>S.to[S.ui.toBr].push({...T("새 업체","","",me(),1,"",""),id:uid()}),
     toDel:()=>{if(confirm("이 줄을 삭제할까요?")){const b=S.ui.toBr,d=+el.dataset.i,n=S.to[b].length;S.to[b].splice(d,1);const map={};for(let i=0;i<n;i++)map[i]=i<d?i:i===d?-1:i-1;toReindex(b,map);}},
@@ -1852,9 +1868,9 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
     arMemoAdd:()=>{const t=(document.getElementById("arMemoIn")||{}).value||"";const id=(document.getElementById("arCoSel")||{}).value;const r=S.ar.find(x=>x.id===id);
       if(!t.trim()){toast("메모를 적어 주세요");return;}if(!r){if(!arList().length){toast("메모를 붙일 거래처가 아직 없습니다. 먼저 거래처를 등록해 주세요");arForm({co:t.trim().split(/\s+/)[0],branch:"본사",billed:0,paid:0,billDate:iso(TODAY),promise:"",stage:0,result:"",memos:[]});}else toast("왼쪽에서 거래처를 골라 주세요 (목록에 없으면 '+ 미수금 등록'으로 먼저 등록)");return;}const pv=parseArMemo(t);addArMemo(r,t.replace(r.co,"").trim()||t,pv);S.ui.arDraft="";S.ui.arCo="";toast(pv.due?`${r.co} · ${mdShort(pv.due)} ${pv.amt?won(pv.amt)+"원 ":""}상환 예정으로 올렸습니다`:"메모를 남겼습니다");},
     arMemoFor:()=>arMemoModal(S.ar.find(x=>x.id===el.dataset.id)),arMore:()=>{S.ui.arOpen=S.ui.arOpen===el.dataset.id?"":el.dataset.id;},
-    arMemoPaid:()=>{const r=S.ar.find(x=>x.id===el.dataset.r),m=r.memos.find(x=>x.id===el.dataset.m);const add=Math.min(+m.amt||0,Math.max(0,r.billed-r.paid));m.done="입금";m.added=add;r.paid+=add;if(r.paid>=r.billed){r.stage=3;}toast(`${r.co} ${won(add)}원 입금 반영 — 회수액 ${won(r.paid)}원`);},
+    arMemoPaid:()=>{const r=S.ar.find(x=>x.id===el.dataset.r),m=r.memos.find(x=>x.id===el.dataset.m);const add=Math.min(+m.amt||0,Math.max(0,r.billed-r.paid));m.done="입금";m.added=add;r.paid+=add;arPaidLog(r,add);if(r.paid>=r.billed){r.stage=3;}toast(`${r.co} ${won(add)}원 입금 반영 — 회수액 ${won(r.paid)}원`);},
     arMemoMiss:()=>{const r=S.ar.find(x=>x.id===el.dataset.r),m=r.memos.find(x=>x.id===el.dataset.m);m.done="미입금";if(r.stage<1)r.stage=1;toast(`${r.co} 미입금으로 표시했습니다`);},
-    arMemoUndo:()=>{const r=S.ar.find(x=>x.id===el.dataset.r),m=r.memos.find(x=>x.id===el.dataset.m);if(m.done==="입금"&&m.added){r.paid=Math.max(0,r.paid-m.added);if(r.stage===3&&r.paid<r.billed)r.stage=2;}m.done=null;m.added=0;toast("되돌렸습니다");},arEdit:()=>arForm(S.ar.find(x=>x.id===el.dataset.id)),
+    arMemoUndo:()=>{const r=S.ar.find(x=>x.id===el.dataset.r),m=r.memos.find(x=>x.id===el.dataset.m);if(m.done==="입금"&&m.added){const b4=r.paid;r.paid=Math.max(0,r.paid-m.added);arPaidLog(r,r.paid-b4);if(r.stage===3&&r.paid<r.billed)r.stage=2;}m.done=null;m.added=0;toast("되돌렸습니다");},arEdit:()=>arForm(S.ar.find(x=>x.id===el.dataset.id)),
     arDel:()=>{if(confirm("삭제할까요?")){S.ar=S.ar.filter(x=>x.id!==el.dataset.id);closeModal();}},
     lvNew:()=>leaveForm(),
     ctNew:()=>ctForm(),ctEdit:()=>{const c=S.contracts.find(x=>x.id===el.dataset.id);if(!ctCan(c)){toast("이 계약은 담당자·팀장만 수정할 수 있습니다");return;}ctForm(c);},ctRenew:()=>{const c=S.contracts.find(x=>x.id===el.dataset.id);if(!ctCan(c)){toast("이 계약은 담당자·팀장만 재계약할 수 있습니다");return;}ctRenew(el.dataset.id);},ctPaste:()=>ctPasteForm(),ctF:()=>S.ui.ctF=v,
