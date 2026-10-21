@@ -429,7 +429,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1792573612";
+const HUB_BUILD="1792574866";
 async function checkBuild(){if(!/^\d+$/.test(HUB_BUILD))return;try{const t=await (await fetch(location.pathname+"?v="+Date.now(),{cache:"no-store"})).text();const m=t.match(/const HUB_BUILD="(\d+)"/);
   if(m&&m[1]!==HUB_BUILD){if(!document.querySelector(".overlay")&&!dirty&&!syncing){toast("새 버전으로 바꾸는 중…");setTimeout(()=>location.reload(),600);}}}catch(e){}}
 async function loadAll(force){if(!force&&(dirty||syncing||document.querySelector(".overlay"))){clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),1500);return;}
@@ -606,7 +606,9 @@ const sel=(name,opts,val)=>`<select name="${name}">${opts.map(o=>`<option ${o==v
 
 /* ---------- 집계 ---------- */
 function hcRows(b){return (S.hc[b]||[]).filter(visG).flatMap(g=>g.rows.filter(r=>!r.excluded));}
-function hcTot(b){const rs=hcRows(b);return {cur:rs.reduce((s,r)=>s+(+r.cur||0),0),base:rs.reduce((s,r)=>s+(+r.base||0),0)};}
+/* 일용직은 그날 출근 체크한 사람만 투입 인원으로 셈 (체크 안 한 업체는 0). 순증 계산에서는 빠짐 */
+function hcTot(b){const rs=hcRows(b);if(b==="일용직"){const d=iso(TODAY);const n=rs.reduce((s,r)=>s+(attOf(r,d)||0),0);return {cur:n,base:n,pool:rs.reduce((s,r)=>s+(+r.cur||0),0),daily:true};}
+  return {cur:rs.reduce((s,r)=>s+(+r.cur||0),0),base:rs.reduce((s,r)=>s+(+r.base||0),0)};}
 function hcAll(){return visHC().reduce((a,b)=>{const t=hcTot(b);a.cur+=t.cur;a.base+=t.base;return a;},{cur:0,base:0});}
 function hcSharedRows(){const out=[];if(!limited())return out;HC_TABS.forEach(t=>(S.hc[t]||[]).forEach((g,gi)=>{if(g.branch===myBr())return;g.rows.forEach((r,i)=>{if(mgrs(r).includes(me()))out.push({r,g,rp:`hc.${t}.${gi}.rows.${i}`});});}));return out;}
 const hcRowRO=rp=>{const m=String(rp).match(/^hc\.([^.]+)\.(\d+)\./);const g=m&&(S.hc[m[1]]||[])[+m[2]];return !!(g&&limited()&&g.branch!==myBr());};
@@ -687,7 +689,7 @@ function vHome(){
     <tr class="tot"><td>합계</td><td>${num(ts.to)}</td><td>${num(ts.plan)}</td><td>${num(ts.placed)}</td><td>${fill}%</td></tr></tbody></table></div></button>
    <button class="card cardlink" data-act="tab" data-v="hc"><h3>현재 인원 <span class="go">인원 현황 →</span></h3>
     <div class="kpi" style="margin-bottom:8px"><div><b>${num(all.cur)}명</b><span>${esc(S.baseLabel)} ${num(all.base)}명 대비 ${diff(net)}</span></div></div>
-    ${visHC().map(b=>{const t=hcTot(b);return `<div class="prow"><span>${b}</span>${bar(pct(t.cur,all.cur)," ")}<span class="v">${num(t.cur)}명 · ${t.cur-t.base>=0?"+":""}${t.cur-t.base}</span></div>`}).join("")}</button>
+    ${visHC().map(b=>{const t=hcTot(b);return `<div class="prow"><span>${b==="일용직"?"일용직 오늘 출근":b}</span>${bar(pct(t.cur,all.cur)," ")}<span class="v">${num(t.cur)}명 · ${t.cur-t.base>=0?"+":""}${t.cur-t.base}</span></div>`}).join("")}</button>
   </div>
   <div class="grid g3" style="margin-top:14px">
    <button class="card cardlink" data-act="tab" data-v="join"><h3>입사 예정자 <span class="go">입사예정 →</span></h3>${(()=>{const [x,y]=weekRange(0);const t=iso(TODAY);const wk=S.joins.filter(j=>j.date>=x&&j.date<=y);const nd=S.joins.filter(j=>j.date&&j.date<t&&j.status==="대기").length;const nx=S.joins.filter(j=>j.date>y&&j.date<=iso(addDays(new Date(y),7))).length;return `<div class="big">${wk.length}<span class="sub"> 명 이번 주 · 다음 주 ${nx}명</span></div><p class="sub">입사 ${wk.filter(j=>j.status==="완료").length} · 보류 ${wk.filter(j=>j.status==="보류").length} · 포기 ${wk.filter(j=>j.status==="포기").length}${nd?` · <span class="up">결과 확인 필요 ${nd}명</span>`:""}</p>`})()}</button>
@@ -711,10 +713,10 @@ function vHC(){
   const b=S.ui.hcBr,groups=S.hc[b],canHC=groups.some(canEditG),ed=S.ui.hcEdit&&canHC,edAll=ed;const CEO=canSales()&&!!S.ui.showSales;const t=hcTot(b);
   let html=ph("현재 인원 현황",`엑셀 양식 그대로 · 담당자가 2명 이상이면 칸을 나눠 인원을 적을 수 있습니다. 증감은 '${esc(S.baseLabel)}' 대비.`,
    `${canSales()?`<button class="btn" data-act="hcSales" aria-pressed="${!!S.ui.showSales}">${S.ui.showSales?"🔓 영업담당자 숨기기":"🔒 영업담당자 보기"}</button>`:""}${canHC&&!ed?'<button class="btn" data-act="rosterUp">명단 엑셀 올리기</button>':""}${canHC?`<button class="btn ${ed?"vis":""}" data-act="hcEdit">${ed?"수정 마치기":"✎ 수정하기"}</button>`:`<span class="chip mute">보기 전용 · ${myBr()} 지사만 수정 가능</span>`}<button class="btn" data-act="hcBase" title="지금 인원을 이번 달 1일 기준으로 저장">기준 인원 저장</button>`)+
-   `<div class="subtabs">${visHC().map(x=>{const tt=hcTot(x);return `<button data-act="hcBr" data-v="${x}" aria-pressed="${x===b}">${x}<small>${tt.cur}명</small></button>`}).join("")}</div>`;
+   `<div class="subtabs">${visHC().map(x=>{const tt=hcTot(x);return `<button data-act="hcBr" data-v="${x}" aria-pressed="${x===b}">${x}<small>${tt.daily?`출근 ${tt.cur}/${tt.pool}`:tt.cur+"명"}</small></button>`}).join("")}</div>`;
   if(ed)html+=`<div class="banner">수정 중 — 칸을 바꾸면 합계·증감·오른쪽 요약이 바로 다시 계산됩니다. '타 지사 집계'에 체크한 줄은 표에는 그대로 보이고, 이 지사 합계에서만 빠집니다.</div>`;
   const isD=b==="일용직";
-  if(isD&&!ed){const at=attTot(groups.filter(visG));const d=attDate();html+=`<div class="card attbar"><div class="tools"><button class="btn sm" data-act="attDay" data-v="-1" aria-label="전날">◀</button><input type="date" class="btn sm" data-ui="attDate" value="${d}" aria-label="출근 날짜"><button class="btn sm" data-act="attDay" data-v="1" aria-label="다음날">▶</button><button class="btn sm" data-act="attDay" data-v="0">오늘</button></div>
+  if(isD&&!ed){const at=attTot(groups.filter(visG));const d=attDate();html+=`<p class="sub" style="margin:0 0 6px">총 투입 인원에는 <b>오늘 출근 체크한 사람만</b> 들어갑니다. 체크하지 않은 업체는 0명으로 셉니다.</p><div class="card attbar"><div class="tools"><button class="btn sm" data-act="attDay" data-v="-1" aria-label="전날">◀</button><input type="date" class="btn sm" data-ui="attDate" value="${d}" aria-label="출근 날짜"><button class="btn sm" data-act="attDay" data-v="1" aria-label="다음날">▶</button><button class="btn sm" data-act="attDay" data-v="0">오늘</button></div>
    <div class="attsum"><span>${mdShort(d)} (${DOW[new Date(d).getDay()]}) 출근</span><b>${at.n}<small>명</small></b><span class="sub">보유 ${at.pool}명 · 체크한 업체 ${at.done}/${at.all}</span></div></div><p class="sub" style="margin:-4px 0 10px">합계인원은 보유 인원(명단)입니다. 매일 바꾸지 말고 '출근' 칸을 눌러 그날 나온 사람만 체크하세요.</p>`;}
   html+=`<div class="layout"><div>`;
   groups.forEach((g,gi)=>{if(!visG(g))return;const ed=edAll&&canEditG(g);
