@@ -433,7 +433,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1792641669";
+const HUB_BUILD="1792641936";
 async function checkBuild(){if(!/^\d+$/.test(HUB_BUILD))return;try{const t=await (await fetch(location.pathname+"?v="+Date.now(),{cache:"no-store"})).text();const m=t.match(/const HUB_BUILD="(\d+)"/);
   if(m&&m[1]!==HUB_BUILD){if(!document.querySelector(".overlay")&&!dirty&&!syncing){toast("새 버전으로 바꾸는 중…");setTimeout(()=>location.reload(),600);}}}catch(e){}}
 async function loadAll(force){if(!force&&(dirty||syncing||document.querySelector(".overlay"))){clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),1500);return;}
@@ -501,7 +501,7 @@ async function loadProfiles(){const [{data:ps},{data:bs}]=await Promise.all([sb.
 async function afterLogin(u){const {data:p}=await sb.from("profiles").select("*").eq("id",u.id).maybeSingle();
   if(!p||!p.active){await sb.auth.signOut();loginView("사용이 중지된 계정입니다. 대표에게 문의하세요.");return;}
   await loadProfiles();
-  ME={id:u.id,name:p.name||p.login_id,role:["ceo","mgr","branch","staff"].includes(p.role)?p.role:(p.role==="admin"?"ceo":"staff"),branch:BRMAP[p.branch_id]||"본사",title:p.title||"",team:p.team||"",loginId:p.login_id};
+  ME={id:u.id,name:p.name||p.login_id,role:p.ceo_level?"ceo":["ceo","mgr","branch","staff"].includes(p.role)?p.role:(p.role==="admin"?"ceo":"staff"),branch:BRMAP[p.branch_id]||"본사",title:p.title||"",team:p.team||"",loginId:p.login_id};
   let saved={};try{saved=JSON.parse(localStorage.getItem("harang-ui-"+ME.id)||"{}");}catch(e){}
   S=emptyS();if(saved.ui)S.ui={...S.ui,...saved.ui};if(saved.tab)S.tab=saved.tab;
   const qt=new URLSearchParams(location.search).get("tab");if(qt&&TABS.some(t=>t[0]===qt))S.tab=qt;if(qt)history.replaceState(null,"",location.pathname);
@@ -648,7 +648,7 @@ const ceoName=()=>CEO_NAME;
 const allPeople=()=>PEOPLE();
 /* 글 안의 @이름 → 그 사람에게 알림 */
 function mentions(txt){return allPeople().filter(n=>String(txt||"").includes("@"+n));}
-function notifyCeoChange(what,tab){if(S.role==="ceo")return;notify([ceoName()],what,tab,{group:"chg|"+tab+"|"+what});}
+function notifyCeoChange(what,tab){if(me()===ceoName())return;notify([ceoName()],what,tab,{group:"chg|"+tab+"|"+what});}
 const myNotifs=()=>(S.notifs||[]).filter(x=>x.to===me());
 function notifModal(){const L=myNotifs();
   modal("알림",L.length?`<div class="nlist">${L.slice(0,80).map(x=>`<button type="button" class="nitem ${x.read?"":"unread"}" data-act="notifGo" data-id="${x.id}"><b>${esc(x.from)}</b> ${esc(x.text)}${x.n>1?` <span class="chip mute">${x.n}건</span>`:""}<span class="sub">${mdShort(x.at.slice(0,10))} ${x.at.slice(11,16)}</span></button>`).join("")}</div>`:'<div class="empty">알림이 없습니다.</div>',
