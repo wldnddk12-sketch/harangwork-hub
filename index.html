@@ -168,6 +168,10 @@ tr.dragging td{opacity:.45}tr.dropto td{box-shadow:inset 0 3px 0 var(--brand)}
 .attbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}.attsum{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}.attsum b{font-size:26px;color:var(--brand)}.attsum b small{font-size:14px}
 .ahist{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}.ah{display:flex;flex-direction:column;align-items:center;border:1px solid var(--line);border-radius:6px;padding:4px 0;font-size:12px}.ah b{font-size:15px}.ah.on{border-color:var(--brand);background:var(--brand-soft)}
 .attgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px}.attp{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:7px 9px;cursor:pointer}.attp:has(input:checked){background:var(--brand-soft);border-color:var(--brand);font-weight:600}
+.jdays{display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 14px}.jdays button{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:62px;padding:6px 8px;border:1px solid var(--line);border-radius:10px;background:var(--surface);cursor:pointer;color:inherit;font:inherit}
+.jdays button b{font-size:15px}.jdays button small{font-size:11px;color:var(--muted)}.jdays button span{font-size:12px;color:var(--brand);font-weight:600}.jdays button span.z{color:var(--muted);font-weight:400}
+.jdays button.today{border-color:var(--brand)}.jdays button[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:#fff}.jdays button[aria-pressed="true"] small,.jdays button[aria-pressed="true"] span{color:#fff}.jdays button.all{justify-content:center;color:var(--brand)}
+.jct{display:inline-flex;align-items:center;gap:4px;margin-left:6px}.jct small{color:var(--muted);font-size:11.5px}.jct .ox button{padding:3px 9px}
 .paycards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
 .paycard{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:12px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
 .paycard.gb{border-top:3px solid #E69A2E}.paycard.paid{opacity:.6}
@@ -359,7 +363,7 @@ function docsOf(s){const D=new Map();const put=(kind,key,branch,data)=>D.set(kin
   s.inv.forEach(it=>put("inv",it.id,it.branch,it));Object.entries(s.conds).forEach(([k,v])=>put("cond",k,k.split("|")[0],v));
   Object.entries(s.leave.alloc).forEach(([n,d])=>put("leave_alloc",n,brOf(n),{days:d}));s.leave.reqs.forEach(r=>put("leave_req",r.id,brOf(r.name),r));
   s.sales.forEach(d=>put("sale",d.id,d.branch,d));s.pays.forEach(p=>put("pay",p.id,p.branch,p));s.docreqs.forEach(d=>put("docreq",d.id,d.branch,d));(s.contracts||[]).forEach(c=>put("ct",c.id,c.branch,c));(s.interviews||[]).forEach(v=>put("iv",v.id,v.branch,v));(s.blacklist||[]).forEach(x=>put("bl",x.id,null,x));
-  const g=s.goal;put("goal","cur",null,{total:g.total,net:g.net,fill:g.fill,salesG:g.salesG});put("goal_money","cur",null,{collect:g.collect});Object.entries(s.goalM||{}).forEach(([m,x])=>{put("goal","m:"+m,null,{ym:m,total:+x.total||0,net:+x.net||0,fill:+x.fill||0});if(x.collect!=null)put("goal_money","m:"+m,null,{ym:m,collect:+x.collect||0});});put("cfg","goalRes",null,{v:s.goalRes||{}});if(s.baseYm)put("cfg","baseYm",null,{v:s.baseYm});
+  const g=s.goal;put("goal","cur",null,{total:g.total,net:g.net,fill:g.fill,salesG:g.salesG,salesGB:g.salesGB||{}});put("goal_money","cur",null,{collect:g.collect});Object.entries(s.goalM||{}).forEach(([m,x])=>{put("goal","m:"+m,null,{ym:m,total:+x.total||0,net:+x.net||0,fill:+x.fill||0,br:x.br||{}});if(x.collect!=null)put("goal_money","m:"+m,null,{ym:m,collect:+x.collect||0});});put("cfg","goalRes",null,{v:s.goalRes||{}});if(s.baseYm)put("cfg","baseYm",null,{v:s.baseYm});
   return D;}
 /* 문서 → 화면 상태 */
 function buildS(rows,ui){const s=emptyS();if(ui)s.ui={...s.ui,...ui};const gs=[];
@@ -373,7 +377,7 @@ function buildS(rows,ui){const s=emptyS();if(ui)s.ui={...s.ui,...ui};const gs=[]
     case "join":s.joins.push(d);break;case "quit":s.quits.push(d);break;case "inv":s.inv.push(d);break;
     case "sale":s.sales.push(d);break;case "pay":s.pays.push(d);break;case "docreq":s.docreqs.push({files:[],...d});break;case "ct":s.contracts.push(d);break;case "iv":s.interviews.push(d);break;case "bl":s.blacklist.push(d);break;
     case "cond":s.conds[key]=d;break;case "leave_alloc":s.leave.alloc[key]=+d.days||0;break;case "leave_req":s.leave.reqs.push(d);break;
-    case "goal":if(String(key).startsWith("m:")){const m=d.ym||key.slice(2);s.goalM[m]={...(s.goalM[m]||{}),total:d.total,net:d.net,fill:d.fill};break;}Object.assign(s.goal,d);if(!s.goal.salesG)s.goal.salesG={meet:0,to:0,deal:0,...monthRange()};break;case "goal_money":if(String(key).startsWith("m:")){const m=d.ym||key.slice(2);s.goalM[m]={...(s.goalM[m]||{}),collect:d.collect};break;}Object.assign(s.goal,d);break;}});
+    case "goal":if(String(key).startsWith("m:")){const m=d.ym||key.slice(2);s.goalM[m]={...(s.goalM[m]||{}),total:d.total,net:d.net,fill:d.fill,br:d.br||{}};break;}Object.assign(s.goal,d);if(!s.goal.salesG)s.goal.salesG={meet:0,to:0,deal:0,...monthRange()};break;case "goal_money":if(String(key).startsWith("m:")){const m=d.ym||key.slice(2);s.goalM[m]={...(s.goalM[m]||{}),collect:d.collect};break;}Object.assign(s.goal,d);break;}});
   gs.sort((a,b)=>HC_TABS.indexOf(a.tab)-HC_TABS.indexOf(b.tab)||(a.idx||0)-(b.idx||0)).forEach(g=>{const {tab,idx,...rest}=g;(s.hc[tab]=s.hc[tab]||[]).push(rest);});
   s.ad.rows.sort((a,b)=>BRANCHES.indexOf(a.branch)-BRANCHES.indexOf(b.branch)||(a.sort||0)-(b.sort||0));
   s.inv.sort((a,b)=>BRANCHES.indexOf(a.branch)-BRANCHES.indexOf(b.branch)||(a.sort||0)-(b.sort||0));
@@ -429,7 +433,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1792574866";
+const HUB_BUILD="1792641669";
 async function checkBuild(){if(!/^\d+$/.test(HUB_BUILD))return;try{const t=await (await fetch(location.pathname+"?v="+Date.now(),{cache:"no-store"})).text();const m=t.match(/const HUB_BUILD="(\d+)"/);
   if(m&&m[1]!==HUB_BUILD){if(!document.querySelector(".overlay")&&!dirty&&!syncing){toast("새 버전으로 바꾸는 중…");setTimeout(()=>location.reload(),600);}}}catch(e){}}
 async function loadAll(force){if(!force&&(dirty||syncing||document.querySelector(".overlay"))){clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),1500);return;}
@@ -658,22 +662,29 @@ function renderHead(){
 
 /* ---------- 월별 목표 · 매달 자동 시작 ---------- */
 const YM=()=>ym(TODAY);
+/* 증감 기준: 매달 1일 (10월만 21일부터 시작) */
+const baseLbl=()=>S.baseYm==="2026-10"?"10월 21일 기준":S.baseYm?`${+S.baseYm.slice(5,7)}월 1일 기준`:(S.baseLabel||"기준");
+function goalOfSc(m,sc){const G=goalOf(m);if(!sc||sc==="전체")return G;G.br=G.br||{};if(!G.br[sc]){const prev=Object.keys(S.goalM).filter(k=>k<m&&S.goalM[k]&&S.goalM[k].br&&S.goalM[k].br[sc]).sort().pop();const src=prev?S.goalM[prev].br[sc]:{};G.br[sc]={total:+src.total||0,net:+src.net||0,fill:+src.fill||0};}return G.br[sc];}
+/* 지사별 인원: 그 지사 표 + 그 지사 일용직(오늘 출근) + 그 지사 채용대행 · '타 지사 집계' 줄은 제외 */
+function hcAllFor(sc){if(!sc||sc==="전체")return hcAll();const d=iso(TODAY);let cur=0,base=0;
+  HC_TABS.forEach(t=>(S.hc[t]||[]).filter(g=>g.branch===sc).forEach(g=>g.rows.filter(r=>!r.excluded).forEach(r=>{if(t==="일용직"){const n=attOf(r,d)||0;cur+=n;base+=n;}else{cur+=+r.cur||0;base+=+r.base||0;}})));return {cur,base};}
+const toStatFor=sc=>!sc||sc==="전체"?toStat():toStat(sc);
 function goalOf(m){S.goalM=S.goalM||{};if(!S.goalM[m]){const prev=Object.keys(S.goalM).filter(k=>k<m&&S.goalM[k]).sort().pop();const src=prev?S.goalM[prev]:(S.goal||{});S.goalM[m]={total:+src.total||0,net:+src.net||0,fill:+src.fill||0,collect:+src.collect||0};}return S.goalM[m];}
 function arPaidLog(r,delta){delta=Math.round(+delta||0);if(!delta)return;(r.paidLog=r.paidLog||[]).push({d:iso(TODAY),amt:delta});}
 function arCollectIn(m){return (S.ar||[]).filter(r=>!limited()||r.branch===myBr()).reduce((s,r)=>s+(r.paidLog||[]).filter(x=>String(x.d).startsWith(m)).reduce((t,x)=>t+(+x.amt||0),0),0);}
-function goalNow(m){const all=hcAll(),ts=toStat();return {total:all.cur,net:all.cur-all.base,fill:pct(ts.placed,ts.to),collect:arCollectIn(m)};}
+function goalNow(m,sc){const all=hcAllFor(sc),ts=toStatFor(sc);return {total:all.cur,net:all.cur-all.base,fill:pct(ts.placed,ts.to),collect:!sc||sc==="전체"?arCollectIn(m):null};}
 /* 대표·팀장이 그달 처음 들어올 때: 지난달 실적을 기록하고, 기준 인원을 지금 인원으로 저장 (순증 0부터) */
 function monthRoll(){if(typeof SNAP!=="undefined"&&!SNAP.size)return;const m=YM();if(!S.baseYm){S.baseYm=m;save();return;}if(S.baseYm>=m||!isBoss())return;
-  const prev=S.baseYm;S.goalRes=S.goalRes||{};if(!S.goalRes[prev]){const n=goalNow(prev);S.goalRes[prev]={total:n.total,net:n.net,fill:n.fill,at:iso(TODAY)};}
+  const prev=S.baseYm;S.goalRes=S.goalRes||{};if(!S.goalRes[prev]){const n=goalNow(prev);S.goalRes[prev]={total:n.total,net:n.net,fill:n.fill,at:iso(TODAY),br:Object.fromEntries(GOAL_SC.filter(x=>x!=="전체").map(b=>{const k=goalNow(prev,b);return [b,{total:k.total,net:k.net,fill:k.fill}];}))};}
   HC_TABS.forEach(b=>(S.hc[b]||[]).forEach(g=>g.rows.forEach(r=>{r.base=r.cur;if(r.splits)r.bsplits=clone(r.splits);})));
-  S.baseLabel=`${pad(TODAY.getMonth()+1)}월 ${pad(TODAY.getDate())}일 기준`;S.baseYm=m;if(S.role==="ceo")goalOf(m);save();setTimeout(()=>toast(`${TODAY.getMonth()+1}월이 시작돼 기준 인원을 새로 저장했습니다 (순증 0부터)`),300);}
+  S.baseYm=m;S.baseLabel=baseLbl();if(S.role==="ceo")goalOf(m);save();setTimeout(()=>toast(`${TODAY.getMonth()+1}월이 시작돼 기준 인원을 새로 저장했습니다 (순증 0부터)`),300);}
 
 /* ---------- 홈 ---------- */
 function vHome(){
-  const all=hcAll(),ts=toStat(),ar=arStat(),g=goalOf(YM());const net=all.cur-all.base;
+  const gsc=goalSc();const all=hcAllFor(gsc),ts=toStatFor(gsc),ar=arStat(),g=goalOfSc(YM(),gsc);const net=all.cur-all.base;
   const fill=pct(ts.placed,ts.to);
   const goals=[["총 투입 인원",all.cur,g.total,"명",pct(all.cur,g.total)],["신규 투입(순증)",net,g.net,"명",pct(Math.max(net,0),g.net)],["TO 충원율",fill,g.fill,"%",pct(fill,g.fill)]];
-  const sst=salesStat(),sg=SG();goals.push([`영업 성사 (기한 ${mdShort(sg.due)})`,sst.deal,sg.deal,"건",pct(sst.deal,sg.deal)]);
+  const sst=salesStat(undefined,gsc),sg=SG(gsc);goals.push([`${gsc!=="전체"?gsc+" ":""}영업 성사 (기한 ${mdShort(sg.due)})`,sst.deal,sg.deal,"건",pct(sst.deal,sg.deal)]);
   const evToday=ttEvents().filter(e=>e.date===iso(TODAY)).sort((a,b)=>(a.hour??0)-(b.hour??0));
   const mine=S.posts.filter(p=>(p.to.includes(me())||p.to.includes("전체"))&&!p.reads.includes(me()));
   const pend=S.leave.reqs.filter(r=>r.status==="대기");
@@ -688,7 +699,7 @@ function vHome(){
     ${visBR().map(b=>{const t=toStat(b);return `<tr><td>${b}</td><td class="num">${num(t.to)}${t.always?` <span class="sub">+상시 ${t.always}</span>`:""}</td><td class="num">${num(t.plan)}</td><td class="num">${num(t.placed)}</td><td>${t.to?bar(pct(t.placed,t.to)):'<span class="sub">-</span>'}</td></tr>`}).join("")}
     <tr class="tot"><td>합계</td><td>${num(ts.to)}</td><td>${num(ts.plan)}</td><td>${num(ts.placed)}</td><td>${fill}%</td></tr></tbody></table></div></button>
    <button class="card cardlink" data-act="tab" data-v="hc"><h3>현재 인원 <span class="go">인원 현황 →</span></h3>
-    <div class="kpi" style="margin-bottom:8px"><div><b>${num(all.cur)}명</b><span>${esc(S.baseLabel)} ${num(all.base)}명 대비 ${diff(net)}</span></div></div>
+    <div class="kpi" style="margin-bottom:8px"><div><b>${num(all.cur)}명</b><span>${esc(baseLbl())} ${num(all.base)}명 대비 ${diff(net)}</span></div></div>
     ${visHC().map(b=>{const t=hcTot(b);return `<div class="prow"><span>${b==="일용직"?"일용직 오늘 출근":b}</span>${bar(pct(t.cur,all.cur)," ")}<span class="v">${num(t.cur)}명 · ${t.cur-t.base>=0?"+":""}${t.cur-t.base}</span></div>`}).join("")}</button>
   </div>
   <div class="grid g3" style="margin-top:14px">
@@ -711,8 +722,8 @@ function vHome(){
 /* ---------- 현재 인원 현황 ---------- */
 function vHC(){
   const b=S.ui.hcBr,groups=S.hc[b],canHC=groups.some(canEditG),ed=S.ui.hcEdit&&canHC,edAll=ed;const CEO=canSales()&&!!S.ui.showSales;const t=hcTot(b);
-  let html=ph("현재 인원 현황",`엑셀 양식 그대로 · 담당자가 2명 이상이면 칸을 나눠 인원을 적을 수 있습니다. 증감은 '${esc(S.baseLabel)}' 대비.`,
-   `${canSales()?`<button class="btn" data-act="hcSales" aria-pressed="${!!S.ui.showSales}">${S.ui.showSales?"🔓 영업담당자 숨기기":"🔒 영업담당자 보기"}</button>`:""}${canHC&&!ed?'<button class="btn" data-act="rosterUp">명단 엑셀 올리기</button>':""}${canHC?`<button class="btn ${ed?"vis":""}" data-act="hcEdit">${ed?"수정 마치기":"✎ 수정하기"}</button>`:`<span class="chip mute">보기 전용 · ${myBr()} 지사만 수정 가능</span>`}<button class="btn" data-act="hcBase" title="지금 인원을 이번 달 1일 기준으로 저장">기준 인원 저장</button>`)+
+  let html=ph("현재 인원 현황",`엑셀 양식 그대로 · 담당자가 2명 이상이면 칸을 나눠 인원을 적을 수 있습니다. 증감은 '${esc(baseLbl())}' 대비.`,
+   `${canSales()?`<button class="btn" data-act="hcSales" aria-pressed="${!!S.ui.showSales}">${S.ui.showSales?"🔓 영업담당자 숨기기":"🔒 영업담당자 보기"}</button>`:""}${canHC&&!ed?'<button class="btn" data-act="rosterUp">명단 엑셀 올리기</button>':""}${canHC?`<button class="btn ${ed?"vis":""}" data-act="hcEdit">${ed?"수정 마치기":"✎ 수정하기"}</button>`:`<span class="chip mute">보기 전용 · ${myBr()} 지사만 수정 가능</span>`}`)+
    `<div class="subtabs">${visHC().map(x=>{const tt=hcTot(x);return `<button data-act="hcBr" data-v="${x}" aria-pressed="${x===b}">${x}<small>${tt.daily?`출근 ${tt.cur}/${tt.pool}`:tt.cur+"명"}</small></button>`}).join("")}</div>`;
   if(ed)html+=`<div class="banner">수정 중 — 칸을 바꾸면 합계·증감·오른쪽 요약이 바로 다시 계산됩니다. '타 지사 집계'에 체크한 줄은 표에는 그대로 보이고, 이 지사 합계에서만 빠집니다.</div>`;
   const isD=b==="일용직";
@@ -724,7 +735,7 @@ function vHC(){
     html+=`<div class="gname"><b>${esc(g.name)}</b>${g.daily?'<span class="chip mute">일 보고 인원 기준</span>':""}${g.note?`<span class="note">${esc(g.note)}</span>`:""}${ed?`<button class="btn sm" data-act="hcAdd" data-g="${gi}">+ 줄 추가</button>`:""}</div>`;
     if(!rs.length){html+=`<div class="empty">아직 등록된 업체가 없습니다.${ed?"":" '수정하기'를 눌러 추가하세요."}</div>`;return;}
     if(!ed)html+=`<div class="mlist only-m">${rs.map((r,ri)=>{if(hideHQ(r))return "";const d=(+r.cur||0)-(+r.base||0);return `<div class="mi ${r.excluded?"mx":""}"><div class="mt"><button class="colink" data-act="hcPpl" data-p="hc.${b}.${gi}.rows.${ri}"><b>${esc(r.co)}</b></button>${rosterBadge(r)}${r.isNew?' <span class="chip vis">신규</span>':""}${r.excluded?` <span class="chip mute">${esc(r.memo||"타 지사 집계")}</span>`:""}<div class="sub">${esc(r.gubun)} · 관리 ${esc(r.mgr)}${CEO&&r.sales?` · 영업 ${esc(r.sales)}`:""}</div></div><div class="mv">${isD?attCell(r,`hc.${b}.${gi}.rows.${ri}`,hcRowRO(`hc.${b}.${gi}.rows.${ri}`)):""}<b>${num(r.cur)}</b><span class="sub">${isD?"보유 · ":""}기준 ${num(r.base)} · ${diff(d)}</span></div></div>`}).join("")}<div class="mi mtot"><div class="mt"><b>합계</b></div><div class="mv"><b>${num(c)}</b><span class="sub">기준 ${num(bs)} · ${diff(c-bs)}</span></div></div></div>`;
-    html+=`<div class="tw ${ed?"":"only-d"}"><table class="x"><thead><tr><th>순번</th><th>구분</th>${CEO?"<th>영업담당자 🔒</th>":""}<th>관리담당자</th><th>업체</th><th>${isD?"보유 인원":"합계인원"}</th>${isD&&!ed?`<th>${mdShort(attDate())} 출근</th>`:""}<th>${esc(S.baseLabel)}</th><th>증감</th>${ed?"<th>타 지사 집계</th><th></th>":""}</tr></thead><tbody>`;
+    html+=`<div class="tw ${ed?"":"only-d"}"><table class="x"><thead><tr><th>순번</th><th>구분</th>${CEO?"<th>영업담당자 🔒</th>":""}<th>관리담당자</th><th>업체</th><th>${isD?"보유 인원":"합계인원"}</th>${isD&&!ed?`<th>${mdShort(attDate())} 출근</th>`:""}<th>${esc(baseLbl())}</th><th>증감</th>${ed?"<th>타 지사 집계</th><th></th>":""}</tr></thead><tbody>`;
     let n=0;
     rs.forEach((r,i)=>{if(hideHQ(r))return;const p=`hc.${b}.${gi}.rows.${i}`;const ms=mgrs(r);n++;
       const tag=(r.isNew?' <span class="chip vis">신규</span>':"")+(r.excluded?` <span class="chip mute">${esc(r.memo||"타 지사 집계")} · 합계 제외</span>`:"");
@@ -749,7 +760,7 @@ function vHC(){
   const sideT=(title,m)=>`<div class="card"><h3>${title}</h3><table class="x"><thead><tr><th>담당자</th><th>현재</th><th>기준</th><th>증감</th></tr></thead><tbody>${Object.entries(m).sort((a,b)=>b[1].cur-a[1].cur).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="num">${v.cur}</td><td class="num">${v.base}</td><td>${diff(v.cur-v.base)}</td></tr>`).join("")}<tr class="tot"><td>합계</td><td>${t.cur}</td><td>${t.base}</td><td>${diff(t.cur-t.base)}</td></tr></tbody></table></div>`;
   if(limited()&&b===visHC()[0]){const sh=hcSharedRows();if(sh.length){const sc=sh.reduce((t,x)=>t+(+x.r.cur||0),0),sb=sh.reduce((t,x)=>t+(+x.r.base||0),0);
     html+=`<div class="gname" style="margin-top:18px"><b>다른 지사 업체 중 내가 관리하는 곳</b><span class="chip mute">보기 전용 · 수정은 해당 지사·본사에서</span></div>
-    <div class="tw"><table class="x resp"><thead><tr><th>지사·분류</th><th>구분</th><th>관리담당자</th><th>업체</th><th>합계인원</th><th>${esc(S.baseLabel)}</th><th>증감</th></tr></thead><tbody>
+    <div class="tw"><table class="x resp"><thead><tr><th>지사·분류</th><th>구분</th><th>관리담당자</th><th>업체</th><th>합계인원</th><th>${esc(baseLbl())}</th><th>증감</th></tr></thead><tbody>
     ${sh.map(({r,g,rp})=>{const d=(+r.cur||0)-(+r.base||0);return `<tr><td>${esc(g.name)}</td><td>${esc(r.gubun)}</td><td>${esc(r.mgr)}</td><td class="l"><button class="colink" data-act="hcPpl" data-p="${rp}">${esc(r.co)}</button>${rosterBadge(r)}</td><td class="num cur">${num(r.cur)}</td><td class="num">${num(r.base)}</td><td class="num">${diff(d)}</td></tr>`}).join("")}
     <tr class="tot"><td colspan="4">합계 (내 지사 합계에는 안 들어감)</td><td>${num(sc)}</td><td>${num(sb)}</td><td>${diff(sc-sb)}</td></tr></tbody></table></div>`;}}
   html+=`</div><aside class="side">
@@ -1510,31 +1521,38 @@ function docDoneForm(d){modal(`${esc(d.co)} 서류 전달`,`<p class="sub" style
 /* ---------- 목표 ---------- */
 function vGoal(){
   if(S.role!=="ceo")return `<div class="lockview card"><h3 style="justify-content:center">🔒 대표 전용</h3><p class="sub">목표 설정은 대표만 할 수 있습니다. 결과는 홈에서 보입니다.</p></div>`;
-  const cm=YM(),m=S.ui.goalYm&&S.ui.goalYm<=cm?S.ui.goalYm:cm,g=goalOf(m),isCur=m===cm;const res=(S.goalRes||{})[m];
-  const now=isCur?goalNow(m):{...(res||{}),collect:arCollectIn(m)};const mo=+m.slice(5,7);
-  const row=(k,l,u,note)=>{const cur=now[k];const has=cur!=null;return `<tr><td class="l"><b>${l}</b><div class="sub">${note}</div></td><td><input type="number" data-set="goalM.${m}.${k}" data-type="num" value="${g[k]}" style="width:140px" aria-label="${l} 목표"> ${u}</td><td class="num cur">${has?(u==="원"?won(cur):num(cur))+" "+u:'<span class="sub">기록 없음</span>'}</td><td style="min-width:160px">${has?`${bar(pct(Math.max(cur,0),g[k]))}<span class="sub">${pct(Math.max(cur,0),g[k])}%</span>`:""}</td></tr>`;};
+  const sc=GOAL_SC.includes(S.ui.goalSc)?S.ui.goalSc:"전체",all=sc==="전체";
+  const cm=YM(),m=S.ui.goalYm&&S.ui.goalYm<=cm?S.ui.goalYm:cm,g=goalOfSc(m,sc),isCur=m===cm;const res0=(S.goalRes||{})[m];const res=res0?(all?res0:(res0.br||{})[sc]):null;
+  const now=isCur?goalNow(m,sc):{...(res||{}),collect:all?arCollectIn(m):null};const mo=+m.slice(5,7);
+  const gp=all?`goalM.${m}`:`goalM.${m}.br.${sc}`;const sp=all?"goal.salesG":`goal.salesGB.${sc}`;
+  const row=(k,l,u,note)=>{const cur=now[k];const has=cur!=null;return `<tr><td class="l"><b>${l}</b><div class="sub">${note}</div></td><td><input type="number" data-set="${gp}.${k}" data-type="num" value="${g[k]??0}" style="width:140px" aria-label="${l} 목표"> ${u}</td><td class="num cur">${has?(u==="원"?won(cur):num(cur))+" "+u:'<span class="sub">기록 없음</span>'}</td><td style="min-width:160px">${has?`${bar(pct(Math.max(cur,0),g[k]))}<span class="sub">${pct(Math.max(cur,0),g[k])}%</span>`:""}</td></tr>`;};
   const months=[...new Set([...Object.keys(S.goalM||{}),...Object.keys(S.goalRes||{})])].filter(x=>x<cm).sort().reverse().slice(0,6);
-  return ph(`${mo}월 목표 설정`,"매달 1일에 지난달 목표를 이어받아 새 달 목표가 자동으로 생깁니다. 고치면 그달에만 적용됩니다. 대표·팀장이 그달 처음 들어올 때 기준 인원도 자동 저장되어 순증이 0부터 시작합니다.")+
-  `<div class="tools" style="margin-bottom:10px"><button class="btn sm" data-act="goalYm" data-v="-1" aria-label="이전 달">◀</button><b>${m.slice(0,4)}년 ${mo}월</b><button class="btn sm" data-act="goalYm" data-v="1" aria-label="다음 달" ${isCur?"disabled":""}>▶</button>${isCur?'<span class="chip ok">이번 달</span>':'<span class="chip mute">지난 달 · 실적은 그달 말 기록</span>'}</div>
-  <div class="tw"><table class="x resp"><thead><tr><th>항목</th><th>${mo}월 목표</th><th>${isCur?"현재 실적":"그달 실적"}</th><th>달성률</th></tr></thead><tbody>
-  ${row("total","총 투입 인원","명","인원현황 합계에서 자동")}${row("net","신규 투입(순증)","명",`${isCur?esc(S.baseLabel):mo+"월 기준 인원"} 대비 증감`)}${row("fill","TO 충원율","%","TO 현황의 실제 투입 ÷ TO")}
-  ${row("collect","미수금 회수","원",`${mo}월에 입금 처리한 회수액만`)}</tbody></table></div>
-  ${months.length?`<div class="card" style="margin-top:14px"><h3>지난 달 기록</h3><div class="tw" style="border:0"><table class="x resp"><thead><tr><th>월</th><th>총 투입</th><th>순증</th><th>TO 충원율</th><th>미수금 회수</th></tr></thead><tbody>${months.map(x=>{const gg=(S.goalM||{})[x]||{},rr=(S.goalRes||{})[x]||{};const c=(k,u)=>rr[k]!=null||k==="collect"?`${k==="collect"?won(arCollectIn(x)):num(rr[k])}${u} <span class="sub">/ ${k==="collect"?won(gg[k]||0):num(gg[k]||0)}${u}</span>`:'<span class="sub">-</span>';return `<tr><td><button class="colink" data-act="goalYmSet" data-v="${x}">${+x.slice(5,7)}월</button></td><td>${c("total","명")}</td><td>${c("net","명")}</td><td>${c("fill","%")}</td><td>${c("collect","원")}</td></tr>`;}).join("")}</tbody></table></div></div>`:""}
-  <div class="card" style="margin-top:14px"><h3>영업 목표 <span class="sub">영업은 시간이 걸리니 기한을 따로 정합니다 · 결과는 '영업성과' 메뉴와 홈에 나옵니다</span></h3>
-   <div class="row2" style="max-width:520px">${F("목표 시작일",`<input type="date" data-set="goal.salesG.from" value="${SG().from}">`)}${F("목표 기한",`<input type="date" data-set="goal.salesG.due" value="${SG().due}">`)}</div>
+  const sg=SG(sc);
+  return ph(`${mo}월 목표 설정`,"전체(회사)와 천안·아산 지사 목표를 따로 정합니다. 지사 사람이 로그인하면 홈에 자기 지사 목표·실적만 보입니다. 매달 1일에 지난달 목표를 이어받아 새 달 목표가 생기고, 증감도 매달 1일 기준으로 다시 시작합니다.")+
+  `<div class="subtabs">${GOAL_SC.map(x=>`<button data-act="goalSc" data-v="${x}" aria-pressed="${x===sc}">${x==="전체"?"전체 (회사)":x+" 지사"}</button>`).join("")}</div>
+  <div class="tools" style="margin-bottom:10px"><button class="btn sm" data-act="goalYm" data-v="-1" aria-label="이전 달">◀</button><b>${m.slice(0,4)}년 ${mo}월</b><button class="btn sm" data-act="goalYm" data-v="1" aria-label="다음 달" ${isCur?"disabled":""}>▶</button>${isCur?'<span class="chip ok">이번 달</span>':'<span class="chip mute">지난 달 · 실적은 그달 말 기록</span>'}</div>
+  <div class="tw"><table class="x resp"><thead><tr><th>항목</th><th>${all?"":sc+" "}${mo}월 목표</th><th>${isCur?"현재 실적":"그달 실적"}</th><th>달성률</th></tr></thead><tbody>
+  ${row("total","총 투입 인원","명",all?"인원현황 합계 (일용직은 오늘 출근)":`${sc} 표 + ${sc} 일용직(오늘 출근) + ${sc} 채용대행`)}${row("net","신규 투입(순증)","명",`${isCur?esc(baseLbl()):mo+"월 기준 인원"} 대비 증감`)}${row("fill","TO 충원율","%",all?"TO 현황의 실제 투입 ÷ TO":`${sc} TO 현황 기준`)}
+  ${all?row("collect","미수금 회수","원",`${mo}월에 입금 처리한 회수액만`):""}</tbody></table></div>
+  ${months.length?`<div class="card" style="margin-top:14px"><h3>지난 달 기록 ${all?"":`<span class="sub">${sc}</span>`}</h3><div class="tw" style="border:0"><table class="x resp"><thead><tr><th>월</th><th>총 투입</th><th>순증</th><th>TO 충원율</th>${all?"<th>미수금 회수</th>":""}</tr></thead><tbody>${months.map(x=>{const G0=(S.goalM||{})[x]||{};const gg=all?G0:((G0.br||{})[sc]||{});const R0=(S.goalRes||{})[x]||{};const rr=all?R0:((R0.br||{})[sc]||{});const c=(k,u)=>rr[k]!=null||k==="collect"?`${k==="collect"?won(arCollectIn(x)):num(rr[k])}${u} <span class="sub">/ ${k==="collect"?won(gg[k]||0):num(gg[k]||0)}${u}</span>`:'<span class="sub">-</span>';return `<tr><td><button class="colink" data-act="goalYmSet" data-v="${x}">${+x.slice(5,7)}월</button></td><td>${c("total","명")}</td><td>${c("net","명")}</td><td>${c("fill","%")}</td>${all?`<td>${c("collect","원")}</td>`:""}</tr>`;}).join("")}</tbody></table></div></div>`:""}
+  <div class="card" style="margin-top:14px"><h3>${all?"":sc+" "}영업 목표 <span class="sub">영업은 시간이 걸리니 기한을 따로 정합니다 · 결과는 '영업성과' 메뉴와 홈에 나옵니다</span></h3>
+   <div class="row2" style="max-width:520px">${F("목표 시작일",`<input type="date" data-set="${sp}.from" value="${sg.from}">`)}${F("목표 기한",`<input type="date" data-set="${sp}.due" value="${sg.due}">`)}</div>
    <div class="tw" style="border:0"><table class="x resp"><thead><tr><th>항목</th><th>목표</th><th>현재 실적</th><th>달성률</th></tr></thead><tbody>
-   ${(()=>{const st=salesStat(S.sales);const sg=SG();const r=(k,l,cur,u)=>`<tr><td class="l"><b>${l}</b></td><td><input type="number" data-set="goal.salesG.${k}" data-type="num" value="${sg[k]}" style="width:110px" aria-label="${l} 목표"> ${u}</td><td class="num cur">${num(cur)} ${u}</td><td style="min-width:160px">${bar(sg[k]?pct(cur,sg[k]):0)}<span class="sub">${sg[k]?pct(cur,sg[k]):0}%</span></td></tr>`;
+   ${(()=>{const st=salesStat(all?S.sales:S.sales.filter(d=>d.branch===sc),sc);const r=(k,l,cur,u)=>`<tr><td class="l"><b>${l}</b></td><td><input type="number" data-set="${sp}.${k}" data-type="num" value="${sg[k]}" style="width:110px" aria-label="${l} 목표"> ${u}</td><td class="num cur">${num(cur)} ${u}</td><td style="min-width:160px">${bar(sg[k]?pct(cur,sg[k]):0)}<span class="sub">${sg[k]?pct(cur,sg[k]):0}%</span></td></tr>`;
      return r("meet","미팅 횟수",st.meet,"회")+r("to","미팅으로 확보한 TO",st.to,"명")+r("deal","영업 성사 (도급·채용대행·일용직)",st.deal,"건");})()}</tbody></table></div>
-   <div class="sub" style="margin-top:8px">지사별 성사: ${BRANCHES.map(b=>`${b} ${salesStat(S.sales.filter(d=>d.branch===b)).deal}건`).join(" · ")}</div></div>`;
+   ${all?`<div class="sub" style="margin-top:8px">지사별 성사: ${BRANCHES.map(b=>`${b} ${salesStat(S.sales.filter(d=>d.branch===b),"전체").deal}건`).join(" · ")}</div>`:""}</div>`;
 }
 
 /* ---------- 영업성과 ---------- */
 const DEAL_TYPES=["도급","채용대행","일용직"];
 const salesVisBR=()=>limited()?[...new Set([myBr(),"본사"])]:BRANCHES;
 const salesList=()=>S.sales.filter(d=>salesVisBR().includes(d.branch));
-const SG=()=>S.goal.salesG||(S.goal.salesG={meet:0,to:0,deal:0,from:iso(new Date(TODAY.getFullYear(),TODAY.getMonth(),1)),due:iso(new Date(TODAY.getFullYear(),TODAY.getMonth()+1,0))});
-const inGoal=d=>{const g=SG();return d>=g.from&&d<=g.due;};
-function salesStat(list){const g=SG();const L=list||salesList();
+/* 목표 범위: 대표·본사는 '전체', 천안·아산 지사 사람은 자기 지사 목표 */
+const GOAL_SC=["전체","천안","아산"];const goalSc=()=>limited()&&GOAL_SC.includes(myBr())?myBr():"전체";
+const sgDef=()=>({meet:0,to:0,deal:0,from:iso(new Date(TODAY.getFullYear(),TODAY.getMonth(),1)),due:iso(new Date(TODAY.getFullYear(),TODAY.getMonth()+1,0))});
+const SG=(sc)=>{sc=sc||goalSc();if(sc==="전체")return S.goal.salesG||(S.goal.salesG=sgDef());S.goal.salesGB=S.goal.salesGB||{};return S.goal.salesGB[sc]||(S.goal.salesGB[sc]={...sgDef(),from:SG("전체").from,due:SG("전체").due});};
+const inGoal=(d,sc)=>{const g=SG(sc);return d>=g.from&&d<=g.due;};
+function salesStat(list,sc){sc=sc||goalSc();const g=SG(sc);const L=list||(sc==="전체"?salesList():S.sales.filter(d=>d.branch===sc));const inGoal=d=>d>=g.from&&d<=g.due;
   const meetDone=L.filter(d=>d.status!=="예정"&&inGoal(d.meetDate));const meetAll=L.filter(d=>inGoal(d.meetDate));
   const deals=L.filter(d=>DEAL_TYPES.includes(d.result)&&inGoal(d.resultDate||d.meetDate));
   return {meet:meetDone.length,meetPlan:meetAll.length-meetDone.length,to:meetDone.reduce((s,d)=>s+(+d.to||0),0),deal:deals.length,dealTo:deals.reduce((s,d)=>s+(+d.to||0),0),
@@ -1547,10 +1565,10 @@ function dealRow(d){const past=d.status==="예정"&&d.meetDate<iso(TODAY);
   return `<div class="jrow"><div class="jn"><b>${esc(d.co)}</b> <span class="chip mute">${d.branch}</span> <span class="sub">${esc(d.mgr)}</span>
    <div class="sub">${mdShort(d.meetDate)}${d.meetTime?" "+d.meetTime:""} 미팅${d.status!=="예정"?` · TO ${d.to||0}명`:past?' · <span class="up">계약형태를 입력해 주세요</span>':""}${d.resultDate&&d.result&&d.result!=="진행중"?` · ${mdShort(d.resultDate)} ${d.result==="무산"?"무산":"성사"}`:""}${d.memo?` · ${esc(d.memo)}`:""}</div></div>
    <div class="jst">${d.status!=="예정"?dealChip(d.result):""}${d.status==="예정"?`<button class="btn sm primary" data-act="dlDone" data-id="${d.id}">미팅 완료</button>`:(!d.result||d.result==="진행중")?`<button class="btn sm primary" data-act="dlResult" data-id="${d.id}">계약형태 입력</button>`:""}<button class="btn sm" data-act="dlEdit" data-id="${d.id}" aria-label="수정">✎</button></div></div>`;}
-function vSales(){const g=SG();const st=salesStat();const brs=salesVisBR();
-  const f=S.ui.salesBr||"전체";const L=salesList().filter(d=>f==="전체"||d.branch===f);const fs=salesStat(L);
+function vSales(){const brs=salesVisBR();
+  const f=S.ui.salesBr||"전체";const sc=limited()?goalSc():(GOAL_SC.includes(f)?f:"전체");const g=SG(sc);const st=salesStat(undefined,sc);const L=salesList().filter(d=>f==="전체"||d.branch===f);const fs=salesStat(L,sc);
   const rate=g.deal?pct(fs.deal,g.deal):0;
-  const byMgr={};L.forEach(d=>{const m=byMgr[d.mgr]=byMgr[d.mgr]||{meet:0,to:0,deal:0};if(d.status!=="예정"&&inGoal(d.meetDate)){m.meet++;m.to+=+d.to||0;}if(DEAL_TYPES.includes(d.result)&&inGoal(d.resultDate||d.meetDate))m.deal++;});
+  const byMgr={};L.forEach(d=>{const m=byMgr[d.mgr]=byMgr[d.mgr]||{meet:0,to:0,deal:0};if(d.status!=="예정"&&inGoal(d.meetDate,sc)){m.meet++;m.to+=+d.to||0;}if(DEAL_TYPES.includes(d.result)&&inGoal(d.resultDate||d.meetDate,sc))m.deal++;});
   return ph("영업성과",`미팅 일정 → 미팅 후 TO → 계약형태(도급·채용대행·일용직)까지 기록합니다. ${limited()?`${myBr()} 지사와 본사 자료가 보입니다.`:"본사는 전체 지사가 보입니다."}`,`<button class="btn primary" data-act="dlNew">+ 미팅 등록</button>`)+
   `<div class="banner">목표 기간 <b>${mdShort(g.from)} ~ ${mdShort(g.due)}</b> · ${st.dueLeft>=0?`기한까지 <b>D-${st.dueLeft}</b>`:`<span class="up">기한 ${-st.dueLeft}일 지남</span>`}${S.role==="ceo"?' · <button class="chip vis" style="border:0;cursor:pointer" data-act="tab" data-v="goal">목표·기한 바꾸기</button>':""}</div>
   <div class="subtabs">${["전체",...brs].map(x=>`<button data-act="salesBr" data-v="${x}" aria-pressed="${x===f}">${x}</button>`).join("")}</div>
@@ -1600,7 +1618,7 @@ function parseBoard(text,mode){ // mode join|quit
   });return out;}
 function joinRow(j){const [cls,lbl]=JST[j.status];
   return `<div class="jrow"><div class="jn"><b>${esc(j.name)}</b>${blTag(j.phone)}${j.ck?'<span class="chip ok" title="사전 연락 확인">✓</span>':""} <span class="sub">${esc(j.phone)}</span>${j.hist.length?`<span class="chip mute">재투입 · 처음 ${mdShort(j.hist[0].date)}</span>`:""}${j.link&&(j.link.hc||j.link.to)?`<span class="chip ok" title="${esc([linkLabel(j.link.hc),linkLabel(j.link.to)].filter(Boolean).join(" / "))}">인원·TO +1 반영</span>`:""}${j.memo?`<div class="sub">${esc(j.memo)}</div>`:""}</div>
-   <div class="jst"><span class="chip ${cls}">${lbl}</span><div class="seg" role="group" aria-label="${esc(j.name)} 입사 결과">${["완료","보류","연기","포기"].map(s=>`<button data-act="jSet" data-id="${j.id}" data-v="${s}" aria-pressed="${j.status===s}">${s==="완료"?"입사":s}</button>`).join("")}</div>${["보류","연기","포기"].includes(j.status)?(j.dbId?'<span class="chip ok">DB로 넘김</span>':`<button class="btn sm" data-act="jToDb" data-id="${j.id}">DB로 넘기기</button>`):""}<button class="btn sm" data-act="jEdit" data-id="${j.id}" aria-label="수정">✎</button></div></div>`;}
+   <div class="jst"><span class="chip ${cls}">${lbl}</span><div class="seg" role="group" aria-label="${esc(j.name)} 입사 결과">${["완료","보류","연기","포기"].map(s=>`<button data-act="jSet" data-id="${j.id}" data-v="${s}" aria-pressed="${j.status===s}">${s==="완료"?"입사":s}</button>`).join("")}</div><span class="jct" title="근로계약서 작성 여부"><small>계약서</small><span class="ox" role="group" aria-label="${esc(j.name)} 근로계약서">${["O","X"].map(x=>`<button data-act="jCt" data-id="${j.id}" data-v="${x}" aria-pressed="${j.ct===x}" class="${x==="O"?"o":"x"}">${x}</button>`).join("")}</span></span>${["보류","연기","포기"].includes(j.status)?(j.dbId?'<span class="chip ok">DB로 넘김</span>':`<button class="btn sm" data-act="jToDb" data-id="${j.id}">DB로 넘기기</button>`):""}<button class="btn sm" data-act="jEdit" data-id="${j.id}" aria-label="수정">✎</button></div></div>`;}
 function joinBlock(list){const byCo={};list.forEach(j=>{(byCo[j.co]=byCo[j.co]||[]).push(j);});
   return Object.entries(byCo).map(([co,js])=>`<div class="wb"><div class="wbh">&lt; ${esc(co)} &gt; <span class="sub">${esc(js[0].mgr||"")} · ${js.length}명</span></div>${js.map(joinRow).join("")}</div>`).join("");}
 function vJoin(){
@@ -1613,6 +1631,8 @@ function vJoin(){
     h+=`<div class="jday ${k===t?"today":""}"><h4>${dd.getMonth()+1}/${dd.getDate()} (${DOW[dd.getDay()]}) ${k===t?'<span class="chip vis">오늘</span>':""}<span class="sub">${js.length}명 입사 예정</span></h4>${joinBlock(js)}</div>`;}return h||'<div class="empty">입사 예정자가 없습니다.</div>';};
   return ph("금주 입사예정자","‘입사예정자 정보등록’에 업체·날짜·이름·연락처를 적어 넣으면 정리됩니다. 입사일 다음 날 결과를 눌러 주세요. '입사'를 누르면 인원현황 합계와 TO 실제 투입이 1씩 올라가고, 결과를 바꾸면 자동으로 되돌아갑니다.",
    `<button class="btn primary" data-act="jPaste">✎ 입사예정자 정보등록</button><button class="btn" data-act="jEdit">+ 1명 추가</button>`)+
+  `<div class="jdays" role="group" aria-label="요일별 보기">${[0,1,2,3,4,5].map(i=>{const k=iso(addDays(new Date(a),i));const dd=new Date(k);const n=S.joins.filter(j=>j.date===k).length;return `<button data-act="jDay" data-v="${k}" aria-pressed="${S.ui.joinDay===k}" class="${k===t?"today":""}"><b>${DOW[dd.getDay()]}</b><small>${mdShort(k)}</small><span class="${n?"":"z"}">${n}명</span></button>`;}).join("")}${S.ui.joinDay?'<button data-act="jDay" data-v="" class="all">전체 보기</button>':""}</div>`+
+  (S.ui.joinDay?(()=>{const k=S.ui.joinDay;const dd=new Date(k);const js=S.joins.filter(j=>j.date===k);return `<div class="jday ${k===t?"today":""}" style="margin-bottom:14px"><h4>${dd.getMonth()+1}/${dd.getDate()} (${DOW[dd.getDay()]}) ${k===t?'<span class="chip vis">오늘</span>':""}<span class="sub">${js.length}명 입사 예정 · 입사 ${js.filter(j=>j.status==="완료").length} · 계약서 O ${js.filter(j=>j.ct==="O").length}</span></h4>${js.length?joinBlock(js):'<div class="empty">이날 입사 예정자가 없습니다.</div>'}</div>`;})():"")+
   `<div class="grid g4" style="margin-bottom:14px">
    <div class="card kpi">${ring(pct(ok,res.length||0))}<div><span>이번 주 입사율</span><b>${ok} / ${res.length}명</b><span>결과가 나온 인원 기준</span></div></div>
    <div class="card"><span class="sub">이번 주 예정</span><div class="big">${wk.length}명</div><span class="sub">다음 주 ${S.joins.filter(j=>inR(j,c,d)).length}명</span></div>
@@ -1692,7 +1712,7 @@ function attModal(rp,d){const r=getPath(rp);if(!r)return;d=d||attDate();const ro
   modal(`${esc(r.co)} 출근 체크`,`<div class="tools" style="margin-bottom:8px"><input type="date" class="btn sm" data-nofocus value="${d}" onchange="closeModal();attModal('${rp}',this.value)" aria-label="날짜"><b>${mdShort(d)} (${DOW[new Date(d).getDay()]})</b><span class="sub">보유 ${act.length||num(r.cur)}명</span></div>
    <div class="ahist">${hist}</div>
    ${act.length?`<div class="tools" style="margin:10px 0 6px"><span>출근 <b id="attN">${[...on].filter(id=>act.some(x=>x.id===id)).length}</b>명</span>${ro?"":`<button type="button" class="btn sm" onclick="attAll(this,true)">모두 체크</button><button type="button" class="btn sm" onclick="attAll(this,false)">모두 해제</button>`}</div>
-   <div class="attgrid">${act.map(x=>`<label class="attp"><input type="checkbox" name="aid" value="${x.id}" ${on.has(x.id)?"checked":""} ${ro?"disabled":""} onchange="attCnt(this)"><span>${esc(x.name)}</span></label>`).join("")}</div>
+   <input class="btn attq" type="search" placeholder="🔍 이름 검색 (예: 김민)" oninput="attFind(this)" aria-label="이름 검색" style="width:100%;margin-bottom:8px;text-align:left"><div class="attgrid">${act.map(x=>`<label class="attp" data-n="${esc(x.name)}"><input type="checkbox" name="aid" value="${x.id}" ${on.has(x.id)?"checked":""} ${ro?"disabled":""} onchange="attCnt(this)"><span>${esc(x.name)}</span></label>`).join("")}</div>
    ${ro?"":`<div class="field" style="margin-top:10px"><span>이름 붙여넣기로 체크 <small class="sub">카톡 출근 명단을 그대로 붙여 넣어도 됩니다. 명단에 없는 이름은 보유 인원에 새로 추가됩니다.</small></span><textarea name="paste" rows="2" placeholder="홍길동, 김철수, 이영희"></textarea></div>`}`
    :`<p class="sub">아직 이 업체에 근무자 명단이 없어서 인원 수로만 적습니다. 업체 이름을 눌러 명단(보유 인원)을 넣으면 사람별로 체크할 수 있습니다.</p>${F("출근 인원",inp("n",a.n??"","number",'min="0" '+(ro?"disabled":"")))}
    ${ro?"":`<div class="field"><span>또는 이름 붙여넣기 <small class="sub">이름을 넣으면 명단에도 추가되고 체크됩니다</small></span><textarea name="paste" rows="2" placeholder="홍길동, 김철수"></textarea></div>`}`}`,
@@ -1701,6 +1721,7 @@ function attModal(rp,d){const r=getPath(rp);if(!r)return;d=d||attDate();const ro
      if(hasRoster(r))r.att[d]={ids};else{const n=fd.get("n");if(n===""||n==null)delete r.att[d];else r.att[d]={n:+n||0};}
      const cut=iso(addDays(TODAY,-90));Object.keys(r.att).forEach(k=>{if(k<cut)delete r.att[k];});
      toast(`${r.co} ${mdShort(d)} 출근 ${attOf(r,d)??0}명 저장${added?` · 명단에 ${added}명 추가`:""}`);}});}
+function attFind(el){const q=el.value.replace(/\s/g,"");const f=el.closest("form");let first=null;f.querySelectorAll(".attp").forEach(l=>{const hit=!q||l.dataset.n.includes(q);l.style.display=hit?"":"none";if(hit&&q&&!first)first=l;});}
 function attCnt(el){const f=el.closest("form");const n=f.querySelectorAll('input[name=aid]:checked').length;const b=document.getElementById("attN");if(b)b.textContent=n;}
 function attAll(b,v){const f=b.closest("form");f.querySelectorAll('input[name=aid]').forEach(c=>c.checked=v);attCnt(b);}
 /* ---------- 근무자 명단 엑셀 올리기 (하랑_근무자명단_양식) ---------- */
@@ -1826,7 +1847,7 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
     pw:()=>passwordModal(),accounts:()=>accountsModal(),logout:()=>logout(),budgetEdit:()=>budgetModal(),pushOn:()=>pushSetup(),
     role:()=>{S.viewer=v;S.role=ROLES[v].role||v;S.ui.showSales=false;S.ui.hcEdit=false;S.ui.toEdit=false;if(isBr())S.ui.condBr=myBr();toast(`${ROLES[v].label} 화면으로 바꿨습니다`);},
     tab:()=>{S.tab=v;scrollTo(0,0);},
-    hcBr:()=>S.ui.hcBr=v,goalYm:()=>{const [y,mm]=(S.ui.goalYm||YM()).split("-").map(Number);const d=new Date(y,mm-1+(+v),1);const x=ym(d);S.ui.goalYm=x>YM()?YM():x;},goalYmSet:()=>{S.ui.goalYm=v;},rosterUp:()=>rosterUpForm(),att:()=>attModal(el.dataset.p),attDay:()=>{S.ui.attDate=+v===0?iso(TODAY):iso(addDays(new Date(attDate()),+v));},hcPpl:()=>hcPeopleModal(el.dataset.p),hcSales:()=>{S.ui.showSales=!S.ui.showSales;},hcEdit:()=>S.ui.hcEdit=!S.ui.hcEdit,
+    hcBr:()=>S.ui.hcBr=v,jCt:()=>{const j=S.joins.find(x=>x.id===el.dataset.id);if(!j)return;j.ct=j.ct===v?"":v;toast(`${j.name} 근로계약서 ${j.ct==="O"?"작성 ✓":j.ct==="X"?"미작성":"표시 지움"}`);},jDay:()=>{S.ui.joinDay=S.ui.joinDay===v?"":v;},goalYm:()=>{const [y,mm]=(S.ui.goalYm||YM()).split("-").map(Number);const d=new Date(y,mm-1+(+v),1);const x=ym(d);S.ui.goalYm=x>YM()?YM():x;},goalYmSet:()=>{S.ui.goalYm=v;},goalSc:()=>{S.ui.goalSc=v;},rosterUp:()=>rosterUpForm(),att:()=>attModal(el.dataset.p),attDay:()=>{S.ui.attDate=+v===0?iso(TODAY):iso(addDays(new Date(attDate()),+v));},hcPpl:()=>hcPeopleModal(el.dataset.p),hcSales:()=>{S.ui.showSales=!S.ui.showSales;},hcEdit:()=>S.ui.hcEdit=!S.ui.hcEdit,
     hcAdd:()=>{S.hc[S.ui.hcBr][+el.dataset.g].rows.push({id:uid(),gubun:"도급",period:P,pay:"",sales:"",mgr:"",co:"새 업체",cur:0,base:0});S.ui.hcEdit=true;},
     hcDel:()=>{if(confirm("이 줄을 삭제할까요?")){const b=S.ui.hcBr,gi=+el.dataset.g,d=+el.dataset.i;const n=S.hc[b][gi].rows.length;S.hc[b][gi].rows.splice(d,1);const map={};for(let i=0;i<n;i++)map[i]=i<d?i:i===d?-1:i-1;hcReindex(b,gi,map);}},
     hcMv:()=>hcMoveRow(S.ui.hcBr,+el.dataset.g,+el.dataset.i,+el.dataset.i+(+v)),
@@ -1855,7 +1876,7 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
     jPaste:()=>jPasteForm("join"),qPaste:()=>jPasteForm("quit"),
     jEdit:()=>jForm(S.joins.find(x=>x.id===el.dataset.id)),jDel:()=>{const jj=S.joins.find(x=>x.id===el.dataset.id);if(unlinkJoin(jj))toast("인원현황·TO 숫자도 되돌렸습니다");S.joins=S.joins.filter(x=>x.id!==el.dataset.id);closeModal();},
     jSet:()=>{const jj=S.joins.find(x=>x.id===el.dataset.id);if(v==="완료"&&jj.status!=="완료"){jDone(jj);return;}const back=unlinkJoin(jj);if(v==="연기"){if(jj.status==="완료")jj.status="대기";jPostpone(jj);return;}jj.status=jj.status===v?"대기":v;toast(`${jj.name} — ${JST[jj.status][1]}${back?" · 인원현황·TO 숫자 되돌림":""}`);},
-    jWk:()=>{S.ui.joinWk=+v===0?0:S.ui.joinWk+(+v);},
+    jWk:()=>{S.ui.joinWk=+v===0?0:S.ui.joinWk+(+v);S.ui.joinDay="";},
     qNew:()=>qForm(),qEdit:()=>qForm(S.quits.find(x=>x.id===el.dataset.id)),qDel:()=>{const qq=S.quits.find(x=>x.id===el.dataset.id);if(unlinkQuit(qq))toast("인원현황 숫자도 되돌렸습니다");S.quits=S.quits.filter(x=>x.id!==el.dataset.id);closeModal();},
     qM:()=>{const [y,m]=S.ui.quitYm.split("-").map(Number);S.ui.quitYm=ym(new Date(y,m-1+(+v),1));},
     salesBr:()=>S.ui.salesBr=v,dlNew:()=>dlForm(),dlEdit:()=>dlForm(S.sales.find(x=>x.id===el.dataset.id)),
@@ -1905,7 +1926,7 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
     invNew:()=>modal("계산서 거래처 추가",`<div class="row2">${F("거래처",inp("co","","text","required"))}${F("지사",sel("branch",BRANCHES,"본사"))}</div><div class="row2">${F("발행 서류",sel("kind",["계산서","명세표","계산서+명세표"],"계산서"))}${F("매월 발행일",inp("due",10,"number",'min="1" max="31"'))}</div>`,
       {onSubmit:fd=>{S.inv.push({id:uid(),co:fd.get("co"),branch:fd.get("branch"),kind:fd.get("kind"),due:+fd.get("due")||10,status:{}});}}),
   };
-  const CHG={blDel:"블랙리스트 삭제",docUndo:"서류 전달 되돌리기",docDel:"서류 요청 취소",docFileDel:"서류 파일 빼기",hcAdd:"인원현황 줄 추가",hcDel:"인원현황 줄 삭제",hcBase:"기준 인원 저장",toAdd:"TO 줄 추가",toDel:"TO 줄 삭제",jSet:"입사예정자 결과 처리",jDel:"입사예정자 삭제",qDel:"퇴사자 삭제",postRead:"특이사항 확인",postDel:"특이사항 삭제",evDel:"일정 삭제",lvOk:"연차 승인",lvNo:"연차 반려",lvDel:"연차 신청 취소",ctDel:"근로계약 삭제",ivDel:"지원 DB 삭제",ivGrade:"지원 DB 상태 변경",invSet:"계산서·명세표 O/X 표시",payDone:"주급·가불 지급완료",payUndo:"지급완료 취소",payBatch:"주급·가불 지급완료",paySheetDone:"주급·가불 지급완료",payDel:"주급·가불 신청 삭제",arMemoAdd:"미수금 메모",arMemoPaid:"미수금 입금 확인",arMemoMiss:"미수금 미입금 표시",arMemoUndo:"미수금 되돌리기",arDel:"미수금 삭제",dlDel:"영업 건 삭제",adNewWk:"광고표 새 주 시작",adAddCo:"광고표 업체 추가"};
+  const CHG={blDel:"블랙리스트 삭제",docUndo:"서류 전달 되돌리기",docDel:"서류 요청 취소",docFileDel:"서류 파일 빼기",hcAdd:"인원현황 줄 추가",hcDel:"인원현황 줄 삭제",hcBase:"기준 인원 저장",toAdd:"TO 줄 추가",toDel:"TO 줄 삭제",jSet:"입사예정자 결과 처리",jCt:"입사예정자 근로계약서 체크",jDel:"입사예정자 삭제",qDel:"퇴사자 삭제",postRead:"특이사항 확인",postDel:"특이사항 삭제",evDel:"일정 삭제",lvOk:"연차 승인",lvNo:"연차 반려",lvDel:"연차 신청 취소",ctDel:"근로계약 삭제",ivDel:"지원 DB 삭제",ivGrade:"지원 DB 상태 변경",invSet:"계산서·명세표 O/X 표시",payDone:"주급·가불 지급완료",payUndo:"지급완료 취소",payBatch:"주급·가불 지급완료",paySheetDone:"주급·가불 지급완료",payDel:"주급·가불 신청 삭제",arMemoAdd:"미수금 메모",arMemoPaid:"미수금 입금 확인",arMemoMiss:"미수금 미입금 표시",arMemoUndo:"미수금 되돌리기",arDel:"미수금 삭제",dlDel:"영업 건 삭제",adNewWk:"광고표 새 주 시작",adAddCo:"광고표 업체 추가"};
   if(H[a]){if(CHG[a]&&S.role!=="ceo"){const t=S.tab;queueMicrotask(()=>{notifyCeoChange(CHG[a],t);save();renderHead();});}const opensModal=["pw","accounts","logout","budgetEdit","pushOn","rosterUp","payUp","att","ivBl","ctNew","ctEdit","ctRenew","ctPaste","ivNew","ivEdit","ivJoin","jToDb","blNew","blEdit","lvEdit","hcPpl","docNew","docDone","invEdit","notif","payNew","payEdit","adPB","dlNew","dlEdit","dlDone","dlResult","arMemoFor","adUp","adCell","adAlias","jPaste","qPaste","jEdit","qNew","qEdit","calDay","evNew","evEdit","condEdit","postNew","arNew","arEdit","lvNew","invNew"].includes(a);H[a]();save();
     if(!opensModal&&a!=="close"&&!document.querySelector(".overlay")){const y=scrollY;render();if(a!=="tab")scrollTo(0,y);}
     void keepModal;}
