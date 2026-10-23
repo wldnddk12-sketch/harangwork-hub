@@ -439,7 +439,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1792736567";
+const HUB_BUILD="1792743470";
 async function checkBuild(){if(!/^\d+$/.test(HUB_BUILD))return;try{const t=await (await fetch(location.pathname+"?v="+Date.now(),{cache:"no-store"})).text();const m=t.match(/const HUB_BUILD="(\d+)"/);
   if(m&&m[1]!==HUB_BUILD){if(!document.querySelector(".overlay")&&!dirty&&!syncing){toast("새 버전으로 바꾸는 중…");setTimeout(()=>location.reload(),600);}}}catch(e){}}
 async function loadAll(force){if(!force&&(dirty||syncing||document.querySelector(".overlay"))){clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),1500);return;}
@@ -707,7 +707,7 @@ function vHome(){
   const goals=[["총 투입 인원",all.cur,g.total,"명",pct(all.cur,g.total)],["신규 투입(순증)",net,g.net,"명",pct(Math.max(net,0),g.net)],["TO 충원율",fill,g.fill,"%",pct(fill,g.fill)]];
   const sst=salesStat(undefined,gsc),sg=SG(gsc);goals.push([`${gsc!=="전체"?gsc+" ":""}영업 성사 (기한 ${mdShort(sg.due)})`,sst.deal,sg.deal,"건",pct(sst.deal,sg.deal)]);
   const evToday=ttEvents().filter(e=>e.date===iso(TODAY)).sort((a,b)=>(a.hour??0)-(b.hour??0));
-  const mine=S.posts.filter(p=>(p.to.includes(me())||p.to.includes("전체"))&&!p.reads.includes(me()));
+  const mine=S.posts.filter(postVis).filter(p=>(p.to.includes(me())||p.to.includes("전체"))&&!p.reads.includes(me()));
   const pend=S.leave.reqs.filter(r=>r.status==="대기");
   const payWait=S.pays.filter(p=>p.status!=="지급완료"&&payVisBR().includes(p.branch));
   const conds=condList();const condDone=conds.filter(c=>condPct(c)===100).length;
@@ -1179,7 +1179,9 @@ function vIV(){const f=S.ui.ivF||"all",q=(S.ui.ivQ||"").trim();const full=ivList
   const mgrs=[...IV_MGRS,...[...new Set(full.map(v=>v.mgr).filter(Boolean))].filter(n=>!IV_MGRS.includes(n))];
   const all=mg==="all"?full:full.filter(v=>v.mgr===mg);
   let L=all.filter(v=>f==="all"?true:gv(v)===(f==="none"?"상태미정":f));
-  L.sort((a,b)=>GRADES.indexOf(gv(a))-GRADES.indexOf(gv(b))||String(b.date||b.at||"").localeCompare(String(a.date||a.at||"")));
+  /* 전체: 올린 순서대로 (최근에 올린 사람이 위) · 상태별 칸: 같은 상태 안에서 최근 순 */
+  const ord=new Map((S.interviews||[]).map((v,i)=>[v,i]));
+  if(f==="all")L.sort((a,b)=>ord.get(b)-ord.get(a));else L.sort((a,b)=>GRADES.indexOf(gv(a))-GRADES.indexOf(gv(b))||ord.get(b)-ord.get(a));
   const c=g=>all.filter(v=>gv(v)===g).length;
   return ph("지원 DB","면접을 봤지만 바로 투입하지 않은 지원자를 모아 둡니다. 입사예정자에서 보류·연기·포기한 사람도 넘겨 받을 수 있습니다. 상태(최상~최하·상태미정)를 매겨 두면 다음에 사람이 필요할 때 좋은 사람부터 다시 연락할 수 있습니다.",`<button class="btn primary" data-act="ivNew">+ 지원자 등록</button>`)+
   `<div class="gradebar">${GRADES.map(g=>`<div class="card gcard ${GCLS[g]}"><span class="sub">${g}</span><div class="big">${c(g)}<span class="sub">명</span></div></div>`).join("")}<div class="card gcard"><span class="sub">${mg==="all"?"전체":esc(mg)}</span><div class="big">${all.length}<span class="sub">명</span></div></div></div>
@@ -1253,16 +1255,18 @@ function vCond(){
 }
 
 /* ---------- 특이사항 ---------- */
+/* 특이사항: '전체'로 올린 글은 모두, 사람을 지정한 글은 지정된 사람·글쓴이·대표만 봄 */
+const postVis=p=>p.to.includes("전체")||p.to.includes(me())||p.author===me()||me()===ceoName(); /* 대표 본인만 (대표 권한 받은 팀장 제외) */
 function vNotes(){
-  const f=S.ui.noteF;let ps=[...S.posts].sort((a,b)=>b.date.localeCompare(a.date));
+  const f=S.ui.noteF;let ps=[...S.posts].filter(postVis).sort((a,b)=>b.date.localeCompare(a.date));
   const forMe=p=>p.to.includes(me())||p.to.includes("전체");
   if(f==="mine")ps=ps.filter(forMe);if(f==="unread")ps=ps.filter(p=>forMe(p)&&!p.reads.includes(me()));
   const recips=p=>p.to.includes("전체")?PEOPLE().filter(n=>n!==p.author):p.to;
-  return ph("현장·거래처 특이사항 공유","누구나 글을 올리고, 꼭 봐야 할 사람을 지정합니다. 지정된 사람이 '확인'을 누르면 확인 현황이 채워집니다.",`<button class="btn primary" data-act="postNew">+ 글쓰기</button>`)+
+  return ph("현장·거래처 특이사항 공유","누구나 글을 올리고, 꼭 봐야 할 사람을 지정합니다. 사람을 지정한 글은 지정된 사람·글쓴이·대표 본인만 볼 수 있고, '전체'로 올린 글은 모두 봅니다. 지정된 사람이 '확인'을 누르면 확인 현황이 채워집니다.",`<button class="btn primary" data-act="postNew">+ 글쓰기</button>`)+
   `<div class="subtabs">${[["all","전체"],["mine","나에게 온 글"],["unread","내가 확인 안 한 글"]].map(([k,l])=>`<button data-act="noteF" data-v="${k}" aria-pressed="${f===k}">${l}</button>`).join("")}</div>
   <div class="grid">${ps.map(p=>{const rc=recips(p);const rd=rc.filter(n=>p.reads.includes(n)).length;const need=forMe(p)&&!p.reads.includes(me())&&p.author!==me();
    return `<article class="post ${p.level}"><h4>${p.level==="urgent"?'<span class="chip late">긴급</span>':p.level==="imp"?'<span class="chip vis">중요</span>':""}${esc(p.title)}${p.co?`<span class="chip mute">${esc(p.co)}</span>`:""}</h4>
-    <div class="meta">${esc(p.author)} · ${p.date} · 우선 확인: ${p.to.map(n=>`<span class="chip ${p.reads.includes(n)?"ok":"mute"}">${esc(n)}${p.reads.includes(n)?" ✓":""}</span>`).join(" ")}</div>
+    <div class="meta">${p.to.includes("전체")?"":'<span class="chip mute" title="지정된 사람·글쓴이·대표만 볼 수 있음">🔒 지정한 사람만</span> '}${esc(p.author)} · ${p.date} · 우선 확인: ${p.to.map(n=>`<span class="chip ${p.reads.includes(n)?"ok":"mute"}">${esc(n)}${p.reads.includes(n)?" ✓":""}</span>`).join(" ")}</div>
     <p>${esc(p.body)}</p>
     <div class="prow" style="grid-template-columns:auto 1fr auto;margin:0"><span class="sub">확인</span>${bar(pct(rd,rc.length))}<span class="v">${rd}/${rc.length}명</span></div>
     <div class="tools">${need?`<button class="btn vis sm" data-act="postRead" data-id="${p.id}">확인했어요</button>`:""}${p.author===me()||S.role==="ceo"?`<button class="btn sm danger" data-act="postDel" data-id="${p.id}">삭제</button>`:""}</div></article>`}).join("")||'<div class="empty">해당하는 글이 없습니다.</div>'}</div>`;
