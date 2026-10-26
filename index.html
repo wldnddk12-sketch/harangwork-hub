@@ -444,7 +444,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1793002163";
+const HUB_BUILD="1793002747";
 async function checkBuild(){if(!/^\d+$/.test(HUB_BUILD))return;try{const t=await (await fetch(location.pathname+"?v="+Date.now(),{cache:"no-store"})).text();const m=t.match(/const HUB_BUILD="(\d+)"/);
   if(m&&m[1]!==HUB_BUILD){if(!document.querySelector(".overlay")&&!dirty&&!syncing){toast("새 버전으로 바꾸는 중…");setTimeout(()=>location.reload(),600);}}}catch(e){}}
 async function loadAll(force){if(!force&&(dirty||syncing||document.querySelector(".overlay"))){clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),1500);return;}
@@ -1157,7 +1157,7 @@ function ctList(){return (S.contracts||[]).filter(c=>ctVisBR().includes(c.branch
 function coStaff(co){const out=new Set();HC_TABS.forEach(t=>(S.hc[t]||[]).forEach(g=>g.rows.forEach(r=>{if(coMatch(r.co,co))[r.sales,r.mgr].forEach(v=>String(v||"").split("/").forEach(n=>{n=n.trim();if(n)out.add(n);}));})));return out;}
 const ctCan=c=>isBoss()||(c&&(c.mgr===me()||c.by===me()||coStaff(c.co).has(me())));
 function ctRemind(){const L=ctList().filter(c=>{const s=ctState(c);return (s.k==="soon"||s.k==="late")&&c.remind!==c.end&&c.mgr&&ctCan(c);});if(!L.length)return;
-  L.forEach(c=>{c.remind=c.end;const s=ctState(c);notify([c.mgr],`근로계약 ${s.k==="late"?"만료됨":"만료 "+s.lbl}: ${c.co} ${c.name} (${mdShort(c.end)}까지) — 다시 작성해 주세요`,"ct",{self:true});});save();}
+  L.forEach(c=>{c.remind=c.end;const s=ctState(c);notify(String(c.mgr||"").split("/").map(x=>x.trim()).filter(Boolean),`근로계약 ${s.k==="late"?"만료됨":"만료 "+s.lbl}: ${c.co} ${c.name} (${mdShort(c.end)}까지) — 다시 작성해 주세요`,"ct",{self:true});});save();}
 function vCT(){const f=S.ui.ctF||"soon",q=(S.ui.ctQ||"").trim();const all=ctList();
   const cnt=k=>all.filter(c=>ctState(c).k===k).length;const act=all.filter(c=>!c.renewedTo);
   let L=all.filter(c=>{const k=ctState(c).k;return f==="all"?true:f==="soon"?(k==="soon"||k==="late"):f==="ok"?k==="ok"||k==="open":k==="renew";});
