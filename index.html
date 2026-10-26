@@ -439,7 +439,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1792974654";
+const HUB_BUILD="1792982804";
 async function checkBuild(){if(!/^\d+$/.test(HUB_BUILD))return;try{const t=await (await fetch(location.pathname+"?v="+Date.now(),{cache:"no-store"})).text();const m=t.match(/const HUB_BUILD="(\d+)"/);
   if(m&&m[1]!==HUB_BUILD){if(!document.querySelector(".overlay")&&!dirty&&!syncing){toast("새 버전으로 바꾸는 중…");setTimeout(()=>location.reload(),600);}}}catch(e){}}
 async function loadAll(force){if(!force&&(dirty||syncing||document.querySelector(".overlay"))){clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),1500);return;}
@@ -1775,7 +1775,7 @@ function hcUnmove(path,d,src){const r=rowOf(path);if(!hasRoster(r)){bumpPath(pat
   else{r.people=r.people.filter(x=>!(x.outSrc===src&&x.added));r.people.forEach(x=>{if(x.outSrc===src){x.out="";delete x.outSrc;}});}
   rosterSync(r);}
 function rosterBadge(r){if(!hasRoster(r))return "";const n=r.people.filter(isNewP).length,o=r.people.filter(isOutP).length;
-  return `${n?` <span class="rb rn" title="최근 7일 신규">+${n}</span>`:""}${o?` <span class="rb ro" title="최근 7일 퇴사">−${o}</span>`:""}`;}
+  return `${n?` <span class="rb rn" title="최근 7일 안에 입사한 사람 (명단 기준)">신규 +${n}</span>`:""}${o?` <span class="rb ro" title="최근 7일 안에 퇴사한 사람">퇴사 −${o}</span>`:""}`;}
 const fmtPhone=v=>{const d=String(v||"").replace(/\D/g,"");return d.length===11?d.replace(/(\d{3})(\d{4})(\d{4})/,"$1-$2-$3"):d.length===10?d.replace(/(\d{3})(\d{3,4})(\d{4})/,"$1-$2-$3"):String(v||"").trim();};
 function parseRosterLines(t,asNew){return String(t||"").split(/\n|,/).map(l=>l.trim()).filter(Boolean).map(l=>{let d="",ph="";const pm=l.match(/01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/);if(pm){ph=fmtPhone(pm[0]);l=l.replace(pm[0],"").trim();}const m=l.match(/(\d{4}-\d{1,2}-\d{1,2})|(\d{1,2})[\/.](\d{1,2})/);
   if(m){if(m[1])d=iso(new Date(m[1]));else{const y=TODAY.getFullYear();d=iso(new Date(y,+m[2]-1,+m[3]));}l=l.replace(m[0],"").trim();}
