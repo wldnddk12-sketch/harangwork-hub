@@ -203,6 +203,11 @@ tr.dragging td{opacity:.45}tr.dropto td{box-shadow:inset 0 3px 0 var(--brand)}
 .pplist{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .pp{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:4px 6px 4px 11px;font-size:13.5px;background:var(--surface)}
 .pp small{font-size:11px;opacity:.85}
+.pp small.rec{color:#7c3aed;opacity:1;font-weight:600}
+.recs{font-size:11.5px;margin-top:2px;color:#7c3aed}
+.recs b{font-weight:700}
+.recm{color:#7c3aed;font-weight:600}
+.recpick{display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap}.recpick small{color:var(--muted);font-size:11.5px;font-weight:600}.recpick .seg button{padding:3px 10px;font-size:12.5px}.recpick .seg button[aria-pressed="true"]{background:#7c3aed;color:#fff}.recpick select{font-size:12.5px;padding:3px 6px;border:1px dashed var(--line);border-radius:6px;background:var(--surface);color:var(--muted);width:auto}
 .pp.pnew{background:#DCE7FA;border-color:#8FB0E6;color:#1A458C;font-weight:600}
 .pp.pout{background:#FBE0E0;border-color:#E9A3A3;color:#A32020;text-decoration:line-through;text-decoration-thickness:1px}
 .pp.pout small{text-decoration:none;display:inline-block}
@@ -439,7 +444,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1792985609";
+const HUB_BUILD="1793002163";
 async function checkBuild(){if(!/^\d+$/.test(HUB_BUILD))return;try{const t=await (await fetch(location.pathname+"?v="+Date.now(),{cache:"no-store"})).text();const m=t.match(/const HUB_BUILD="(\d+)"/);
   if(m&&m[1]!==HUB_BUILD){if(!document.querySelector(".overlay")&&!dirty&&!syncing){toast("새 버전으로 바꾸는 중…");setTimeout(()=>location.reload(),600);}}}catch(e){}}
 async function loadAll(force){if(!force&&(dirty||syncing||document.querySelector(".overlay"))){clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),1500);return;}
@@ -620,12 +625,21 @@ function hcRows(b){return (S.hc[b]||[]).filter(visG).flatMap(g=>g.rows.filter(r=
 function hcTot(b){const rs=hcRows(b);if(b==="일용직"){const d=iso(TODAY);const n=rs.reduce((s,r)=>s+(attOf(r,d)||0),0);return {cur:n,base:n,pool:rs.reduce((s,r)=>s+(+r.cur||0),0),daily:true};}
   return {cur:rs.reduce((s,r)=>s+(+r.cur||0),0),base:rs.reduce((s,r)=>s+(+r.base||0),0)};}
 function hcAll(){return visHC().reduce((a,b)=>{const t=hcTot(b);a.cur+=t.cur;a.base+=t.base;return a;},{cur:0,base:0});}
-function hcSharedRows(){const out=[];if(!limited())return out;HC_TABS.forEach(t=>(S.hc[t]||[]).forEach((g,gi)=>{if(g.branch===myBr())return;g.rows.forEach((r,i)=>{if(mgrs(r).includes(me()))out.push({r,g,rp:`hc.${t}.${gi}.rows.${i}`});});}));return out;}
+function hcSharedRows(){const out=[];if(!limited())return out;HC_TABS.forEach(t=>(S.hc[t]||[]).forEach((g,gi)=>{if(g.branch===myBr())return;g.rows.forEach((r,i)=>{if(mgrs(r).includes(me())||recExtra(r).includes(me()))out.push({r,g,rp:`hc.${t}.${gi}.rows.${i}`});});}));return out;}
 const hcRowRO=rp=>{const m=String(rp).match(/^hc\.([^.]+)\.(\d+)\./);const g=m&&(S.hc[m[1]]||[])[+m[2]];return !!(g&&limited()&&g.branch!==myBr());};
 function mgrs(r){return String(r.mgr||"").split("/").map(s=>s.trim()).filter(Boolean);}
+/* 다른 사람이 채용해 넣은 인원: 그 사람 몫으로 따로 셈 (cur=지금 재직, base=기준일에 재직) */
+const baseStart=()=>{const y=S.baseYm||YM();return y==="2026-10"?"2026-10-21":y+"-01";};
+function recCounts(r){const out={};if(!r||typeof recOf!=="function")return out;const b0=baseStart();const ms=mgrs(r);
+  if(!hasRoster(r)){(r.recs||[]).forEach(x=>{const n=x.rec;if(!n||(ms.length===1&&ms[0]===n))return;const o=out[n]=out[n]||{cur:0,base:0};o.cur++;if(x.in&&x.in<b0)o.base++;});return out;}
+  r.people.forEach(x=>{const n=recOf(x,r);if(!n)return;const o=out[n]=out[n]||{cur:0,base:0};if(!x.out)o.cur++;if((!x.in||x.in<b0)&&(!x.out||x.out>=b0))o.base++;});return out;}
+const recExtra=r=>Object.keys(recCounts(r)).filter(n=>!mgrs(r).includes(n));
+const mgrCell=r=>esc(r.mgr||"")+recExtra(r).map(n=>`<span class="recm" title="${esc(n)} 채용 인원 포함 (관리담당자별 합계에 따로 셈)">/${esc(n)}</span>`).join("");
 function attribute(rows,key){ // key: mgr|sales
   const m={};rows.forEach(r=>{
-    if(key==="mgr"){const ms=mgrs(r);const sp=r.splits||{};const sum=ms.reduce((s,n)=>s+(+sp[n]||0),0);
+    if(key==="mgr"){const rc=recCounts(r);const ks=Object.keys(rc);if(ks.length){let c=+r.cur||0,b=+r.base||0;ks.forEach(n=>{m[n]=m[n]||{cur:0,base:0};const v=rc[n];const vc=Math.min(v.cur,c),vb=Math.min(v.base,b);m[n].cur+=vc;m[n].base+=vb;c-=vc;b-=vb;});
+        const sp=r.splits?Object.fromEntries(Object.entries(r.splits).map(([n,v])=>[n,Math.max(0,(+v||0)-((rc[n]&&rc[n].cur)||0))])):null;
+        r=Object.assign({},r,{cur:c,base:b,splits:sp,bsplits:null});}const ms=mgrs(r);const sp=r.splits||{};const sum=ms.reduce((s,n)=>s+(+sp[n]||0),0);
       if(ms.length>1&&sum===(+r.cur||0)){ms.forEach(n=>{m[n]=m[n]||{cur:0,base:0};m[n].cur+=+sp[n]||0;});
         const bs=r.bsplits||{};const bsum=ms.reduce((s,n)=>s+(+bs[n]||0),0);const B=+r.base||0;
         if(bs&&bsum===B&&r.bsplits)ms.forEach(n=>m[n].base+=+bs[n]||0);
@@ -759,21 +773,22 @@ function vHC(){
     const rs=g.rows;const act=rs.filter(r=>!r.excluded);const hideHQ=r=>!ed&&g.branch!=="본사"&&r.excluded&&/본사/.test(r.memo||"");const nHid=rs.filter(hideHQ).length;const c=act.reduce((s,r)=>s+(+r.cur||0),0),bs=act.reduce((s,r)=>s+(+r.base||0),0);
     html+=`<div class="gname"><b>${esc(g.name)}</b>${g.daily?'<span class="chip mute">일 보고 인원 기준</span>':""}${g.note?`<span class="note">${esc(g.note)}</span>`:""}${ed?`<button class="btn sm" data-act="hcAdd" data-g="${gi}">+ 줄 추가</button>`:""}</div>`;
     if(!rs.length){html+=`<div class="empty">아직 등록된 업체가 없습니다.${ed?"":" '수정하기'를 눌러 추가하세요."}</div>`;return;}
-    if(!ed)html+=`<div class="mlist only-m">${rs.map((r,ri)=>{if(hideHQ(r))return "";const d=(+r.cur||0)-(+r.base||0);return `<div class="mi ${r.excluded?"mx":""}"><div class="mt"><button class="colink" data-act="hcPpl" data-p="hc.${b}.${gi}.rows.${ri}"><b>${esc(r.co)}</b></button>${rosterBadge(r)}${r.isNew?' <span class="chip vis">신규</span>':""}${r.excluded?` <span class="chip mute">${esc(r.memo||"타 지사 집계")}</span>`:""}<div class="sub">${esc(r.gubun)} · 관리 ${esc(r.mgr)}${CEO&&r.sales?` · 영업 ${esc(r.sales)}`:""}</div></div><div class="mv">${isD?attCell(r,`hc.${b}.${gi}.rows.${ri}`,hcRowRO(`hc.${b}.${gi}.rows.${ri}`)):""}<b>${num(r.cur)}</b><span class="sub">${isD?"보유 · ":""}기준 ${num(r.base)} · ${diff(d)}</span></div></div>`}).join("")}<div class="mi mtot"><div class="mt"><b>합계</b></div><div class="mv"><b>${num(c)}</b><span class="sub">기준 ${num(bs)} · ${diff(c-bs)}</span></div></div></div>`;
+    if(!ed)html+=`<div class="mlist only-m">${rs.map((r,ri)=>{if(hideHQ(r))return "";const d=(+r.cur||0)-(+r.base||0);return `<div class="mi ${r.excluded?"mx":""}"><div class="mt"><button class="colink" data-act="hcPpl" data-p="hc.${b}.${gi}.rows.${ri}"><b>${esc(r.co)}</b></button>${rosterBadge(r)}${r.isNew?' <span class="chip vis">신규</span>':""}${r.excluded?` <span class="chip mute">${esc(r.memo||"타 지사 집계")}</span>`:""}<div class="sub">${esc(r.gubun)} · 관리 ${mgrCell(r)}${CEO&&r.sales?` · 영업 ${esc(r.sales)}`:""}</div>${recSplitHtml(r)}</div><div class="mv">${isD?attCell(r,`hc.${b}.${gi}.rows.${ri}`,hcRowRO(`hc.${b}.${gi}.rows.${ri}`)):""}<b>${num(r.cur)}</b><span class="sub">${isD?"보유 · ":""}기준 ${num(r.base)} · ${diff(d)}</span></div></div>`}).join("")}<div class="mi mtot"><div class="mt"><b>합계</b></div><div class="mv"><b>${num(c)}</b><span class="sub">기준 ${num(bs)} · ${diff(c-bs)}</span></div></div></div>`;
     html+=`<div class="tw ${ed?"":"only-d"}"><table class="x"><thead><tr><th>순번</th><th>구분</th>${CEO?"<th>영업담당자 🔒</th>":""}<th>관리담당자</th><th>업체</th><th>${isD?"보유 인원":"합계인원"}</th>${isD&&!ed?`<th>${mdShort(attDate())} 출근</th>`:""}<th>${esc(baseLbl())}</th><th>증감</th>${ed?"<th>타 지사 집계</th><th></th>":""}</tr></thead><tbody>`;
     let n=0;
     rs.forEach((r,i)=>{if(hideHQ(r))return;const p=`hc.${b}.${gi}.rows.${i}`;const ms=mgrs(r);n++;
       const tag=(r.isNew?' <span class="chip vis">신규</span>':"")+(r.excluded?` <span class="chip mute">${esc(r.memo||"타 지사 집계")} · 합계 제외</span>`:"");
       let curCell=`${num(r.cur)}`,baseCell=num(r.base);
+      if(ms.length<=1&&!ed){const L=recSplit(r);if(L)curCell=`<div class="split"><b>${num(r.cur)}</b>${L.map(x=>`<span${x.own?"":' class="recm"'}>${esc(x.n)}<b>${x.c}</b></span>`).join("")}</div>`;}
       if(ms.length>1){
         const sp=r.splits||{};
         curCell=ed?`<div class="split">${inpS(p+".cur",r.cur,"합계")}${ms.map(m=>`<span>${esc(m)} ${inpS(p+".splits."+m,sp[m]??"","")}</span>`).join("")}</div>`
-          :`<div class="split"><b>${num(r.cur)}</b>${ms.map(m=>`<span>${esc(m)}<b>${sp[m]??"-"}</b></span>`).join("")}</div>`;
+          :`<div class="split"><b>${num(r.cur)}</b>${ms.map(m=>{const rc=recCounts(r)[m];return `<span>${esc(m)}<b>${sp[m]??(rc?rc.cur:"-")}</b></span>`;}).join("")}${recExtra(r).map(m=>`<span class="recm">${esc(m)}<b>${recCounts(r)[m].cur}</b></span>`).join("")}</div>`;
       }else if(ed)curCell=hasRoster(r)?`<b>${num(r.cur)}</b><div class="sub">명단 연동</div>`:inpS(p+".cur",r.cur);
       if(ed)baseCell=inpS(p+".base",r.base);
       html+=(ed?`<tr data-dk="hc|${gi}" data-di="${i}"><td class="nowrap"><span class="dh" draggable="true" title="끌어서 순서 바꾸기" aria-hidden="true">⠿</span> ${n} <button class="btn sm mv" data-act="hcMv" data-g="${gi}" data-i="${i}" data-v="-1" aria-label="위로" ${i===0?"disabled":""}>▲</button><button class="btn sm mv" data-act="hcMv" data-g="${gi}" data-i="${i}" data-v="1" aria-label="아래로" ${i===rs.length-1?"disabled":""}>▼</button></td>`:`<tr><td>${n}</td>`)+
         (ed?["gubun",...(CEO?["sales"]:[]),"mgr","co"].map(k=>`<td><input data-set="${p}.${k}" value="${esc(r[k])}" aria-label="${k}" style="min-width:${k==="co"?150:k==="period"?130:k==="gubun"?90:70}px"></td>`).join("")
-           :`<td>${esc(r.gubun)}</td>${CEO?`<td>${esc(r.sales)}</td>`:""}<td>${esc(r.mgr)}</td><td class="l"><button class="colink" data-act="hcPpl" data-p="${p}" title="근무자 명단 보기">${esc(r.co)}</button>${rosterBadge(r)}${tag}</td>`)+
+           :`<td>${esc(r.gubun)}</td>${CEO?`<td>${esc(r.sales)}</td>`:""}<td>${mgrCell(r)}</td><td class="l"><button class="colink" data-act="hcPpl" data-p="${p}" title="근무자 명단 보기">${esc(r.co)}</button>${rosterBadge(r)}${tag}</td>`)+
         `<td class="cur num">${curCell}</td>${isD&&!ed?`<td class="num">${attCell(r,p,hcRowRO(p))}</td>`:""}<td class="num">${baseCell}</td><td class="num">${diff((+r.cur||0)-(+r.base||0))}</td>`+
         (ed?`<td><input type="checkbox" data-set="${p}.excluded" data-type="bool" ${r.excluded?"checked":""} aria-label="다른 지사 집계"></td><td><button class="btn sm danger" data-act="hcDel" data-g="${gi}" data-i="${i}">삭제</button></td>`:"")+`</tr>`;
     });
@@ -786,7 +801,7 @@ function vHC(){
   if(limited()&&b===visHC()[0]){const sh=hcSharedRows();if(sh.length){const sc=sh.reduce((t,x)=>t+(+x.r.cur||0),0),sb=sh.reduce((t,x)=>t+(+x.r.base||0),0);
     html+=`<div class="gname" style="margin-top:18px"><b>다른 지사 업체 중 내가 관리하는 곳</b><span class="chip mute">보기 전용 · 수정은 해당 지사·본사에서</span></div>
     <div class="tw"><table class="x resp"><thead><tr><th>지사·분류</th><th>구분</th><th>관리담당자</th><th>업체</th><th>합계인원</th><th>${esc(baseLbl())}</th><th>증감</th></tr></thead><tbody>
-    ${sh.map(({r,g,rp})=>{const d=(+r.cur||0)-(+r.base||0);return `<tr><td>${esc(g.name)}</td><td>${esc(r.gubun)}</td><td>${esc(r.mgr)}</td><td class="l"><button class="colink" data-act="hcPpl" data-p="${rp}">${esc(r.co)}</button>${rosterBadge(r)}</td><td class="num cur">${num(r.cur)}</td><td class="num">${num(r.base)}</td><td class="num">${diff(d)}</td></tr>`}).join("")}
+    ${sh.map(({r,g,rp})=>{const d=(+r.cur||0)-(+r.base||0);return `<tr><td>${esc(g.name)}</td><td>${esc(r.gubun)}</td><td>${mgrCell(r)}</td><td class="l"><button class="colink" data-act="hcPpl" data-p="${rp}">${esc(r.co)}</button>${rosterBadge(r)}</td><td class="num cur">${num(r.cur)}</td><td class="num">${num(r.base)}</td><td class="num">${diff(d)}</td></tr>`}).join("")}
     <tr class="tot"><td colspan="4">합계 (내 지사 합계에는 안 들어감)</td><td>${num(sc)}</td><td>${num(sb)}</td><td>${diff(sc-sb)}</td></tr></tbody></table></div>`;}}
   html+=`</div><aside class="side">
    <div class="card"><h3>${b} ${["일용직","채용대행"].includes(b)?"지사별":"분류별"} 합계</h3><table class="x"><thead><tr><th>분류</th><th>현재</th><th>기준</th><th>증감</th></tr></thead><tbody>${groups.filter(visG).map(g=>{const a=g.rows.filter(r=>!r.excluded);const c=a.reduce((s,r)=>s+(+r.cur||0),0),bb=a.reduce((s,r)=>s+(+r.base||0),0);return `<tr><td>${esc(g.name.replace(b+" ",""))}</td><td>${c}</td><td>${bb}</td><td>${diff(c-bb)}</td></tr>`}).join("")}<tr class="tot"><td>총 합계</td><td>${t.cur}</td><td>${t.base}</td><td>${diff(t.cur-t.base)}</td></tr></tbody></table></div>
@@ -1709,10 +1724,10 @@ function parseBoard(text,mode){ // mode join|quit
       out.push({co,name,inDate:dates[0]||"",outDate:dates[1]||dates[0]||"",reason:rest.replace(name,"").trim()});}
   });return out;}
 function joinRow(j){const [cls,lbl]=JST[j.status];
-  return `<div class="jrow"><div class="jn"><b>${esc(j.name)}</b>${blTag(j.phone)}${j.ck?'<span class="chip ok" title="사전 연락 확인">✓</span>':""} <span class="sub">${esc(j.phone)}</span>${j.hist.length?`<span class="chip mute">재투입 · 처음 ${mdShort(j.hist[0].date)}</span>`:""}${j.link&&(j.link.hc||j.link.to)?`<span class="chip ok" title="${esc([linkLabel(j.link.hc),linkLabel(j.link.to)].filter(Boolean).join(" / "))}">인원·TO +1 반영</span>`:""}${j.memo?`<div class="sub">${esc(j.memo)}</div>`:""}${j.at||j._ts||(j.resAt&&j.status!=="대기")?`<div class="sub stamp">${[j.at||j._ts?"등록 "+stampTxt(j.at||j._ts,j.by):"",j.resAt&&j.status!=="대기"?`${JST[j.status][1]} ${stampTxt(j.resAt,j.resBy)}`:""].filter(Boolean).join(" · ")}</div>`:""}</div>
+  return `<div class="jrow"><div class="jn"><b>${esc(j.name)}</b>${blTag(j.phone)}${j.ck?'<span class="chip ok" title="사전 연락 확인">✓</span>':""} <span class="sub">${esc(j.phone)}</span>${j.hist.length?`<span class="chip mute">재투입 · 처음 ${mdShort(j.hist[0].date)}</span>`:""}${j.link&&(j.link.hc||j.link.to)?`<span class="chip ok" title="${esc([linkLabel(j.link.hc),linkLabel(j.link.to)].filter(Boolean).join(" / "))}">인원·TO +1 반영</span>`:""}${j.memo?`<div class="sub">${esc(j.memo)}</div>`:""}${recPick(j)}${j.at||j._ts||(j.resAt&&j.status!=="대기")?`<div class="sub stamp">${[j.at||j._ts?"등록 "+stampTxt(j.at||j._ts,j.by):"",j.resAt&&j.status!=="대기"?`${JST[j.status][1]} ${stampTxt(j.resAt,j.resBy)}`:""].filter(Boolean).join(" · ")}</div>`:""}</div>
    <div class="jst"><span class="chip ${cls}">${lbl}</span><div class="seg" role="group" aria-label="${esc(j.name)} 입사 결과">${["완료","보류","연기","포기"].map(s=>`<button data-act="jSet" data-id="${j.id}" data-v="${s}" aria-pressed="${j.status===s}">${s==="완료"?"입사":s}</button>`).join("")}</div><span class="jct" title="근로계약서 작성 여부"><small>계약서</small><span class="ox" role="group" aria-label="${esc(j.name)} 근로계약서">${["O","X"].map(x=>`<button data-act="jCt" data-id="${j.id}" data-v="${x}" aria-pressed="${j.ct===x}" class="${x==="O"?"o":"x"}">${x}</button>`).join("")}</span></span>${["보류","연기","포기"].includes(j.status)?(j.dbId?'<span class="chip ok">DB로 넘김</span>':`<button class="btn sm" data-act="jToDb" data-id="${j.id}">DB로 넘기기</button>`):""}<button class="btn sm" data-act="jEdit" data-id="${j.id}" aria-label="수정">✎</button></div></div>`;}
 function joinBlock(list){const byCo={};list.forEach(j=>{(byCo[j.co]=byCo[j.co]||[]).push(j);});
-  return Object.entries(byCo).map(([co,js])=>`<div class="wb"><div class="wbh">&lt; ${esc(co)} &gt; <span class="sub">${esc(js[0].mgr||"")} · ${js.length}명</span></div>${js.map(joinRow).join("")}</div>`).join("");}
+  return Object.entries(byCo).map(([co,js])=>`<div class="wb"><div class="wbh">&lt; ${esc(co)} &gt; <span class="sub">${js[0].mgr?"관리 "+esc(js[0].mgr)+" · ":""}${js.length}명</span></div>${js.map(joinRow).join("")}</div>`).join("");}
 function vJoin(){
   const off=S.ui.joinWk;const [a,b]=weekRange(off),[c,d]=weekRange(off+1);const t=iso(TODAY);
   const need=S.joins.filter(j=>j.date&&j.date<t&&j.status==="대기");
@@ -1747,8 +1762,8 @@ function jPasteForm(mode){
 function pastePreview(ta){const rs=parseBoard(ta.value,ta.dataset.mode);const p=document.getElementById("pasteP");if(!p)return;
   p.innerHTML=rs.length?`<div class="tw"><table class="x"><thead><tr><th>업체</th>${ta.dataset.mode==="quit"?"<th>이름</th><th>입사일</th><th>퇴사일</th><th>사유</th>":"<th>입사일</th><th>이름</th><th>연락처</th><th>✓</th>"}</tr></thead><tbody>${rs.map(r=>ta.dataset.mode==="quit"?`<tr><td>${esc(r.co)}</td><td>${esc(r.name)}</td><td>${mdShort(r.inDate)}</td><td>${mdShort(r.outDate)}</td><td class="l">${esc(r.reason)}</td></tr>`:`<tr><td>${esc(r.co)}</td><td>${r.date?mdShort(r.date):'<span class="up">미정</span>'}</td><td>${esc(r.name)}</td><td>${esc(r.phone)}</td><td>${r.ck?"✓":""}</td></tr>`).join("")}</tbody></table></div><p class="sub">${rs.length}명이 추가됩니다.</p>`:"미리보기가 여기에 나옵니다.";}
 function jForm(j){const n=!j;j=j||{date:iso(addDays(TODAY,1)),co:"",name:"",phone:"",ck:false,memo:""};
-  modal(n?"입사 예정자 추가":"입사 예정자 수정",`<div class="row3">${F("입사 예정일",inp("date",j.date,"date"))}${F("업체",inp("co",j.co,"text","required"))}${F("이름",inp("name",j.name,"text","required"))}</div><div class="row2">${F("연락처",inp("phone",j.phone))}${F("메모",inp("memo",j.memo))}</div><label class="checks"><label><input type="checkbox" name="ck" ${j.ck?"checked":""}>사전 연락 확인(✓)</label></label>`,
-   {onSubmit:fd=>{const o=n?{id:uid(),status:"대기",hist:[],at:nowLocal(),by:me()}:S.joins.find(x=>x.id===j.id);Object.assign(o,{date:fd.get("date"),co:fd.get("co"),name:fd.get("name"),phone:fd.get("phone"),memo:fd.get("memo"),ck:!!fd.get("ck")});o.mgr=mgrOfCo(o.co);if(n)S.joins.push(o);chgNote(`${o.name}(${o.co})`);toast("저장했습니다");},
+  modal(n?"입사 예정자 추가":"입사 예정자 수정",`<div class="row3">${F("입사 예정일",inp("date",j.date,"date"))}${F("업체",inp("co",j.co,"text","required"))}${F("이름",inp("name",j.name,"text","required"))}</div><div class="row2">${F("연락처",inp("phone",j.phone))}${F("메모",inp("memo",j.memo))}</div>${F("채용 담당 <small class=\"sub\">실제로 뽑은 한 명 — 인센티브·인사점수 기준</small>",`<select name="rec"><option value="">${j.co&&mgrNames({mgr:mgrOfCo(j.co)}).length===1?"관리담당 ("+esc(mgrOfCo(j.co))+")":"선택 안 함"}</option>${REC_NAMES().map(n=>`<option ${jRec(j)===n?"selected":""}>${n}</option>`).join("")}</select>`)}<label class="checks"><label><input type="checkbox" name="ck" ${j.ck?"checked":""}>사전 연락 확인(✓)</label></label>`,
+   {onSubmit:fd=>{const o=n?{id:uid(),status:"대기",hist:[],at:nowLocal(),by:me()}:S.joins.find(x=>x.id===j.id);Object.assign(o,{date:fd.get("date"),co:fd.get("co"),name:fd.get("name"),phone:fd.get("phone"),memo:fd.get("memo"),ck:!!fd.get("ck"),rec:""});if(fd.get("rec"))o.rec=fd.get("rec");o.mgr=mgrOfCo(o.co);if(o.link&&o.link.hc){const rr=rowOf(o.link.hc);const px=rr&&(rr.people||[]).find(y=>y.src==="j:"+o.id);if(px){if(o.rec)px.rec=o.rec;else delete px.rec;}}if(n)S.joins.push(o);chgNote(`${o.name}(${o.co})`);toast("저장했습니다");},
     extra:n?"":`<button type="button" class="btn danger" data-act="jDel" data-id="${j.id}">삭제</button>`});}
 function jPostpone(j){modal(`${esc(j.name)} 입사연기`,`${F("재투입 예정일",inp("date",iso(addDays(TODAY,3)),"date","required"))}${F("사유 (선택)",inp("why"))}<p class="sub">재투입 날짜로 옮겨지고 '재투입' 표시가 붙습니다. 원래 날짜는 기록으로 남습니다.</p>`,
   {submit:"연기 저장",onSubmit:fd=>{j.hist.push({date:j.date,status:"연기",why:fd.get("why")});j.date=fd.get("date");j.status="대기";if(fd.get("why"))j.memo="연기 사유: "+fd.get("why");toast(`${mdShort(j.date)} 재투입으로 옮겼습니다`);}});}
@@ -1760,18 +1775,31 @@ function getPath(p){if(!p)return null;if(p.startsWith("hcid:"))return findHcRow(
 /* ---------- 업체별 근무자 명단 (인원현황 연동) ---------- */
 const rowOf=p=>getPath(String(p).replace(/\.cur$/,""));
 const hasRoster=r=>!!(r&&Array.isArray(r.people)&&r.people.length);
+/* 채용 담당: 관리담당과 다른 사람이 뽑아 온 경우 업체 인원을 사람별로 나눠 보기 */
+const REC_NAMES=()=>[...new Set([...IV_MGRS,"정훈","정태균","서영은","최지웅"])];
+function recPick(j){const ms=mgrNames({mgr:j.mgr||mgrOfCo(j.co)});const cur=jRec(j);const one=ms.length===1;const other=cur&&!ms.includes(cur)?cur:"";
+  const btn=(n,on)=>`<button type="button" data-act="jRec" data-id="${j.id}" data-v="${esc(n)}" aria-pressed="${on}">${esc(n)}</button>`;
+  return `<div class="recpick"><small>채용</small><span class="seg" role="group" aria-label="${esc(j.name)} 채용 담당 (한 명만)">${ms.map(n=>btn(n,cur===n||(one&&!cur))).join("")}${other?btn(other,true):""}</span><select data-jrec="${j.id}" aria-label="다른 채용 담당 고르기"><option value="">${other?"바꾸기":"+ 다른 사람"}</option>${REC_NAMES().filter(n=>!ms.includes(n)&&n!==other).map(n=>`<option>${n}</option>`).join("")}</select>${!cur&&!one?'<span class="chip late">한 명 골라 주세요</span>':""}</div>`;}
+function setJRec(j,v){j.rec=v||"";if(j.link&&j.link.hc){const rr=rowOf(j.link.hc);const px=rr&&(rr.people||[]).find(y=>y.src==="j:"+j.id);if(px){px.rec=v||"";}const rx=rr&&(rr.recs||[]).find(y=>y.src==="j:"+j.id);if(rx)rx.rec=v||"";else if(rr&&!hasRoster(rr)&&v)rr.recs=(rr.recs||[]).concat([{src:"j:"+j.id,rec:v,name:j.name,in:j.date||iso(TODAY)}]);}}
+function jRec(j){if(!j)return "";if(j.rec==="-")return "";if(j.rec)return j.rec;const m=String(j.memo||"");return REC_NAMES().find(n=>m.includes(n))||"";}
+const mgrNames=r=>String((r&&r.mgr)||"").split("/").map(x=>x.trim()).filter(Boolean);
+function recOf(x,r){let n=x.rec;if(!("rec" in x)&&x.src&&String(x.src).startsWith("j:")){const j=(S.joins||[]).find(y=>"j:"+y.id===x.src);n=jRec(j);}
+  const ms=mgrNames(r);return n&&!(ms.length===1&&ms[0]===n)?n:"";}
+function recSplit(r){if(!hasRoster(r)){const rc=recCounts(r);const ks=Object.keys(rc);if(!ks.length)return null;let own=+r.cur||0;const L=ks.map(n=>{const c=Math.min(rc[n].cur,own);own-=c;return {n,c,own:false};});return [{n:r.mgr||"관리담당",c:own,own:true},...L];}const m={};let other=0;rosterAct(r).forEach(x=>{const n=recOf(x,r)||"";if(n)other++;m[n]=(m[n]||0)+1;});if(!other)return null;
+  return Object.entries(m).sort((a,b)=>(a[0]===""?-1:b[0]===""?1:b[1]-a[1])).map(([n,c])=>({n:n||(r.mgr||"관리담당"),c,own:!n}));}
+const recSplitHtml=r=>{const L=recSplit(r);return L?`<div class="sub recs" title="채용 담당별 재직 인원">${L.map(x=>`${esc(x.n)} <b>${x.c}</b>`).join(" · ")}</div>`:"";};
 const rosterAct=r=>((r&&r.people)||[]).filter(x=>!x.out);
 /* 한 주 = 화요일~월요일 (월요일 회의 때 지난 화요일부터 한 주 전체가 보이도록) */
 const wkAgo=()=>iso(addDays(TODAY,-((TODAY.getDay()+5)%7)));
 const isNewP=x=>!x.out&&x.in&&x.in>=wkAgo()&&x.in<=iso(TODAY);
 const isOutP=x=>x.out&&x.out>=wkAgo()&&x.out<=iso(TODAY);
 function rosterSync(r){if(hasRoster(r))r.cur=rosterAct(r).length;}
-function hcMove(path,d,info){const r=rowOf(path);if(!hasRoster(r)||!info){bumpPath(path,d);return;}
-  if(d>0)r.people.push({id:uid(),name:info.name,phone:fmtPhone(info.phone||""),in:info.date||iso(TODAY),src:info.src});
+function hcMove(path,d,info){const r=rowOf(path);if(!hasRoster(r)||!info){bumpPath(path,d);if(r&&info&&d>0&&info.rec)r.recs=(r.recs||[]).concat([{src:info.src,rec:info.rec,name:info.name,in:info.date||iso(TODAY)}]);return;}
+  if(d>0)r.people.push(Object.assign({id:uid(),name:info.name,phone:fmtPhone(info.phone||""),in:info.date||iso(TODAY),src:info.src},info.rec?{rec:info.rec}:{}));
   else{const nm=norm(info.name);const x=r.people.find(y=>!y.out&&norm(y.name)===nm);
     if(x){x.out=info.date||iso(TODAY);x.outSrc=info.src;}else r.people.push({id:uid(),name:info.name,in:info.inDate||"",out:info.date||iso(TODAY),outSrc:info.src,added:true});}
   rosterSync(r);}
-function hcUnmove(path,d,src){const r=rowOf(path);if(!hasRoster(r)){bumpPath(path,d);return;}
+function hcUnmove(path,d,src){const r=rowOf(path);if(!hasRoster(r)){bumpPath(path,d);if(r&&r.recs&&d<0){r.recs=r.recs.filter(x=>x.src!==src);if(!r.recs.length)delete r.recs;}return;}
   if(d<0)r.people=r.people.filter(x=>x.src!==src);
   else{r.people=r.people.filter(x=>!(x.outSrc===src&&x.added));r.people.forEach(x=>{if(x.outSrc===src){x.out="";delete x.outSrc;}});}
   rosterSync(r);}
@@ -1785,9 +1813,9 @@ function hcPeopleModal(rp){const r=getPath(rp);if(!r)return;const ro=hcRowRO(rp)
   const recentOut=all.filter(isOutP),oldOut=all.filter(x=>x.out&&!isOutP(x));
   const insB=x=>x.ins==="가입"?` <span class="ins ok" title="4대보험 가입${x.insDate?" "+x.insDate:""}">4대${x.insDate?" "+mdShort(x.insDate):" ✓"}</span>`:x.ins==="미가입"?' <span class="ins no">4대 미가입</span>':"";
   const insN=act.filter(x=>x.ins==="가입").length,insX=act.filter(x=>x.ins==="미가입").length;
-  const pill=x=>`<span class="pp ${isNewP(x)?"pnew":""} ${x.out?"pout":""}">${ro?`<span class="pn">${esc(x.name)}</span>`:`<button type="button" class="pn" onclick="hcPplEdit('${rp}','${x.id}')" title="눌러서 정보 수정">${esc(x.name)}</button>`}${insB(x)}${isNewP(x)?` <small>신규 ${mdShort(x.in)}</small>`:""}${x.out?` <small>퇴사 ${mdShort(x.out)}</small>`:""}${x.phone?` <a class="tel" href="tel:${esc(x.phone.replace(/\D/g,""))}">${esc(x.phone)}</a>`:""}${ro?"":`<button type="button" class="px" aria-label="${esc(x.name)} 명단에서 빼기" onclick="hcPplDel('${rp}','${x.id}')">✕</button>`}</span>`;
+  const pill=x=>`<span class="pp ${isNewP(x)?"pnew":""} ${x.out?"pout":""}">${ro?`<span class="pn">${esc(x.name)}</span>`:`<button type="button" class="pn" onclick="hcPplEdit('${rp}','${x.id}')" title="눌러서 정보 수정">${esc(x.name)}</button>`}${insB(x)}${recOf(x,r)?` <small class="rec">채용 ${esc(recOf(x,r))}</small>`:""}${isNewP(x)?` <small>신규 ${mdShort(x.in)}</small>`:""}${x.out?` <small>퇴사 ${mdShort(x.out)}</small>`:""}${x.phone?` <a class="tel" href="tel:${esc(x.phone.replace(/\D/g,""))}">${esc(x.phone)}</a>`:""}${ro?"":`<button type="button" class="px" aria-label="${esc(x.name)} 명단에서 빼기" onclick="hcPplDel('${rp}','${x.id}')">✕</button>`}</span>`;
   modal(`${esc(r.co)} 근무자 명단`,`<p class="sub" style="margin-top:0">${hasRoster(r)?`재직 <b>${act.length}명</b> — 합계인원이 이 명단 수로 자동 계산됩니다. 입사 처리하면 파란색, 퇴사 등록하면 빨간색으로 이번 주(화~월) 동안 표시됩니다.${ro?"":" 이름을 누르면 전화번호·4대보험을 고칠 수 있습니다."}${insN||insX?`<br>4대보험 가입 <b>${insN}명</b>${insX?` · <span class="up">미가입 ${insX}명</span>`:""}${act.length-insN-insX?` · 미입력 ${act.length-insN-insX}명`:""}`:""}`:`아직 명단이 없습니다. 아래에 이름을 넣으면 그때부터 합계인원(지금 ${num(r.cur)}명)이 명단 수로 자동 계산됩니다.`}</p>
-   ${act.length||recentOut.length?`<div class="pplist">${act.map(pill).join("")}${recentOut.map(pill).join("")}</div>`:""}
+   ${recSplit(r)?`<p class="sub">채용 담당별: ${recSplit(r).map(x=>`${esc(x.n)} <b>${x.c}명</b>`).join(" · ")}</p>`:""}${act.length||recentOut.length?`<div class="pplist">${act.map(pill).join("")}${recentOut.map(pill).join("")}</div>`:""}
    ${oldOut.length?`<details style="margin-top:8px"><summary class="sub">지난 퇴사자 ${oldOut.length}명</summary><div class="pplist">${oldOut.map(pill).join("")}</div></details>`:""}
    ${ro?'<p class="sub" style="margin-top:12px">보기 전용입니다. 명단 수정은 이 업체가 있는 지사(본사) 담당이 합니다.</p>':`<div class="field" style="margin-top:12px"><span>이름 추가 <small class="sub">한 줄에 한 명 (또는 쉼표). 전화번호·입사일도 같이 쓸 수 있습니다: "홍길동 010-1234-5678 10/15". 이미 있는 이름을 다시 쓰면 번호·입사일만 바뀝니다.</small></span><textarea name="names" rows="4" placeholder="홍길동 010-1234-5678\n김철수 01098765432 10/15"></textarea></div>
    <label class="checks"><label><input type="checkbox" name="asNew">날짜 없는 사람도 오늘 신규 입사로 표시 (파란색)</label></label>`}`,
@@ -1853,8 +1881,9 @@ async function rosterFilePicked(f){const box=document.getElementById("rosterPrev
 function hcPplEdit(rp,id){const r=getPath(rp);const x=r&&(r.people||[]).find(y=>y.id===id);if(!x)return;
   modal(`${esc(x.name)} 정보`,`<div class="row2">${F("이름",inp("name",x.name,"text","required"))}${F("전화번호",inp("phone",x.phone||"","tel",'placeholder="010-0000-0000"'))}</div>
    <div class="row3">${F("입사일",inp("in",x.in||"","date"))}${F("4대보험",`<select name="ins"><option value="">미입력</option><option ${x.ins==="가입"?"selected":""}>가입</option><option ${x.ins==="미가입"?"selected":""}>미가입</option></select>`)}${F("4대보험 가입일",inp("insDate",x.insDate||"","date"))}</div>
+   ${F("채용 담당",`<select name="rec"><option value="">관리담당 (${esc(r.mgr||"-")})</option>${REC_NAMES().map(n=>`<option ${recOf(x,r)===n?"selected":""}>${n}</option>`).join("")}</select>`)}
    ${x.out?`<p class="sub">퇴사일 ${x.out} (퇴사 등록은 '퇴사자 공유'에서 관리합니다)</p>`:""}`,
-   {onSubmit:fd=>{x.name=String(fd.get("name")||"").trim()||x.name;x.phone=fmtPhone(fd.get("phone"));x.in=fd.get("in")||"";x.ins=fd.get("ins")||"";x.insDate=fd.get("insDate")||"";if(x.insDate&&!x.ins)x.ins="가입";toast("저장했습니다");setTimeout(()=>hcPeopleModal(rp),0);}});}
+   {onSubmit:fd=>{x.name=String(fd.get("name")||"").trim()||x.name;x.phone=fmtPhone(fd.get("phone"));x.in=fd.get("in")||"";x.ins=fd.get("ins")||"";x.insDate=fd.get("insDate")||"";if(x.insDate&&!x.ins)x.ins="가입";const rc=fd.get("rec")||"";if(rc)x.rec=rc;else{delete x.rec;if(x.src&&String(x.src).startsWith("j:")){const jj=S.joins.find(y=>"j:"+y.id===x.src);if(jj&&jRec(jj))x.rec="";}}toast("저장했습니다");setTimeout(()=>hcPeopleModal(rp),0);}});}
 function hcPplDel(rp,id){const r=getPath(rp);if(!r)return;const x=(r.people||[]).find(y=>y.id===id);if(!x||!confirm(`${x.name}님을 명단에서 뺄까요? (퇴사 처리는 '퇴사자 공유'에서 하면 빨간색으로 남습니다)`))return;
   r.people=r.people.filter(y=>y.id!==id);if(!r.people.length)delete r.people;else rosterSync(r);save();render();hcPeopleModal(rp);}
 function hcReindex(b,gi,map){const pre=`hc.${b}.${gi}.rows.`;
@@ -1882,10 +1911,11 @@ function candSel(name,list,emptyLbl){const best=list[0]&&list[0].sc>0?list[0].pa
 function linkLabel(p){if(!p)return "";if(p.startsWith("hcid:")){const [g,r]=findHcRow(p.slice(5));return r?`${g.name} · ${r.co}`:"";}if(p.startsWith("toid:")){const [b,r]=findToRow(p.slice(5));return r?`${b} TO · ${r.co}${r.job?" / "+r.job:""}`:"";}const ks=p.split(".");if(ks[0]==="hc"){const g=S.hc[ks[1]][+ks[2]],r=g&&g.rows[+ks[4]];return r?`${g.name} · ${r.co}`:"";}const r=S.to[ks[1]][+ks[2]];return r?`${ks[1]} TO · ${r.co}${r.job?" / "+r.job:""}`:"";}
 function jDone(j){const hc=hcCands(j.co),to=toCands(j.co);
   modal(`${esc(j.name)} 입사 처리`,`<p class="sub" style="margin-top:0">${esc(j.co)} 입사로 표시하면서 아래 두 곳의 숫자를 1씩 올립니다. 업체가 다르면 직접 골라 주세요.</p>
+   ${(()=>{const ms=mgrNames({mgr:j.mgr||mgrOfCo(j.co)}),cur=jRec(j)||(ms.length===1?ms[0]:"");return F("채용 담당 <small class=\"sub\">인센티브·인사점수 기준 — 한 명만</small>",`<select name="rec" required><option value="">골라 주세요</option>${[...new Set([...ms,...REC_NAMES()])].map(n=>`<option ${cur===n?"selected":""}>${n}</option>`).join("")}</select>`);})()}
    ${F("인원현황 · 합계인원 +1",candSel("hc",hc,"인원현황에는 반영 안 함"))}${F("TO 현황 · 실제 투입 +1 (투입 예정이 있으면 −1)",candSel("to",to,"TO에는 반영 안 함"))}
    ${!(hc[0]&&hc[0].sc>0)?`<p class="banner">인원현황에서 '${esc(j.co)}'와 비슷한 업체를 찾지 못했습니다. 목록에서 고르거나 '반영 안 함'으로 두세요.</p>`:""}`,
-   {submit:"입사 처리",onSubmit:fd=>{const L={hc:fd.get("hc")||"",to:fd.get("to")||"",planDec:false};
-     if(L.hc)hcMove(L.hc,1,{name:j.name,phone:j.phone||"",date:j.date&&j.date<=iso(TODAY)?j.date:iso(TODAY),src:"j:"+j.id});
+   {submit:"입사 처리",onSubmit:fd=>{if(fd.get("rec"))j.rec=fd.get("rec");const L={hc:fd.get("hc")||"",to:fd.get("to")||"",planDec:false};
+     if(L.hc)hcMove(L.hc,1,{name:j.name,phone:j.phone||"",date:j.date&&j.date<=iso(TODAY)?j.date:iso(TODAY),src:"j:"+j.id,rec:jRec(j)});
      if(L.to){const r=getPath(L.to);r.placed=(+r.placed||0)+1;if(+r.plan>0){r.plan--;L.planDec=true;}}
      j.status="완료";j.link=L;toast(`${j.name} 입사 — ${[L.hc&&"인원현황",L.to&&"TO"].filter(Boolean).join("·")||"숫자 반영 없이"} 처리`);}});}
 function unlinkJoin(j){const L=j.link;if(!L)return false;
@@ -1936,7 +1966,7 @@ function setPath(path,val,type){const ks=path.split(".");let o=S;for(let i=0;i<k
   const k=ks[ks.length-1];if(type==="num")val=val===""?0:+val;else if(type==="numnull")val=val===""||+val===0?null:+val;else if(type==="bool")val=!!val;
   if(ks.includes("splits")&&val===0&&type==="num"){}o[k]=val;}
 document.addEventListener("change",e=>{const el=e.target;if(el.dataset.docfile){const d=S.docreqs.find(x=>x.id===el.dataset.docfile);uploadDocFiles(d,[...el.files]);return;}
-if(el.dataset.ui==="docMine"){S.ui.docMine=el.checked;save();render();return;}if(el.dataset.payamt){const p=S.pays.find(x=>x.id===el.dataset.payamt);if(p){p.amt=+el.value||0;notifyCeoChange("주급 금액 입력","pay");save();toast(`${p.name} 주급 ${won(p.amt)}원`);setTimeout(()=>{const y=scrollY;render();scrollTo(0,y);},0);}return;}if(el.id==="arCoSel"){S.ui.arCo=el.value;return;}if(el.id==="arMemoIn")return;if(el.id==="adFile"&&el.files[0]){adFilePicked(el.files[0]);return;}if(el.id==="payFile"&&el.files[0]){payFilePicked(el.files[0]);return;}if(el.id==="rosterFile"&&el.files[0]){rosterFilePicked(el.files[0]);return;}
+if(el.dataset.jrec){const j=S.joins.find(x=>x.id===el.dataset.jrec);if(j&&el.value){setJRec(j,el.value);chgNote(`${j.name}(${j.co}) 채용 ${el.value}`);notifyCeoChange("입사예정자 채용 담당 지정","join");save();toast(`${j.name} 채용 담당 — ${el.value}`);render();}return;}if(el.dataset.ui==="docMine"){S.ui.docMine=el.checked;save();render();return;}if(el.dataset.payamt){const p=S.pays.find(x=>x.id===el.dataset.payamt);if(p){p.amt=+el.value||0;notifyCeoChange("주급 금액 입력","pay");save();toast(`${p.name} 주급 ${won(p.amt)}원`);setTimeout(()=>{const y=scrollY;render();scrollTo(0,y);},0);}return;}if(el.id==="arCoSel"){S.ui.arCo=el.value;return;}if(el.id==="arMemoIn")return;if(el.id==="adFile"&&el.files[0]){adFilePicked(el.files[0]);return;}if(el.id==="payFile"&&el.files[0]){payFilePicked(el.files[0]);return;}if(el.id==="rosterFile"&&el.files[0]){rosterFilePicked(el.files[0]);return;}
   if(el.dataset.set){setPath(el.dataset.set,el.type==="checkbox"?el.checked:el.value,el.dataset.type);notifyCeoChange(`${(TABS.find(t=>t[0]===S.tab)||[,""])[1]} 수정`,S.tab);save();
     setTimeout(()=>{const a=document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.set;const y=scrollY;render();scrollTo(0,y);if(a){const n=document.querySelector(`[data-set="${CSS.escape(a)}"]`);if(n)n.focus();}},0);}
   if(el.dataset.ui==="ttDate"){S.ui.ttDate=el.value;save();render();}if(el.dataset.ui==="attDate"){S.ui.attDate=el.value||iso(TODAY);save();render();}
@@ -1953,7 +1983,7 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
     pw:()=>passwordModal(),accounts:()=>accountsModal(),logout:()=>logout(),budgetEdit:()=>budgetModal(),pushOn:()=>pushSetup(),
     role:()=>{S.viewer=v;S.role=ROLES[v].role||v;S.ui.showSales=false;S.ui.hcEdit=false;S.ui.toEdit=false;if(isBr())S.ui.condBr=myBr();toast(`${ROLES[v].label} 화면으로 바꿨습니다`);},
     tab:()=>{S.tab=v;scrollTo(0,0);},
-    hcBr:()=>S.ui.hcBr=v,jCt:()=>{const j=S.joins.find(x=>x.id===el.dataset.id);if(!j)return;j.ct=j.ct===v?"":v;toast(`${j.name} 근로계약서 ${j.ct==="O"?"작성 ✓":j.ct==="X"?"미작성":"표시 지움"}`);},jDay:()=>{S.ui.joinDay=S.ui.joinDay===v?"":v;},goalYm:()=>{if(+v===0){S.ui.goalYm=YM();return;}const [y,mm]=(S.ui.goalYm||YM()).split("-").map(Number);const d=new Date(y,mm-1+(+v),1);const x=ym(d);S.ui.goalYm=x>goalMaxYm()?goalMaxYm():x;},goalYmSet:()=>{S.ui.goalYm=v;},goalSc:()=>{S.ui.goalSc=v;},rosterUp:()=>rosterUpForm(),att:()=>attModal(el.dataset.p),attDay:()=>{S.ui.attDate=+v===0?iso(TODAY):iso(addDays(new Date(attDate()),+v));},hcPpl:()=>hcPeopleModal(el.dataset.p),hcSales:()=>{S.ui.showSales=!S.ui.showSales;},hcEdit:()=>S.ui.hcEdit=!S.ui.hcEdit,
+    hcBr:()=>S.ui.hcBr=v,jCt:()=>{const j=S.joins.find(x=>x.id===el.dataset.id);if(!j)return;j.ct=j.ct===v?"":v;toast(`${j.name} 근로계약서 ${j.ct==="O"?"작성 ✓":j.ct==="X"?"미작성":"표시 지움"}`);},jRec:()=>{const j=S.joins.find(x=>x.id===el.dataset.id);if(!j)return;setJRec(j,v);toast(`${j.name} 채용 담당 — ${v||"관리담당"}`);},jDay:()=>{S.ui.joinDay=S.ui.joinDay===v?"":v;},goalYm:()=>{if(+v===0){S.ui.goalYm=YM();return;}const [y,mm]=(S.ui.goalYm||YM()).split("-").map(Number);const d=new Date(y,mm-1+(+v),1);const x=ym(d);S.ui.goalYm=x>goalMaxYm()?goalMaxYm():x;},goalYmSet:()=>{S.ui.goalYm=v;},goalSc:()=>{S.ui.goalSc=v;},rosterUp:()=>rosterUpForm(),att:()=>attModal(el.dataset.p),attDay:()=>{S.ui.attDate=+v===0?iso(TODAY):iso(addDays(new Date(attDate()),+v));},hcPpl:()=>hcPeopleModal(el.dataset.p),hcSales:()=>{S.ui.showSales=!S.ui.showSales;},hcEdit:()=>S.ui.hcEdit=!S.ui.hcEdit,
     hcAdd:()=>{S.hc[S.ui.hcBr][+el.dataset.g].rows.push({id:uid(),gubun:"도급",period:P,pay:"",sales:"",mgr:"",co:"새 업체",cur:0,base:0});S.ui.hcEdit=true;},
     hcDel:()=>{if(confirm("이 줄을 삭제할까요?")){const b=S.ui.hcBr,gi=+el.dataset.g,d=+el.dataset.i;const n=S.hc[b][gi].rows.length;S.hc[b][gi].rows.splice(d,1);const map={};for(let i=0;i<n;i++)map[i]=i<d?i:i===d?-1:i-1;hcReindex(b,gi,map);}},
     hcMv:()=>hcMoveRow(S.ui.hcBr,+el.dataset.g,+el.dataset.i,+el.dataset.i+(+v)),
@@ -2032,7 +2062,7 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
     invNew:()=>modal("계산서 거래처 추가",`<div class="row2">${F("거래처",inp("co","","text","required"))}${F("지사",sel("branch",BRANCHES,"본사"))}</div><div class="row2">${F("발행 서류",sel("kind",["계산서","명세표","계산서+명세표"],"계산서"))}${F("매월 발행일",inp("due",10,"number",'min="1" max="31"'))}</div>`,
       {onSubmit:fd=>{S.inv.push({id:uid(),co:fd.get("co"),branch:fd.get("branch"),kind:fd.get("kind"),due:+fd.get("due")||10,status:{}});}}),
   };
-  const CHG={blDel:"블랙리스트 삭제",docUndo:"서류 전달 되돌리기",docDel:"서류 요청 취소",docFileDel:"서류 파일 빼기",hcAdd:"인원현황 줄 추가",hcDel:"인원현황 줄 삭제",hcBase:"기준 인원 저장",toAdd:"TO 줄 추가",toDel:"TO 줄 삭제",jSet:"입사예정자 결과 처리",jCt:"입사예정자 근로계약서 체크",jDel:"입사예정자 삭제",qDel:"퇴사자 삭제",postRead:"특이사항 확인",postDel:"특이사항 삭제",evDel:"일정 삭제",lvOk:"연차 승인",lvNo:"연차 반려",lvDel:"연차 신청 취소",ctDel:"근로계약 삭제",ivDel:"지원 DB 삭제",ivGrade:"지원 DB 상태 변경",invSet:"계산서·명세표 O/X 표시",payDone:"주급·가불 지급완료",payUndo:"지급완료 취소",payBatch:"주급·가불 지급완료",paySheetDone:"주급·가불 지급완료",payDel:"주급·가불 신청 삭제",arMemoAdd:"미수금 메모",arMemoPaid:"미수금 입금 확인",arMemoMiss:"미수금 미입금 표시",arMemoUndo:"미수금 되돌리기",arDel:"미수금 삭제",dlDel:"영업 건 삭제",adNewWk:"광고표 새 주 시작",adAddCo:"광고표 업체 추가"};
+  const CHG={blDel:"블랙리스트 삭제",docUndo:"서류 전달 되돌리기",docDel:"서류 요청 취소",docFileDel:"서류 파일 빼기",hcAdd:"인원현황 줄 추가",hcDel:"인원현황 줄 삭제",hcBase:"기준 인원 저장",toAdd:"TO 줄 추가",toDel:"TO 줄 삭제",jSet:"입사예정자 결과 처리",jCt:"입사예정자 근로계약서 체크",jRec:"입사예정자 채용 담당 지정",jDel:"입사예정자 삭제",qDel:"퇴사자 삭제",postRead:"특이사항 확인",postDel:"특이사항 삭제",evDel:"일정 삭제",lvOk:"연차 승인",lvNo:"연차 반려",lvDel:"연차 신청 취소",ctDel:"근로계약 삭제",ivDel:"지원 DB 삭제",ivGrade:"지원 DB 상태 변경",invSet:"계산서·명세표 O/X 표시",payDone:"주급·가불 지급완료",payUndo:"지급완료 취소",payBatch:"주급·가불 지급완료",paySheetDone:"주급·가불 지급완료",payDel:"주급·가불 신청 삭제",arMemoAdd:"미수금 메모",arMemoPaid:"미수금 입금 확인",arMemoMiss:"미수금 미입금 표시",arMemoUndo:"미수금 되돌리기",arDel:"미수금 삭제",dlDel:"영업 건 삭제",adNewWk:"광고표 새 주 시작",adAddCo:"광고표 업체 추가"};
   if(H[a]){if(CHG[a]&&me()!==ceoName()){const t=S.tab;let d=chgFind(el.dataset.id);
       if(!d&&el.dataset.g!=null&&el.dataset.i!=null&&a.startsWith("hc")){const r=((S.hc[S.ui.hcBr]||[])[+el.dataset.g]||{rows:[]}).rows[+el.dataset.i];d=r&&r.co;}
       if(!d&&el.dataset.i!=null&&a.startsWith("to")){const r=(S.to[S.ui.toBr]||[])[+el.dataset.i];d=r&&r.co;}
