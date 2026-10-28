@@ -145,8 +145,9 @@ tr.dragging td{opacity:.45}tr.dropto td{box-shadow:inset 0 3px 0 var(--brand)}
 .meta{font-size:12.5px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .cond{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
 .cond h4{margin:0 0 4px;font-size:16px;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
-.cond dl{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:10px 0 0;font-size:13px}
-.cond dt{color:var(--muted)}.cond dd{margin:0}
+.cond dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:5px 12px;margin:10px 0 0;font-size:13px;line-height:1.5}
+.cond dt{color:var(--muted);white-space:nowrap;font-weight:600}.cond dd{margin:0;min-width:0;overflow-wrap:anywhere;word-break:keep-all;white-space:pre-line}.cond dd a{color:var(--brand);text-decoration:underline;word-break:break-all}
+@media (max-width:420px){.cond dl{grid-template-columns:1fr;gap:0}.cond dt{margin-top:7px;font-size:12px}}
 .cond dd.miss{color:var(--muted);font-style:italic}
 /* modal */
 .overlay{position:fixed;inset:0;background:rgba(10,18,26,.55);display:flex;align-items:flex-start;justify-content:center;padding:max(36px,env(safe-area-inset-top,0px)) 14px 36px;overflow-y:auto;z-index:30}
@@ -418,30 +419,69 @@ function canWrite(kind,branch,data){const r=ME.role,boss=r==="ceo"||r==="mgr";
 /* 근로계약: 인원현황에서 그 업체의 영업·관리담당자 (서버 hub_co_mine 과 같은 기준) */
 function coStaffOf(co){const out=new Set();const k=String(co||"").replace(/\s/g,"").toLowerCase();if(!k||typeof S==="undefined"||!S||!S.hc)return out;
   Object.values(S.hc).forEach(gs=>(gs||[]).forEach(g=>(g.rows||[]).forEach(r=>{const x=String(r.co||"").replace(/\s/g,"").toLowerCase();if(x&&(x===k||x.includes(k)||k.includes(x)))[r.sales,r.mgr].forEach(v=>String(v||"").split("/").forEach(n=>{n=n.trim();if(n)out.add(n);}));})));return out;}
+/* ---------- 동시 수정 합치기 (3-way merge) ----------
+   base = 내가 마지막으로 불러온 서버 내용, mine = 지금 내 화면, theirs = 그 사이 다른 사람이 저장한 서버 내용.
+   서로 다른 칸을 고쳤으면 둘 다 살리고, 같은 칸을 둘 다 고쳤으면 방금 고친 내 것을 씀. */
+const jeq=(a,b)=>stable(a)===stable(b);
+const dc=v=>v===undefined?v:JSON.parse(JSON.stringify(v)); /* 기준점은 깊은 복사로 (화면 수정이 기준점까지 바꾸지 않게) */
+const isObj=v=>v&&typeof v==="object"&&!Array.isArray(v);
+const mKey=x=>isObj(x)?(x.id!=null?"id:"+x.id:x.co!=null?"co:"+x.co+"|"+(x.gubun||"")+"|"+(x.job||"")+"|"+(x.sex||""):x.name!=null?"nm:"+x.name:null):null;
+function merge3(base,mine,theirs){
+  if(jeq(mine,theirs))return theirs;if(jeq(mine,base))return theirs;if(jeq(theirs,base))return mine;
+  if(isObj(mine)&&isObj(theirs)){const b=isObj(base)?base:{};const out={};new Set([...Object.keys(mine),...Object.keys(theirs),...Object.keys(b)]).forEach(k=>{
+      const inM=k in mine,inT=k in theirs,inB=k in b;
+      if(!inM&&!inT)return;if(!inM){if(inB&&jeq(b[k],theirs[k]))return;out[k]=theirs[k];return;}if(!inT){if(inB&&jeq(b[k],mine[k]))return;out[k]=mine[k];return;}
+      out[k]=merge3(inB?b[k]:undefined,mine[k],theirs[k]);});return out;}
+  if(Array.isArray(mine)&&Array.isArray(theirs)){const b=Array.isArray(base)?base:[];
+    const prim=a=>a.every(x=>x==null||typeof x!=="object");
+    if(prim(mine)&&prim(theirs)&&prim(b)){const add=mine.filter(x=>!b.includes(x)),del=b.filter(x=>!mine.includes(x));const out=theirs.filter(x=>!del.includes(x));add.forEach(x=>{if(!out.includes(x))out.push(x);});return out;}
+    const keyed=a=>{const ks=a.map(mKey);return ks.every(k=>k!=null)&&new Set(ks).size===ks.length?ks:null;};
+    const km=keyed(mine),kt=keyed(theirs),kb=keyed(b);
+    if(km&&kt&&kb){const B=new Map(b.map((x,i)=>[kb[i],x])),T=new Map(theirs.map((x,i)=>[kt[i],x]));const out=[];
+      mine.forEach((x,i)=>{const k=km[i];if(T.has(k))out.push(merge3(B.get(k),x,T.get(k)));else if(!B.has(k))out.push(x);/* theirs 가 지운 것: 내가 안 바꿨으면 지움 */else if(!jeq(B.get(k),x))out.push(x);});
+      theirs.forEach((x,i)=>{const k=kt[i];if(!km.includes(k)&&!B.has(k))out.push(x);/* 다른 사람이 새로 넣은 것 */});
+      return out;}
+    if(mine.length===theirs.length&&theirs.length===b.length)return mine.map((x,i)=>merge3(b[i],x,theirs[i]));
+    return mine;}
+  return mine;}
+/* 충돌 난 문서 한 개: 서버 최신본을 받아 합친 뒤 다시 저장 (최대 3번) */
+let MERGED=false;
+async function resolveConflict(d,old){for(let t=0;t<3;t++){
+    const {data:cur,error:e1}=await sb.from("hub_data").select("kind,key,branch,data,version").eq("kind",d.kind).eq("key",d.key).maybeSingle();if(e1)return false;
+    const base=old?old.data:undefined;
+    if(!cur){/* 서버에서 지워짐 → 내 것을 새로 넣음 */const {error}=await sb.from("hub_data").insert({kind:d.kind,key:d.key,branch:d.branch,data:d.data,version:1,updated_by:ME.id,updated_at:new Date().toISOString()}).select("version");if(error)continue;SNAP.set(d.kind+"|"+d.key,{version:1,json:docJson(d),branch:d.branch,data:dc(d.data)});MERGED=true;return true;}
+    const merged=merge3(base,d.data,cur.data);const nd={...d,data:merged};
+    if(!canWrite(d.kind,d.branch,merged))return false;
+    const {data,error}=await sb.from("hub_data").update({branch:d.branch,data:merged,version:cur.version+1,updated_by:ME.id,updated_at:new Date().toISOString()}).eq("kind",d.kind).eq("key",d.key).eq("version",cur.version).select("version");
+    if(error)return false;if(data&&data.length){SNAP.set(d.kind+"|"+d.key,{version:data[0].version,json:docJson(nd),branch:d.branch,data:dc(merged)});MERGED=true;return true;}}
+  return false;}
 /* 저장: 바뀐 문서만 버전 확인 후 올림 */
 let SNAP=new Map(),syncT=null,syncing=false,dirty=false;
 const docJson=d=>stable(d.data)+"#"+(d.branch||"");
 function save(){try{localStorage.setItem("harang-ui-"+ME.id,JSON.stringify({ui:S.ui,tab:S.tab}));}catch(e){}if(!ME.id)return;dirty=true;clearTimeout(syncT);syncT=setTimeout(sync,350);}
 async function sync(){if(syncing){clearTimeout(syncT);syncT=setTimeout(sync,300);return;}syncing=true;dirty=false;setSyncState("저장 중…");
-  const now=docsOf(S);let conflict=false,denied=false,n=0,why="";
+  const now=docsOf(S);let conflict=false,denied=false,n=0,why="",net=false;const isNet=e=>/fetch|network|timeout|load failed|offline|502|503|504/i.test(String((e&&(e.message||e.code))||e||""));
   try{
     for(const [k,d] of now){const old=SNAP.get(k);const j=docJson(d);if(old&&old.json===j)continue;
       if(!old){const empty=d.data&&Array.isArray(d.data.rows)&&!d.data.rows.length;if(empty&&d.kind!=="adw")continue;}
       if(!canWrite(d.kind,d.branch,d.data)||(old&&old.version&&["ct","bl"].includes(d.kind)&&!canWrite(d.kind,old.branch,old.data))){if(old)old.skip=true;continue;}
       const row={kind:d.kind,key:d.key,branch:d.branch,data:d.data,updated_by:ME.id,updated_at:new Date().toISOString()};
       if(old&&old.version){const {data,error}=await sb.from("hub_data").update({...row,version:old.version+1}).eq("kind",d.kind).eq("key",d.key).eq("version",old.version).select("version");
-        if(error){denied=true;why=why||(d.kind+": "+(error.message||error.code||""));continue;}if(!data||!data.length){conflict=true;continue;}SNAP.set(k,{version:data[0].version,json:j,branch:d.branch,data:d.data});n++;}
+        if(error){if(isNet(error))net=true;else denied=true;why=why||(d.kind+": "+(error.message||error.code||""));continue;}if(!data||!data.length){if(await resolveConflict(d,old))n++;else conflict=true;continue;}SNAP.set(k,{version:data[0].version,json:j,branch:d.branch,data:dc(d.data)});n++;}
       else{const {data,error}=await sb.from("hub_data").insert({...row,version:1}).select("version");
-        if(error){if(/duplicate|23505/.test((error.message||"")+(error.code||"")))conflict=true;else{denied=true;why=why||(d.kind+": "+(error.message||error.code||""));}continue;}SNAP.set(k,{version:1,json:j,branch:d.branch,data:d.data});n++;}}
+        if(error){if(/duplicate|23505/.test((error.message||"")+(error.code||""))){if(await resolveConflict(d,null))n++;else conflict=true;}else{if(isNet(error))net=true;else denied=true;why=why||(d.kind+": "+(error.message||error.code||""));}continue;}SNAP.set(k,{version:1,json:j,branch:d.branch,data:dc(d.data)});n++;}}
     for(const [k,old] of SNAP){if(now.has(k)||!old.version)continue;const [kind,...rest]=k.split("|");const key=rest.join("|");
       if(!canWrite(kind,old.branch,old.data))continue;if(kind==="iv"&&!(ME.role==="ceo"||ME.role==="mgr"||(old.data&&old.data.by===ME.name)))continue;
       const {data,error}=await sb.from("hub_data").delete().eq("kind",kind).eq("key",key).eq("version",old.version).select("key");
-      if(error){denied=true;continue;}if(!data||!data.length){conflict=true;continue;}SNAP.delete(k);n++;}
-  }catch(e){denied=true;why=why||String(e&&e.message||e);}
+      if(error){if(isNet(error))net=true;else denied=true;continue;}if(!data||!data.length){conflict=true;continue;}SNAP.delete(k);n++;}
+  }catch(e){if(isNet(e))net=true;else denied=true;why=why||String(e&&e.message||e);}
   syncing=false;
+  if(net&&!denied&&!conflict){/* 인터넷이 잠깐 끊김: 화면 내용은 그대로 두고 5초 뒤 다시 저장 */dirty=true;setSyncState("연결 끊김 · 다시 저장 시도 중…");clearTimeout(syncT);syncT=setTimeout(sync,5000);return;}
   if(conflict){toast("다른 사람이 먼저 바꾼 내용이 있어 최신 내용으로 불러왔습니다. 방금 바꾼 부분을 다시 확인해 주세요.");await loadAll(true);}
   else if(denied){toast("권한이 없거나 연결이 끊겨 저장하지 못한 내용이 있습니다. 최신 내용으로 다시 불러옵니다."+(why?" ("+why.slice(0,80)+")":""));console.warn("sync denied",why);await loadAll(true);}
-  else setSyncState(n?"저장됨":"");}
+  else if(MERGED){MERGED=false;if(dirty){clearTimeout(syncT);syncT=setTimeout(sync,300);RELOAD_AFTER=true;}else await loadAll(true);setSyncState("저장됨 (다른 사람 수정과 합침)");}
+  else{setSyncState(n?"저장됨":"");if(RELOAD_AFTER&&!dirty){RELOAD_AFTER=false;await loadAll(true);}}}
+let RELOAD_AFTER=false;
 function setSyncState(t){const e=document.getElementById("syncst");if(e)e.textContent=t;if(t==="저장됨")setTimeout(()=>{if(e&&e.textContent==="저장됨")e.textContent="";},1500);}
 async function fetchAll(){const out=[];for(let from=0;;from+=1000){const {data,error}=await sb.from("hub_data").select("kind,key,branch,data,version,created_at").order("kind").order("key").range(from,from+999);
   if(error)throw error;out.push(...data);if(data.length<1000)break;}return out;}
@@ -449,14 +489,16 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1793155412";
+const HUB_BUILD="1793160419";
 async function checkBuild(){if(!/^\d+$/.test(HUB_BUILD))return;try{const t=await (await fetch(location.pathname+"?v="+Date.now(),{cache:"no-store"})).text();const m=t.match(/const HUB_BUILD="(\d+)"/);
-  if(m&&m[1]!==HUB_BUILD){if(!document.querySelector(".overlay")&&!dirty&&!syncing){toast("새 버전으로 바꾸는 중…");setTimeout(()=>location.reload(),600);}}}catch(e){}}
-async function loadAll(force){if(!force&&(dirty||syncing||document.querySelector(".overlay"))){clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),1500);return;}
+  if(m&&m[1]!==HUB_BUILD){if(!document.querySelector(".overlay")&&!dirty&&!syncing&&!typing()){toast("새 버전으로 바꾸는 중…");setTimeout(()=>location.reload(),600);}}}catch(e){}}
+/* 입력칸에 글자를 치는 중이면 화면을 새로 그리지 않음 (치던 글자가 사라지지 않게) */
+function typing(){const a=document.activeElement;if(!a||!/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))return false;if(a.type==="checkbox"||a.type==="radio"||a.type==="file"||a.type==="button")return false;return true;}
+async function loadAll(force){if(!force&&(dirty||syncing||document.querySelector(".overlay")||typing())){clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),1500);return;}
   try{const rows=await fetchAll();const ver=new Map(rows.map(r=>[r.kind+"|"+r.key,r.version]));
     const y=scrollY;const keepModal=document.querySelector(".overlay");const tab=S.tab;const notifs=S.notifs||[];S=buildS(rows,S.ui);if(tab)S.tab=tab;S.notifs=notifs;
     /* 기준점: 불러온 직후의 화면 상태 (기본값으로 채운 칸은 '바뀐 것'으로 보지 않음) */
-    SNAP=new Map();for(const [k,d] of docsOf(S))SNAP.set(k,{version:ver.get(k)||null,json:docJson(d),branch:d.branch,data:d.data});
+    SNAP=new Map();for(const [k,d] of docsOf(S))SNAP.set(k,{version:ver.get(k)||null,json:docJson(d),branch:d.branch,data:dc(d.data)});
     if(!keepModal){render();scrollTo(0,y);}else renderHead();setSyncState("");}
   catch(e){toast("자료를 불러오지 못했습니다. 인터넷 연결을 확인하세요.");}}
 /* ---------- 알림 (hub_notifs) ---------- */
@@ -526,7 +568,9 @@ async function afterLogin(u){const {data:p}=await sb.from("profiles").select("*"
   sb.channel("hub").on("postgres_changes",{event:"*",schema:"public",table:"hub_data"},()=>{clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),800);})
     .on("postgres_changes",{event:"*",schema:"public",table:"hub_notifs",filter:`to_name=eq.${ME.name}`},()=>loadNotifs()).subscribe();
   setInterval(()=>{if(document.visibilityState==="visible"){loadAll();loadNotifs();checkBuild();}},60000);
-  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){loadAll();loadNotifs();checkBuild();}});
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){loadAll();loadNotifs();checkBuild();}else if(dirty&&!syncing){/* 다른 앱으로 넘어가기 전에 바로 저장 */clearTimeout(syncT);sync();}});
+  window.addEventListener("beforeunload",e=>{if(dirty||syncing){try{clearTimeout(syncT);sync();}catch(_){}e.preventDefault();e.returnValue="아직 저장 중입니다";}});
+  window.addEventListener("online",()=>{if(dirty){clearTimeout(syncT);sync();}else loadAll();});
   setTimeout(checkBuild,5000);
   if(navigator.serviceWorker)navigator.serviceWorker.addEventListener("message",e=>{if(e.data&&e.data.tab){S.tab=e.data.tab;render();}});}
 function passwordModal(){modal("비밀번호 변경",`${F("새 비밀번호 (8자 이상)",'<input type="password" name="a" autocomplete="new-password" required>')}${F("새 비밀번호 확인",'<input type="password" name="b" autocomplete="new-password" required>')}`,
@@ -1312,6 +1356,12 @@ function blForm(x,after){const n=!x||!x.id;x={name:"",sex:"",age:"",addr:"",phon
      S.blacklist=S.blacklist||[];if(n){const nb={id:uid(),...o,at:iso(TODAY),by:me()};S.blacklist.push(nb);if(after){after.done(nb);return;}}else Object.assign(S.blacklist.find(y=>y.id===x.id),o);toast("저장했습니다");}});}
 
 /* ---------- 업체별 채용조건 ---------- */
+/* 글 안의 링크·메일·전화번호를 누를 수 있게 (그 외는 그대로 글자) */
+function linkify(t){let h=esc(String(t||"").trim());
+  h=h.replace(/(https?:\/\/[^\s<]+)/g,u=>`<a href="${u}" target="_blank" rel="noopener">${u.length>48?u.slice(0,45)+"…":u}</a>`);
+  h=h.replace(/(^|[\s(])([\w.+-]+@[\w-]+\.[\w.-]+)/g,(m,a,e)=>`${a}<a href="mailto:${e}">${e}</a>`);
+  h=h.replace(/(^|[^\d-])(01[016789]-?\d{3,4}-?\d{4})(?![\d])/g,(m,a,n)=>`${a}<a href="tel:${n.replace(/-/g,"")}">${n}</a>`);
+  return h;}
 const CF=[["hours","근무시간"],["brk","휴게시간"],["pay","급여"],["ot","잔업·특근"],["wel","식대·통근·기숙사"],["caution","주의사항"]];
 const coKey2=s=>String(s||"").replace(/주식회사|\(주\)|㈜|\s/g,"").toLowerCase();
 function coSame(a,b){const x=coKey2(a),y=coKey2(b);if(!x||!y)return false;if(x===y)return true;const ax=CO_ALIAS[norm(a)],ay=CO_ALIAS[norm(b)];if(ax&&ax===ay&&!/\(/.test(a+b))return true;return x.length>=4&&y.length>=4&&lev1(x,y);}
@@ -1336,7 +1386,7 @@ function vCond(){
     <div class="prow" style="grid-template-columns:auto 1fr auto;margin:4px 0"><span class="sub">작성</span>${bar(p)}<span class="v">${p}%</span></div>
     <dl><dt>담당</dt><dd>${esc(c.mgr)}${c.sales&&canSales()&&(!isBr()||c.branch===myBr())?` · 영업 ${esc(c.sales)}`:""}</dd>${c.pay?`<dt>월급일</dt><dd>${esc(c.pay)} (${esc(c.period)})</dd>`:""}
     ${t0?`<dt>모집</dt><dd>${c.to.map(t=>`${esc(t.job||"생산")} ${esc(t.sex)} ${t.to?t.to+"명":"상시"}`).join(" / ")}</dd><dt>나이·외국인</dt><dd>${esc(t0.age||"-")} · 외국인 ${esc(t0.foreign||"미정")}</dd>`:""}
-    ${CF.map(([k,l])=>`<dt>${l}</dt><dd class="${d[k]?"":"miss"}">${d[k]?esc(d[k]):"미입력"}</dd>`).join("")}</dl></div>`}).join("")}<div class="empty" id="condEmpty" ${list.some(c=>!q||(c.co+" "+c.mgr+" "+(c.sales||"")).toLowerCase().includes(q.toLowerCase()))?'style="display:none"':""}>검색 결과가 없습니다.</div></div>`;
+    ${CF.map(([k,l])=>`<dt>${l}</dt><dd class="${d[k]?"":"miss"}">${d[k]?linkify(d[k]):"미입력"}</dd>`).join("")}</dl></div>`}).join("")}<div class="empty" id="condEmpty" ${list.some(c=>!q||(c.co+" "+c.mgr+" "+(c.sales||"")).toLowerCase().includes(q.toLowerCase()))?'style="display:none"':""}>검색 결과가 없습니다.</div></div>`;
 }
 
 /* ---------- 특이사항 ---------- */
@@ -2021,12 +2071,25 @@ function adFloat(){let f=document.getElementById("adFloat");const tw=document.qu
 addEventListener("scroll",adFloat,{passive:true});addEventListener("resize",()=>{const f=document.getElementById("adFloat");if(f)f.__src=null;adFloat();});
 function render(){if(!ME.id){return;}setTimeout(()=>{const f=document.getElementById("adFloat");if(f)f.__src=null;adFloat();},0);if(typeof monthRoll==="function")monthRoll();if(!visHC().includes(S.ui.hcBr)&&!(S.ui.hcBr==="전체"&&isBoss()))S.ui.hcBr=visHC()[0];if(!visBR().includes(S.ui.toBr))S.ui.toBr=visBR()[0];const t=TABS.find(x=>x[0]===S.tab);if(!t)S.tab="home";if(t&&t[2]&&!t[2].includes(S.role))S.tab="home";renderHead();document.getElementById("main").innerHTML=VIEWS[S.tab]();labelTables();const at=document.querySelector('nav.tabs [aria-current="page"]');if(at&&at.scrollIntoView)at.scrollIntoView({block:"nearest",inline:"nearest"});}
 function labelTables(){document.querySelectorAll("table.resp").forEach(t=>{const hs=[...t.querySelectorAll("thead th")].map(th=>th.textContent.trim());t.querySelectorAll("tbody tr").forEach(tr=>{if(tr.classList.contains("tot"))return;[...tr.children].forEach((td,i)=>{if(hs[i]&&!td.hasAttribute("colspan"))td.setAttribute("data-label",hs[i]);});});});}
+/* 업체 이름 바꾸기: 인원현황에서 이름을 고치면 같은 이름으로 연결된 자료(채용조건·TO·입사/퇴사·계약·주급·광고표 등)도 같이 바꿈 */
+const coK=s=>String(s||"").replace(/\s/g,"").toLowerCase(); /* 괄호까지 같은 정확한 이름 */
+function coRename(oldCo,newCo,br){const o=coK(oldCo),nw=String(newCo||"").trim();if(!o||!nw||o===coK(nw))return 0;let n=0;
+  /* 실제 허브: 내가 고칠 권한이 있는 자료만 바꿈 (권한 없는 건 저장 거부로 되돌아가므로) */
+  const can=(kind,br2,data)=>typeof canWrite!=="function"||canWrite(kind,br2,data);
+  const fix=(kind,brf)=>x=>{if(x&&typeof x==="object"&&typeof x.co==="string"&&coK(x.co)===o&&can(kind,brf?brf(x):(x.branch||null),x)){x.co=nw;n++;}};
+  Object.entries(S.to||{}).forEach(([b,a])=>{if(can("to",b,{rows:a}))(a||[]).forEach(fix("to",()=>b));});
+  [["joins","join",()=>null],["quits","quit",()=>null],["contracts","ct"],["pays","pay"],["interviews","iv"],["docreqs","docreq"],["inv","inv"],["ar","ar"],["sales","sale"],["posts","post",()=>null]].forEach(([k,kind,bf])=>(S[k]||[]).forEach(fix(kind,bf)));
+  Object.values(S.adw||{}).forEach(w=>Object.entries(w||{}).forEach(([b,a])=>Array.isArray(a)&&a.forEach(fix("adw",()=>b))));if(S.ad&&Array.isArray(S.ad.rows))S.ad.rows.forEach(fix("adbudget"));
+  /* 채용조건: '지사|업체' 칸 옮기기 (이미 새 이름으로 쓴 칸이 있으면 빈 칸만 채움) */
+  Object.keys(S.conds||{}).forEach(k=>{const i=k.indexOf("|");const b=k.slice(0,i),c=k.slice(i+1);if(coK(c)!==o||!can("cond",b,S.conds[k]))return;
+    const nk=b+"|"+nw;const src=S.conds[k],dst=S.conds[nk]||{};Object.entries(src).forEach(([f,v])=>{if(String(v||"").trim()&&!String(dst[f]||"").trim())dst[f]=v;});S.conds[nk]=dst;delete S.conds[k];n++;});
+  return n;}
 function setPath(path,val,type){const ks=path.split(".");let o=S;for(let i=0;i<ks.length-1;i++){if(o[ks[i]]==null)o[ks[i]]={};o=o[ks[i]];}
   const k=ks[ks.length-1];if(type==="num")val=val===""?0:+val;else if(type==="numnull")val=val===""||+val===0?null:+val;else if(type==="bool")val=!!val;
   if(ks.includes("splits")&&val===0&&type==="num"){}o[k]=val;}
 document.addEventListener("change",e=>{const el=e.target;if(el.dataset.docfile){const d=S.docreqs.find(x=>x.id===el.dataset.docfile);uploadDocFiles(d,[...el.files]);return;}
 if(el.dataset.jrec){const j=S.joins.find(x=>x.id===el.dataset.jrec);if(j&&el.value){setJRec(j,el.value);chgNote(`${j.name}(${j.co}) 채용 ${el.value}`);notifyCeoChange("입사예정자 채용 담당 지정","join");save();toast(`${j.name} 채용 담당 — ${el.value}`);render();}return;}if(el.dataset.ui==="docMine"){S.ui.docMine=el.checked;save();render();return;}if(el.dataset.payamt){const p=S.pays.find(x=>x.id===el.dataset.payamt);if(p){p.amt=+el.value||0;notifyCeoChange("주급 금액 입력","pay");save();toast(`${p.name} 주급 ${won(p.amt)}원`);setTimeout(()=>{const y=scrollY;render();scrollTo(0,y);},0);}return;}if(el.id==="arCoSel"){S.ui.arCo=el.value;return;}if(el.id==="arMemoIn")return;if(el.id==="adFile"&&el.files[0]){adFilePicked(el.files[0]);return;}if(el.id==="payFile"&&el.files[0]){payFilePicked(el.files[0]);return;}if(el.id==="rosterFile"&&el.files[0]){rosterFilePicked(el.files[0]);return;}if(el.id==="hubImp"&&el.files[0]){hubImport(el.files[0]);el.value="";return;}
-  if(el.dataset.set){setPath(el.dataset.set,el.type==="checkbox"?el.checked:el.value,el.dataset.type);notifyCeoChange(`${(TABS.find(t=>t[0]===S.tab)||[,""])[1]} 수정`,S.tab);save();
+  if(el.dataset.set){const coP=/^hc\.[^.]+\.\d+\.rows\.\d+\.co$/.test(el.dataset.set);const oldCo=coP?getPath(el.dataset.set):null;setPath(el.dataset.set,el.type==="checkbox"?el.checked:el.value,el.dataset.type);if(coP&&oldCo&&String(el.value).trim()){const others=HC_TABS.some(t=>(S.hc[t]||[]).some(g=>g.rows.some(r=>coK(r.co)===coK(oldCo))));const nn=others?0:coRename(oldCo,el.value);if(nn)toast(`업체 이름을 바꾸고, 연결된 자료 ${nn}건(채용조건·TO·입사/퇴사·계약 등)도 같이 바꿨습니다`);else if(others)toast("같은 이름의 다른 줄이 있어 연결 자료는 그대로 뒀습니다");}notifyCeoChange(`${(TABS.find(t=>t[0]===S.tab)||[,""])[1]} 수정`,S.tab);save();
     setTimeout(()=>{const a=document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.set;const y=scrollY;render();scrollTo(0,y);if(a){const n=document.querySelector(`[data-set="${CSS.escape(a)}"]`);if(n)n.focus();}},0);}
   if(el.dataset.ui==="ttDate"){S.ui.ttDate=el.value;save();render();}if(el.dataset.ui==="attDate"){S.ui.attDate=el.value||iso(TODAY);save();render();}
 });
@@ -2068,7 +2131,7 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
     evDel:()=>{S.events=S.events.filter(x=>x.id!==el.dataset.id);closeModal();toast("삭제했습니다");},
     condBr:()=>S.ui.condBr=v,
     condEdit:()=>{const k=el.dataset.k;const c=condList().find(x=>x.key===k);const d=condData(c);
-      modal(`${esc(c.co)} 채용조건`,CF.map(([f,l])=>F(l,f==="caution"?`<textarea name="${f}">${esc(d[f]||"")}</textarea>`:inp(f,d[f]||""))).join(""),{onSubmit:fd=>{S.conds[k]=Object.fromEntries(CF.map(([f])=>[f,fd.get(f)]));toast("저장했습니다");}});},
+      modal(`${esc(c.co)} 채용조건`,CF.map(([f,l])=>F(l,`<textarea name="${f}" rows="${f==="caution"?5:f==="wel"?3:2}">${esc(d[f]||"")}</textarea>`)).join("")+'<p class="sub">링크·메일·전화번호는 카드에서 바로 누를 수 있게 바뀝니다. 줄바꿈도 그대로 보입니다.</p>',{onSubmit:fd=>{S.conds[k]=Object.fromEntries(CF.map(([f])=>[f,fd.get(f)]));toast("저장했습니다");}});},
     jPaste:()=>jPasteForm("join"),qPaste:()=>jPasteForm("quit"),
     jEdit:()=>jForm(S.joins.find(x=>x.id===el.dataset.id)),jDel:()=>{const jj=S.joins.find(x=>x.id===el.dataset.id);if(unlinkJoin(jj))toast("인원현황·TO 숫자도 되돌렸습니다");S.joins=S.joins.filter(x=>x.id!==el.dataset.id);closeModal();},
     jSet:()=>{const jj=S.joins.find(x=>x.id===el.dataset.id);jj.resAt=nowLocal();jj.resBy=me();if(v==="완료"&&jj.status!=="완료"){jDone(jj);return;}const back=unlinkJoin(jj);if(v==="연기"){if(jj.status==="완료")jj.status="대기";jPostpone(jj);return;}jj.status=jj.status===v?"대기":v;toast(`${jj.name} — ${JST[jj.status][1]}${back?" · 인원현황·TO 숫자 되돌림":""}`);},
