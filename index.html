@@ -208,7 +208,7 @@ tr.dragging td{opacity:.45}tr.dropto td{box-shadow:inset 0 3px 0 var(--brand)}
 .recs b{font-weight:700}
 .recm{color:#7c3aed;font-weight:600}
 .lvtag{color:var(--late,#c62828);font-weight:700}.cal .ev.lvev{background:var(--late-soft,#fdecec);color:var(--ink,#222)}@media (max-width:620px){.cal .ev.lvev{display:block;font-size:10.5px}}
-.split span.unasg{color:var(--late,#c62828);font-weight:600}
+.split .unasg{color:var(--late,#c62828);font-weight:600;font-size:11px;border:0;background:none;cursor:pointer;text-decoration:underline;padding:2px 0;text-align:left}
 .recgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px;margin-top:8px}.recgrid label{display:flex;align-items:center;justify-content:space-between;gap:6px;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font-size:13px}.recgrid select{font-size:12.5px;padding:2px 4px;width:auto}
 .hcalltbl tr.gh td{background:var(--brand-soft,#eef2f8);text-align:left;padding:8px 10px}
 .recpick{display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap}.recpick small{color:var(--muted);font-size:11.5px;font-weight:600}.recpick .seg button{padding:3px 10px;font-size:12.5px}.recpick .seg button[aria-pressed="true"]{background:#7c3aed;color:#fff}.recpick select{font-size:12.5px;padding:3px 6px;border:1px dashed var(--line);border-radius:6px;background:var(--surface);color:var(--muted);width:auto}
@@ -448,7 +448,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1793152881";
+const HUB_BUILD="1793154055";
 async function checkBuild(){if(!/^\d+$/.test(HUB_BUILD))return;try{const t=await (await fetch(location.pathname+"?v="+Date.now(),{cache:"no-store"})).text();const m=t.match(/const HUB_BUILD="(\d+)"/);
   if(m&&m[1]!==HUB_BUILD){if(!document.querySelector(".overlay")&&!dirty&&!syncing){toast("새 버전으로 바꾸는 중…");setTimeout(()=>location.reload(),600);}}}catch(e){}}
 async function loadAll(force){if(!force&&(dirty||syncing||document.querySelector(".overlay"))){clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),1500);return;}
@@ -642,9 +642,14 @@ const mgrCell=r=>esc(r.mgr||"")+recExtra(r).map(n=>`<span class="recm" title="${
 /* 일용직은 담당자별 집계에서 '오늘 출근 체크한 인원'으로 셈 (보유 인원 X) */
 function attRow(r,d){d=d||attDate();const n=attOf(r,d)||0;const a=((r&&r.att)||{})[d]||{};const ids=Array.isArray(a.ids)?a.ids:[];
   const ppl=ids.length&&hasRoster(r)?r.people.filter(x=>ids.includes(x.id)).map(x=>Object.assign({},x,{out:""})):null;
-  return Object.assign({},r,{cur:n,base:n,splits:null,bsplits:null,people:ppl,recs:null,_att:true});}
+  let w=null;const ms=mgrs(r);if(ms.length>1&&r.splits){const rb=recCounts(r);w={};ms.forEach(m=>{w[m]=Math.max(0,(+r.splits[m]||0)-((rb[m]||{}).cur||0));});}
+  return Object.assign({},r,{cur:n,base:n,splits:null,bsplits:null,people:ppl,recs:null,_att:true,_w:w});}
 function attribute(rows,key){ // key: mgr|sales
   const m={};rows.forEach(r=>{
+    if(key==="mgr"&&r._att&&r._w){const add=(n,v)=>{if(!v)return;m[n]=m[n]||{cur:0,base:0};m[n].cur+=v;m[n].base+=v;};const rc=recCounts(r);let c=+r.cur||0;
+      Object.keys(rc).forEach(n=>{const v=Math.min(rc[n].cur,c);add(n,v);c-=v;});const W=Object.entries(r._w),tot=W.reduce((a,x)=>a+x[1],0);
+      if(c>0&&tot>0){const q=W.map(([n,x])=>({n,e:c*x/tot}));q.forEach(o=>o.f=Math.floor(o.e));let left=c-q.reduce((a,o)=>a+o.f,0);q.sort((a,b)=>(b.e-b.f)-(a.e-a.f)).forEach(o=>{if(left>0){o.f++;left--;}add(o.n,o.f);});}
+      else add(r.mgr||"미정",c);return;}
     if(key==="mgr"){const rc=recCounts(r);const ks=Object.keys(rc);if(ks.length){let c=+r.cur||0,b=+r.base||0;ks.forEach(n=>{m[n]=m[n]||{cur:0,base:0};const v=rc[n];const vc=Math.min(v.cur,c),vb=Math.min(v.base,b);m[n].cur+=vc;m[n].base+=vb;c-=vc;b-=vb;});
         const sp=r.splits?Object.fromEntries(Object.entries(r.splits).map(([n,v])=>[n,Math.max(0,(+v||0)-((rc[n]&&rc[n].cur)||0))])):null;
         r=Object.assign({},r,{cur:c,base:b,splits:sp,bsplits:null});}const ms=mgrs(r);const sp=r.splits||{};const sum=ms.reduce((s,n)=>s+(+sp[n]||0),0);
@@ -767,6 +772,8 @@ function vHome(){
 }
 
 /* ---------- 현재 인원 현황 ---------- */
+function hcMultiCell(r,p,ms,sp){sp=sp||r.splits||{};const RC=recCounts(r);const asg=Object.values(RC).reduce((t,v)=>t+v.cur,0);const un=(+r.cur||0)-asg;const useR=hasRoster(r)&&asg>0&&(un<=0||!r.splits);
+            return `<div class="split"><b>${num(r.cur)}</b>${ms.map(m=>`<span>${esc(m)}<b>${useR?((RC[m]||{}).cur||0):(sp[m]??"-")}</b></span>`).join("")}${recExtra(r).map(m=>`<span class="recm">${esc(m)}<b>${RC[m].cur}</b></span>`).join("")}${hasRoster(r)&&un>0?`<button type="button" class="unasg" data-act="hcPpl" data-p="${p}" title="명단에서 사람마다 담당을 정하면 출근 인원도 정확히 나뉩니다">담당 나누기 · 미지정 ${un} ›</button>`:""}</div>`;}
 function hcSubtabs(b){return `<div class="subtabs">${isBoss()?`<button data-act="hcBr" data-v="전체" aria-pressed="${b==="전체"}" title="대표·팀장만 보입니다">전체<small>${num(hcGrand().cur)}명</small></button>`:""}${visHC().map(x=>{const tt=hcTot(x);return `<button data-act="hcBr" data-v="${x}" aria-pressed="${x===b}">${x}<small>${tt.daily?`출근 ${tt.cur}/${tt.pool}`:tt.cur+"명"}</small></button>`}).join("")}</div>`;}
 function hcGrand(){return BRANCHES.map(hcSplitFor).reduce((a,x)=>({cur:a.cur+x.cur,do:a.do+x.do,il:a.il+x.il,ch:a.ch+x.ch,base:a.base+x.base}),{cur:0,do:0,il:0,ch:0,base:0});}
 /* 전체 보기 (대표·팀장 전용): 모든 지사·분류를 한 표로 */
@@ -781,7 +788,7 @@ function vHCAll(){const CEO=canSales()&&!!S.ui.showSales;const T=hcGrand();const
     mob+=`<div class="gname" style="margin-top:12px"><b>${t==="일용직"||t==="채용대행"?t:t+" 도급"}</b><span class="sub">${rows.length}곳 · ${isD?`보유 ${num(c)} · 오늘 ${num(at)}`:`${num(c)}명 ${diff(c-bs)}`}</span></div><div class="mlist hcallm">`;
     html+=`<tr class="gh"><td colspan="${CEO?8:7}" class="l"><b>${t==="일용직"||t==="채용대행"?t:t+" 도급"}</b> <span class="sub">${rows.length}곳 · ${isD?`보유 ${num(c)}명 · 오늘 출근 ${num(at)}명`:`${num(c)}명 (${diff(c-bs)})`}</span></td></tr>`;
     rows.forEach(({r,g,rp})=>{all.push(r);allA.push(isD?attRow(r,d):r);if(q&&!(String(r.co)+String(r.mgr)+String(g.branch)+String(r.gubun)).includes(q.trim()))return;const df=(+r.cur||0)-(+r.base||0);const L=recSplit(r);
-      html+=`<tr><td>${esc(g.branch||"")}</td><td>${esc(r.gubun||"")}</td>${CEO?`<td>${esc(r.sales||"")}</td>`:""}<td>${mgrCell(r)}</td><td class="l"><button class="colink" data-act="hcPpl" data-p="${rp}">${esc(r.co)}</button>${rosterBadge(r)}</td><td class="num cur">${L?`<div class="split"><b>${num(r.cur)}</b>${L.map(x=>`<span${x.own?"":' class="recm"'}>${esc(x.n)}<b>${x.c}</b></span>`).join("")}</div>`:`<b>${num(r.cur)}</b>`}${isD?`<div class="sub">오늘 ${attOf(r,d)!=null?attOf(r,d)+"명":"미체크"}</div>`:""}</td><td class="num">${num(r.base)}</td><td class="num">${diff(df)}</td></tr>`;
+      html+=`<tr><td>${esc(g.branch||"")}</td><td>${esc(r.gubun||"")}</td>${CEO?`<td>${esc(r.sales||"")}</td>`:""}<td>${mgrCell(r)}</td><td class="l"><button class="colink" data-act="hcPpl" data-p="${rp}">${esc(r.co)}</button>${rosterBadge(r)}</td><td class="num cur">${mgrs(r).length>1?hcMultiCell(r,rp,mgrs(r)):L?`<div class="split"><b>${num(r.cur)}</b>${L.map(x=>`<span${x.own?"":' class="recm"'}>${esc(x.n)}<b>${x.c}</b></span>`).join("")}</div>`:`<b>${num(r.cur)}</b>`}${isD?`<div class="sub">오늘 ${attOf(r,d)!=null?attOf(r,d)+"명":"미체크"}</div>`:""}</td><td class="num">${num(r.base)}</td><td class="num">${diff(df)}</td></tr>`;
       mob+=`<div class="mi"><div class="mt"><button class="colink" data-act="hcPpl" data-p="${rp}"><b>${esc(r.co)}</b></button>${rosterBadge(r)}<div class="sub">${esc(g.branch||"")} · 관리 ${mgrCell(r)}${CEO&&r.sales?` · 영업 ${esc(r.sales)}`:""}</div>${recSplitHtml(r)}</div><div class="mv"><b>${num(r.cur)}</b><span class="sub">${isD?`오늘 ${attOf(r,d)!=null?attOf(r,d):"-"} · `:""}기준 ${num(r.base)} · ${diff(df)}</span></div></div>`;});mob+=`</div>`;});
   const ac=all.reduce((s,r)=>s+(+r.cur||0),0),ab=all.reduce((s,r)=>s+(+r.base||0),0);html=html.replace("@@MOB@@",`<div class="only-m">${mob}</div>`);
   html+=`<tr class="tot"><td colspan="${CEO?5:4}">전체 (일용직은 보유 인원)</td><td>${num(ac)}</td><td>${num(ab)}</td><td>${diff(ac-ab)}</td></tr></tbody></table></div></div>`;
@@ -814,8 +821,7 @@ function vHC(){
       if(ms.length>1){
         const sp=r.splits||{};
         curCell=ed?`<div class="split">${inpS(p+".cur",r.cur,"합계")}${ms.map(m=>`<span>${esc(m)} ${inpS(p+".splits."+m,sp[m]??"","")}</span>`).join("")}</div>`
-          :(()=>{const RC=recCounts(r);const useR=hasRoster(r)&&Object.keys(RC).length;const asg=Object.values(RC).reduce((t,v)=>t+v.cur,0);const un=(+r.cur||0)-asg;
-            return `<div class="split"><b>${num(r.cur)}</b>${ms.map(m=>`<span>${esc(m)}<b>${useR?((RC[m]||{}).cur||0):(sp[m]??"-")}</b></span>`).join("")}${recExtra(r).map(m=>`<span class="recm">${esc(m)}<b>${RC[m].cur}</b></span>`).join("")}${useR&&un>0?`<span class="unasg" title="명단에서 담당을 안 정한 인원 — 업체 이름을 눌러 '담당 나누기'에서 정해 주세요">미지정<b>${un}</b></span>`:""}</div>`;})();
+          :hcMultiCell(r,p,ms,sp);
       }else if(ed)curCell=hasRoster(r)?`<b>${num(r.cur)}</b><div class="sub">명단 연동</div>`:inpS(p+".cur",r.cur);
       if(ed)baseCell=inpS(p+".base",r.base);
       html+=(ed?`<tr data-dk="hc|${gi}" data-di="${i}"><td class="nowrap"><span class="dh" draggable="true" title="끌어서 순서 바꾸기" aria-hidden="true">⠿</span> ${n} <button class="btn sm mv" data-act="hcMv" data-g="${gi}" data-i="${i}" data-v="-1" aria-label="위로" ${i===0?"disabled":""}>▲</button><button class="btn sm mv" data-act="hcMv" data-g="${gi}" data-i="${i}" data-v="1" aria-label="아래로" ${i===rs.length-1?"disabled":""}>▼</button></td>`:`<tr><td>${n}</td>`)+
