@@ -207,6 +207,9 @@ tr.dragging td{opacity:.45}tr.dropto td{box-shadow:inset 0 3px 0 var(--brand)}
 .recs{font-size:11.5px;margin-top:2px;color:#7c3aed}
 .recs b{font-weight:700}
 .recm{color:#7c3aed;font-weight:600}
+.lvtag{color:var(--late,#c62828);font-weight:700}.cal .ev.lvev{background:var(--late-soft,#fdecec);color:var(--ink,#222)}@media (max-width:620px){.cal .ev.lvev{display:block;font-size:10.5px}}
+.split span.unasg{color:var(--late,#c62828);font-weight:600}
+.recgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px;margin-top:8px}.recgrid label{display:flex;align-items:center;justify-content:space-between;gap:6px;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font-size:13px}.recgrid select{font-size:12.5px;padding:2px 4px;width:auto}
 .hcalltbl tr.gh td{background:var(--brand-soft,#eef2f8);text-align:left;padding:8px 10px}
 .recpick{display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap}.recpick small{color:var(--muted);font-size:11.5px;font-weight:600}.recpick .seg button{padding:3px 10px;font-size:12.5px}.recpick .seg button[aria-pressed="true"]{background:#7c3aed;color:#fff}.recpick select{font-size:12.5px;padding:3px 6px;border:1px dashed var(--line);border-radius:6px;background:var(--surface);color:var(--muted);width:auto}
 .pp.pnew{background:#DCE7FA;border-color:#8FB0E6;color:#1A458C;font-weight:600}
@@ -445,7 +448,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1793150108";
+const HUB_BUILD="1793152881";
 async function checkBuild(){if(!/^\d+$/.test(HUB_BUILD))return;try{const t=await (await fetch(location.pathname+"?v="+Date.now(),{cache:"no-store"})).text();const m=t.match(/const HUB_BUILD="(\d+)"/);
   if(m&&m[1]!==HUB_BUILD){if(!document.querySelector(".overlay")&&!dirty&&!syncing){toast("새 버전으로 바꾸는 중…");setTimeout(()=>location.reload(),600);}}}catch(e){}}
 async function loadAll(force){if(!force&&(dirty||syncing||document.querySelector(".overlay"))){clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),1500);return;}
@@ -633,11 +636,13 @@ function mgrs(r){return String(r.mgr||"").split("/").map(s=>s.trim()).filter(Boo
 const baseStart=()=>{const y=S.baseYm||YM();return y==="2026-10"?"2026-10-21":y+"-01";};
 function recCounts(r){const out={};if(!r||typeof recOf!=="function")return out;const b0=baseStart();const ms=mgrs(r);
   if(!hasRoster(r)){(r.recs||[]).forEach(x=>{const n=x.rec;if(!n||(ms.length===1&&ms[0]===n))return;const o=out[n]=out[n]||{cur:0,base:0};o.cur++;if(x.in&&x.in<b0)o.base++;});return out;}
-  r.people.forEach(x=>{const n=recOf(x,r);if(!n)return;const o=out[n]=out[n]||{cur:0,base:0};if(!x.out)o.cur++;if((!x.in||x.in<b0)&&(!x.out||x.out>=b0))o.base++;});return out;}
+  r.people.forEach(x=>{const n=recOf(x,r);if(!n)return;const o=out[n]=out[n]||{cur:0,base:0};if(!x.out)o.cur++;if(r._att)o.base++;else if((!x.in||x.in<b0)&&(!x.out||x.out>=b0))o.base++;});return out;}
 const recExtra=r=>Object.keys(recCounts(r)).filter(n=>!mgrs(r).includes(n));
 const mgrCell=r=>esc(r.mgr||"")+recExtra(r).map(n=>`<span class="recm" title="${esc(n)} 채용 인원 포함 (관리담당자별 합계에 따로 셈)">/${esc(n)}</span>`).join("");
 /* 일용직은 담당자별 집계에서 '오늘 출근 체크한 인원'으로 셈 (보유 인원 X) */
-function attRow(r,d){const n=attOf(r,d||attDate())||0;return Object.assign({},r,{cur:n,base:n,splits:null,bsplits:null,people:null,recs:null});}
+function attRow(r,d){d=d||attDate();const n=attOf(r,d)||0;const a=((r&&r.att)||{})[d]||{};const ids=Array.isArray(a.ids)?a.ids:[];
+  const ppl=ids.length&&hasRoster(r)?r.people.filter(x=>ids.includes(x.id)).map(x=>Object.assign({},x,{out:""})):null;
+  return Object.assign({},r,{cur:n,base:n,splits:null,bsplits:null,people:ppl,recs:null,_att:true});}
 function attribute(rows,key){ // key: mgr|sales
   const m={};rows.forEach(r=>{
     if(key==="mgr"){const rc=recCounts(r);const ks=Object.keys(rc);if(ks.length){let c=+r.cur||0,b=+r.base||0;ks.forEach(n=>{m[n]=m[n]||{cur:0,base:0};const v=rc[n];const vc=Math.min(v.cur,c),vb=Math.min(v.base,b);m[n].cur+=vc;m[n].base+=vb;c-=vc;b-=vb;});
@@ -809,7 +814,8 @@ function vHC(){
       if(ms.length>1){
         const sp=r.splits||{};
         curCell=ed?`<div class="split">${inpS(p+".cur",r.cur,"합계")}${ms.map(m=>`<span>${esc(m)} ${inpS(p+".splits."+m,sp[m]??"","")}</span>`).join("")}</div>`
-          :`<div class="split"><b>${num(r.cur)}</b>${ms.map(m=>{const rc=recCounts(r)[m];return `<span>${esc(m)}<b>${sp[m]??(rc?rc.cur:"-")}</b></span>`;}).join("")}${recExtra(r).map(m=>`<span class="recm">${esc(m)}<b>${recCounts(r)[m].cur}</b></span>`).join("")}</div>`;
+          :(()=>{const RC=recCounts(r);const useR=hasRoster(r)&&Object.keys(RC).length;const asg=Object.values(RC).reduce((t,v)=>t+v.cur,0);const un=(+r.cur||0)-asg;
+            return `<div class="split"><b>${num(r.cur)}</b>${ms.map(m=>`<span>${esc(m)}<b>${useR?((RC[m]||{}).cur||0):(sp[m]??"-")}</b></span>`).join("")}${recExtra(r).map(m=>`<span class="recm">${esc(m)}<b>${RC[m].cur}</b></span>`).join("")}${useR&&un>0?`<span class="unasg" title="명단에서 담당을 안 정한 인원 — 업체 이름을 눌러 '담당 나누기'에서 정해 주세요">미지정<b>${un}</b></span>`:""}</div>`;})();
       }else if(ed)curCell=hasRoster(r)?`<b>${num(r.cur)}</b><div class="sub">명단 연동</div>`:inpS(p+".cur",r.cur);
       if(ed)baseCell=inpS(p+".base",r.base);
       html+=(ed?`<tr data-dk="hc|${gi}" data-di="${i}"><td class="nowrap"><span class="dh" draggable="true" title="끌어서 순서 바꾸기" aria-hidden="true">⠿</span> ${n} <button class="btn sm mv" data-act="hcMv" data-g="${gi}" data-i="${i}" data-v="-1" aria-label="위로" ${i===0?"disabled":""}>▲</button><button class="btn sm mv" data-act="hcMv" data-g="${gi}" data-i="${i}" data-v="1" aria-label="아래로" ${i===rs.length-1?"disabled":""}>▼</button></td>`:`<tr><td>${n}</td>`)+
@@ -1141,6 +1147,9 @@ const ttVis=e=>(e.staff!==PEOPLE()[0]||me()===PEOPLE()[0])&&(!TT_MGR_ONLY.includ
 const TT_PEOPLE=()=>STAFF.filter(n=>n!==PEOPLE()[0]&&(isBoss()||!TT_MGR_ONLY.includes(n)));
 const ttEvents=()=>S.events.filter(ttVis);
 const ttDef=()=>TT_PEOPLE().includes(me())?me():TT_PEOPLE()[0];
+/* 타임트리: 승인된 연차·반차를 그날 이름 옆에 빨간색으로 */
+function lvOn(name,d){const dw=new Date(d).getDay();return ((S.leave&&S.leave.reqs)||[]).find(r=>r.status==="승인"&&r.name===name&&r.from<=d&&(r.to||r.from)>=d&&(r.type!=="연차"||dw%6));}
+function lvTag(name,d){const r=lvOn(name,d);return r?` <span class="lvtag">(${r.type})</span>`:"";}
 function vTT(){
   const v=S.ui.ttView;
   let html=ph("타임트리","담당자별 시간표(08~22시)와 월간 달력. 칸을 누르면 일정을 넣을 수 있습니다.",`<button class="btn primary" data-act="evNew">+ 일정 추가</button>`)+
@@ -1149,13 +1158,13 @@ function vTT(){
     html+=`<div class="tools" style="margin-bottom:10px"><button class="btn sm" data-act="ttDay" data-v="-1" aria-label="전날">◀</button><input type="date" data-ui="ttDate" value="${d}" class="btn sm"><button class="btn sm" data-act="ttDay" data-v="1" aria-label="다음날">▶</button><button class="btn sm" data-act="ttDay" data-v="0">오늘</button><b>${dd.getMonth()+1}월 ${dd.getDate()}일 (${DOW[dd.getDay()]})</b></div>`;
     const ev=ttEvents().filter(e=>e.date===d);const allday=ev.filter(e=>e.hour==null);
     if(allday.length)html+=`<div class="banner">종일: ${allday.map(e=>`<button class="task" style="display:inline-block;border:0;cursor:pointer" data-act="evEdit" data-id="${e.id}">${esc(e.staff)} · ${esc(e.title)}</button>`).join(" ")}</div>`;
-    html+=`<div class="tw"><table class="tt"><thead><tr><th>시간</th>${TT_PEOPLE().map(p=>`<th>${p}${TT_MGR_ONLY.includes(p)?' <small class="sub">🔒</small>':""}</th>`).join("")}</tr></thead><tbody>`;
+    html+=`<div class="tw"><table class="tt"><thead><tr><th>시간</th>${TT_PEOPLE().map(p=>`<th>${p}${lvTag(p,d)}${TT_MGR_ONLY.includes(p)?' <small class="sub">🔒</small>':""}</th>`).join("")}</tr></thead><tbody>`;
     for(const h of TT_SLOTS){html+=`<tr class="${h%1?"half":""}"><td class="h">${hm(h)}</td>${TT_PEOPLE().map(p=>{const es=ev.filter(e=>e.hour===h&&e.staff===p);return `<td data-act="evNew" data-h="${h}" data-s="${p}" aria-label="${p} ${hm(h)}">${es.map(e=>`<button class="task" style="border:0;cursor:pointer;width:100%;text-align:left" data-act="evEdit" data-id="${e.id}">${esc(e.title)}</button>`).join("")}</td>`}).join("")}</tr>`;}
     html+=`</tbody></table></div>`;
   }else{const [y,mo]=S.ui.calYm.split("-").map(Number);const first=new Date(y,mo-1,1);const start=addDays(first,-first.getDay());
     html+=`<div class="tools" style="margin-bottom:10px"><button class="btn sm" data-act="calM" data-v="-1" aria-label="이전 달">◀</button><b style="font-size:17px">${y}년 ${mo}월</b><button class="btn sm" data-act="calM" data-v="1" aria-label="다음 달">▶</button><button class="btn sm" data-act="calM" data-v="0">이번 달</button><span class="sub">날짜를 누르면 크게 보입니다</span></div><div class="cal">${DOW.map((d,i)=>`<div class="dw ${i===0?"sun":i===6?"sat":""}">${d}</div>`).join("")}`;
-    for(let i=0;i<42;i++){const d=addDays(start,i);const k=iso(d);const es=ttEvents().filter(e=>e.date===k).sort((a,b)=>(a.hour??-1)-(b.hour??-1));
-      html+=`<button class="day ${d.getMonth()!==mo-1?"other":""} ${k===iso(TODAY)?"today":""}" data-act="calDay" data-v="${k}" aria-label="${d.getMonth()+1}월 ${d.getDate()}일 일정 ${es.length}건"><span class="dn ${d.getDay()===0?"sun":d.getDay()===6?"sat":""}">${d.getDate()}</span>${es.slice(0,3).map(e=>`<span class="ev">${e.hour==null?"":hm(e.hour)+" "}${esc(e.staff)} ${esc(e.title)}</span>`).join("")}${es.length>3?`<span class="more">+${es.length-3}건 더</span>`:""}${es.length?`<span class="cnt">${es.length}건</span>`:""}</button>`;}
+    for(let i=0;i<42;i++){const d=addDays(start,i);const k=iso(d);const es=ttEvents().filter(e=>e.date===k).sort((a,b)=>(a.hour??-1)-(b.hour??-1));const lvs=TT_PEOPLE().map(n=>[n,lvOn(n,k)]).filter(x=>x[1]);
+      html+=`<button class="day ${d.getMonth()!==mo-1?"other":""} ${k===iso(TODAY)?"today":""}" data-act="calDay" data-v="${k}" aria-label="${d.getMonth()+1}월 ${d.getDate()}일 일정 ${es.length}건"><span class="dn ${d.getDay()===0?"sun":d.getDay()===6?"sat":""}">${d.getDate()}</span>${lvs.map(([n,r])=>`<span class="ev lvev">${esc(n)} <span class="lvtag">(${r.type})</span></span>`).join("")}${es.slice(0,3).map(e=>`<span class="ev">${e.hour==null?"":hm(e.hour)+" "}${esc(e.staff)} ${esc(e.title)}</span>`).join("")}${es.length>3?`<span class="more">+${es.length-3}건 더</span>`:""}${es.length?`<span class="cnt">${es.length}건</span>`:""}</button>`;}
     html+=`</div>`;
   }
   return html;
@@ -1168,7 +1177,8 @@ function evForm(e){
 }
 function dayModal(k){const d=new Date(k);const es=ttEvents().filter(e=>e.date===k).sort((a,b)=>(a.hour??-1)-(b.hour??-1));
   modal(`${d.getMonth()+1}월 ${d.getDate()}일 (${DOW[d.getDay()]}) 일정 ${es.length}건`,
-   (es.length?`<div class="tw"><table class="x" style="font-size:15px"><thead><tr><th>시간</th><th>담당자</th><th>내용</th><th></th></tr></thead><tbody>${es.map(e=>`<tr><td>${e.hour==null?"종일":hm(e.hour)}</td><td>${esc(e.staff)}</td><td class="l">${esc(e.title)}</td><td><button type="button" class="btn sm" data-act="evEdit" data-id="${e.id}">수정</button></td></tr>`).join("")}</tbody></table></div>`:'<div class="empty">이 날 일정이 없습니다.</div>')+
+   (()=>{const L=TT_PEOPLE().map(n=>[n,lvOn(n,k)]).filter(x=>x[1]);return L.length?`<p class="banner" style="margin-top:0">휴가: ${L.map(([n,r])=>`<b>${esc(n)}</b> <span class="lvtag">(${r.type})</span>`).join(" · ")}</p>`:"";})()+
+   (es.length?`<div class="tw"><table class="x" style="font-size:15px"><thead><tr><th>시간</th><th>담당자</th><th>내용</th><th></th></tr></thead><tbody>${es.map(e=>`<tr><td>${e.hour==null?"종일":hm(e.hour)}</td><td>${esc(e.staff)}${lvTag(e.staff,k)}</td><td class="l">${esc(e.title)}</td><td><button type="button" class="btn sm" data-act="evEdit" data-id="${e.id}">수정</button></td></tr>`).join("")}</tbody></table></div>`:'<div class="empty">이 날 일정이 없습니다.</div>')+
    `<h3 style="margin:16px 0 8px;font-size:15px">이 날 일정 추가</h3><div class="row3">${F("시간",`<select name="hour">${hourOpts(null)}</select>`)}${F("담당자",sel("staff",TT_PEOPLE(),ttDef()))}${F("내용",inp("title","","text","required"))}</div>`,
    {wide:true,submit:"추가",onSubmit:fd=>{S.events.push({id:uid(),date:k,hour:fd.get("hour")===""?null:+fd.get("hour"),staff:fd.get("staff"),title:fd.get("title")});toast("추가했습니다");setTimeout(()=>dayModal(k),0);}});
 }
@@ -1812,7 +1822,7 @@ const mgrNames=r=>String((r&&r.mgr)||"").split("/").map(x=>x.trim()).filter(Bool
 function recOf(x,r){let n=x.rec;if(!("rec" in x)&&x.src&&String(x.src).startsWith("j:")){const j=(S.joins||[]).find(y=>"j:"+y.id===x.src);n=jRec(j);}
   const ms=mgrNames(r);return n&&!(ms.length===1&&ms[0]===n)?n:"";}
 function recSplit(r){if(!hasRoster(r)){const rc=recCounts(r);const ks=Object.keys(rc);if(!ks.length)return null;let own=+r.cur||0;const L=ks.map(n=>{const c=Math.min(rc[n].cur,own);own-=c;return {n,c,own:false};});return [{n:r.mgr||"관리담당",c:own,own:true},...L];}const m={};let other=0;rosterAct(r).forEach(x=>{const n=recOf(x,r)||"";if(n)other++;m[n]=(m[n]||0)+1;});if(!other)return null;
-  return Object.entries(m).sort((a,b)=>(a[0]===""?-1:b[0]===""?1:b[1]-a[1])).map(([n,c])=>({n:n||(r.mgr||"관리담당"),c,own:!n}));}
+  return Object.entries(m).sort((a,b)=>(a[0]===""?-1:b[0]===""?1:b[1]-a[1])).map(([n,c])=>({n:n||(mgrs(r).length>1?"미지정":(r.mgr||"관리담당")),c,own:!n}));}
 const recSplitHtml=r=>{const L=recSplit(r);return L?`<div class="sub recs" title="채용 담당별 재직 인원">${L.map(x=>`${esc(x.n)} <b>${x.c}</b>`).join(" · ")}</div>`:"";};
 const rosterAct=r=>((r&&r.people)||[]).filter(x=>!x.out);
 /* 한 주 = 화요일~월요일 (월요일 회의 때 지난 화요일부터 한 주 전체가 보이도록) */
@@ -1835,6 +1845,10 @@ const fmtPhone=v=>{const d=String(v||"").replace(/\D/g,"");return d.length===11?
 function parseRosterLines(t,asNew){return String(t||"").split(/\n|,/).map(l=>l.trim()).filter(Boolean).map(l=>{let d="",ph="";const pm=l.match(/01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/);if(pm){ph=fmtPhone(pm[0]);l=l.replace(pm[0],"").trim();}const m=l.match(/(\d{4}-\d{1,2}-\d{1,2})|(\d{1,2})[\/.](\d{1,2})/);
   if(m){if(m[1])d=iso(new Date(m[1]));else{const y=TODAY.getFullYear();d=iso(new Date(y,+m[2]-1,+m[3]));}l=l.replace(m[0],"").trim();}
   return {id:uid(),name:l.replace(/\s+/g," "),in:d||(asNew?iso(TODAY):""),phone:ph};}).filter(x=>x.name);}
+function hcRecTable(rp,r,act){const ms=mgrs(r);const opts=[...new Set([...ms,...REC_NAMES()])];const un=act.filter(x=>!recOf(x,r)).length;
+  return `<details style="margin-top:10px" ${un?"open":""}><summary><b>담당 나누기</b> <span class="sub">관리담당이 ${ms.length}명인 업체 — 사람마다 누구 인원인지 정하면 보유·출근 인원이 담당자별로 정확히 나뉩니다${un?` · <span class="up">미지정 ${un}명</span>`:""}</span></summary>
+   <div class="recgrid">${act.slice().sort((a,b)=>(!!recOf(a,r))-(!!recOf(b,r))||a.name.localeCompare(b.name,"ko")).map(x=>`<label><span>${esc(x.name)}</span><select onchange="hcRecSet('${rp}','${x.id}',this.value)" data-nofocus><option value="">미지정</option>${opts.map(n=>`<option ${recOf(x,r)===n?"selected":""}>${n}</option>`).join("")}</select></label>`).join("")}</div></details>`;}
+function hcRecSet(rp,id,v){const r=getPath(rp);const x=r&&(r.people||[]).find(y=>y.id===id);if(!x)return;x.rec=v||"";if(!v&&x.src&&String(x.src).startsWith("j:"))x.rec="";save();toast(`${x.name} → ${v||"미지정"}`);}
 function hcPeopleModal(rp){const r=getPath(rp);if(!r)return;const ro=hcRowRO(rp);const all=r.people||[];const act=rosterAct(r).sort((a,b)=>(isNewP(b)-isNewP(a))||a.name.localeCompare(b.name,"ko"));
   const recentOut=all.filter(isOutP),oldOut=all.filter(x=>x.out&&!isOutP(x));
   const insB=x=>x.ins==="가입"?` <span class="ins ok" title="4대보험 가입${x.insDate?" "+x.insDate:""}">4대${x.insDate?" "+mdShort(x.insDate):" ✓"}</span>`:x.ins==="미가입"?' <span class="ins no">4대 미가입</span>':"";
@@ -1842,6 +1856,7 @@ function hcPeopleModal(rp){const r=getPath(rp);if(!r)return;const ro=hcRowRO(rp)
   const pill=x=>`<span class="pp ${isNewP(x)?"pnew":""} ${x.out?"pout":""}">${ro?`<span class="pn">${esc(x.name)}</span>`:`<button type="button" class="pn" onclick="hcPplEdit('${rp}','${x.id}')" title="눌러서 정보 수정">${esc(x.name)}</button>`}${insB(x)}${recOf(x,r)?` <small class="rec">채용 ${esc(recOf(x,r))}</small>`:""}${isNewP(x)?` <small>신규 ${mdShort(x.in)}</small>`:""}${x.out?` <small>퇴사 ${mdShort(x.out)}</small>`:""}${x.phone?` <a class="tel" href="tel:${esc(x.phone.replace(/\D/g,""))}">${esc(x.phone)}</a>`:""}${ro?"":`<button type="button" class="px" aria-label="${esc(x.name)} 명단에서 빼기" onclick="hcPplDel('${rp}','${x.id}')">✕</button>`}</span>`;
   modal(`${esc(r.co)} 근무자 명단`,`<p class="sub" style="margin-top:0">${hasRoster(r)?`재직 <b>${act.length}명</b> — 합계인원이 이 명단 수로 자동 계산됩니다. 입사 처리하면 파란색, 퇴사 등록하면 빨간색으로 이번 주(화~월) 동안 표시됩니다.${ro?"":" 이름을 누르면 전화번호·4대보험을 고칠 수 있습니다."}${insN||insX?`<br>4대보험 가입 <b>${insN}명</b>${insX?` · <span class="up">미가입 ${insX}명</span>`:""}${act.length-insN-insX?` · 미입력 ${act.length-insN-insX}명`:""}`:""}`:`아직 명단이 없습니다. 아래에 이름을 넣으면 그때부터 합계인원(지금 ${num(r.cur)}명)이 명단 수로 자동 계산됩니다.`}</p>
    ${recSplit(r)?`<p class="sub">채용 담당별: ${recSplit(r).map(x=>`${esc(x.n)} <b>${x.c}명</b>`).join(" · ")}</p>`:""}${act.length||recentOut.length?`<div class="pplist">${act.map(pill).join("")}${recentOut.map(pill).join("")}</div>`:""}
+   ${!ro&&mgrs(r).length>1&&act.length?hcRecTable(rp,r,act):""}
    ${oldOut.length?`<details style="margin-top:8px"><summary class="sub">지난 퇴사자 ${oldOut.length}명</summary><div class="pplist">${oldOut.map(pill).join("")}</div></details>`:""}
    ${ro?'<p class="sub" style="margin-top:12px">보기 전용입니다. 명단 수정은 이 업체가 있는 지사(본사) 담당이 합니다.</p>':`<div class="field" style="margin-top:12px"><span>이름 추가 <small class="sub">한 줄에 한 명 (또는 쉼표). 전화번호·입사일도 같이 쓸 수 있습니다: "홍길동 010-1234-5678 10/15". 이미 있는 이름을 다시 쓰면 번호·입사일만 바뀝니다.</small></span><textarea name="names" rows="4" placeholder="홍길동 010-1234-5678\n김철수 01098765432 10/15"></textarea></div>
    <label class="checks"><label><input type="checkbox" name="asNew">날짜 없는 사람도 오늘 신규 입사로 표시 (파란색)</label></label>`}`,
