@@ -449,7 +449,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1793154213";
+const HUB_BUILD="1793155412";
 async function checkBuild(){if(!/^\d+$/.test(HUB_BUILD))return;try{const t=await (await fetch(location.pathname+"?v="+Date.now(),{cache:"no-store"})).text();const m=t.match(/const HUB_BUILD="(\d+)"/);
   if(m&&m[1]!==HUB_BUILD){if(!document.querySelector(".overlay")&&!dirty&&!syncing){toast("새 버전으로 바꾸는 중…");setTimeout(()=>location.reload(),600);}}}catch(e){}}
 async function loadAll(force){if(!force&&(dirty||syncing||document.querySelector(".overlay"))){clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),1500);return;}
@@ -783,6 +783,9 @@ function vHome(){
 /* ---------- 현재 인원 현황 ---------- */
 function hcMultiCell(r,p,ms,sp){sp=sp||r.splits||{};const RC=recCounts(r);const asg=Object.values(RC).reduce((t,v)=>t+v.cur,0);const un=(+r.cur||0)-asg;const useR=hasRoster(r)&&asg>0&&(un<=0||!r.splits);
             return `<div class="split"><b>${num(r.cur)}</b>${ms.map(m=>`<span>${esc(m)}<b>${useR?((RC[m]||{}).cur||0):(sp[m]??"-")}</b></span>`).join("")}${recExtra(r).map(m=>`<span class="recm">${esc(m)}<b>${RC[m].cur}</b></span>`).join("")}${hasRoster(r)&&un>0?`<button type="button" class="unasg" data-act="hcPpl" data-p="${p}" title="명단에서 사람마다 담당을 정하면 출근 인원도 정확히 나뉩니다">담당 나누기 · 미지정 ${un} ›</button>`:""}</div>`;}
+/* '타 지사 집계'로 빠졌는데 다른 표 어디에도 같은 업체가 없으면 → 어디에도 안 세지는 상태 */
+function exclOrphan(r){if(!r||!r.excluded)return false;const n=norm(r.co);return !HC_TABS.some(t=>(S.hc[t]||[]).some(g=>g.rows.some(x=>x!==r&&!x.excluded&&norm(x.co)===n)));}
+const exclTag=(r,tail)=>exclOrphan(r)?` <span class="chip late" title="'타 지사 집계'에 체크돼 있는데 다른 표에 같은 업체가 없어서 어떤 합계·담당자별 숫자에도 안 들어갑니다. ✎ 수정하기에서 체크를 풀어 주세요">⚠ 어디에도 안 세짐 (타 지사 집계 체크됨)</span>`:` <span class="chip mute">${esc(r.memo||"타 지사 집계")}${tail||""}</span>`;
 function hcSubtabs(b){return `<div class="subtabs">${isBoss()?`<button data-act="hcBr" data-v="전체" aria-pressed="${b==="전체"}" title="대표·팀장만 보입니다">전체<small>${num(hcGrand().cur)}명</small></button>`:""}${visHC().map(x=>{const tt=hcTot(x);return `<button data-act="hcBr" data-v="${x}" aria-pressed="${x===b}">${x}<small>${tt.daily?`출근 ${tt.cur}/${tt.pool}`:tt.cur+"명"}</small></button>`}).join("")}</div>`;}
 function hcGrand(){return BRANCHES.map(hcSplitFor).reduce((a,x)=>({cur:a.cur+x.cur,do:a.do+x.do,il:a.il+x.il,ch:a.ch+x.ch,base:a.base+x.base}),{cur:0,do:0,il:0,ch:0,base:0});}
 /* 전체 보기 (대표·팀장 전용): 모든 지사·분류를 한 표로 */
@@ -820,11 +823,11 @@ function vHC(){
     const rs=g.rows;const act=rs.filter(r=>!r.excluded);const hideHQ=r=>!ed&&g.branch!=="본사"&&r.excluded&&/본사/.test(r.memo||"");const nHid=rs.filter(hideHQ).length;const c=act.reduce((s,r)=>s+(+r.cur||0),0),bs=act.reduce((s,r)=>s+(+r.base||0),0);
     html+=`<div class="gname"><b>${esc(g.name)}</b>${g.daily?'<span class="chip mute">일 보고 인원 기준</span>':""}${g.note?`<span class="note">${esc(g.note)}</span>`:""}${ed?`<button class="btn sm" data-act="hcAdd" data-g="${gi}">+ 줄 추가</button>`:""}</div>`;
     if(!rs.length){html+=`<div class="empty">아직 등록된 업체가 없습니다.${ed?"":" '수정하기'를 눌러 추가하세요."}</div>`;return;}
-    if(!ed)html+=`<div class="mlist only-m">${rs.map((r,ri)=>{if(hideHQ(r))return "";const d=(+r.cur||0)-(+r.base||0);return `<div class="mi ${r.excluded?"mx":""}"><div class="mt"><button class="colink" data-act="hcPpl" data-p="hc.${b}.${gi}.rows.${ri}"><b>${esc(r.co)}</b></button>${rosterBadge(r)}${r.isNew?' <span class="chip vis">신규</span>':""}${r.excluded?` <span class="chip mute">${esc(r.memo||"타 지사 집계")}</span>`:""}<div class="sub">${esc(r.gubun)} · 관리 ${mgrCell(r)}${CEO&&r.sales?` · 영업 ${esc(r.sales)}`:""}</div>${recSplitHtml(r)}</div><div class="mv">${isD?attCell(r,`hc.${b}.${gi}.rows.${ri}`,hcRowRO(`hc.${b}.${gi}.rows.${ri}`)):""}<b>${num(r.cur)}</b><span class="sub">${isD?"보유 · ":""}기준 ${num(r.base)} · ${diff(d)}</span></div></div>`}).join("")}<div class="mi mtot"><div class="mt"><b>합계</b></div><div class="mv"><b>${num(c)}</b><span class="sub">기준 ${num(bs)} · ${diff(c-bs)}</span></div></div></div>`;
+    if(!ed)html+=`<div class="mlist only-m">${rs.map((r,ri)=>{if(hideHQ(r))return "";const d=(+r.cur||0)-(+r.base||0);return `<div class="mi ${r.excluded?"mx":""}"><div class="mt"><button class="colink" data-act="hcPpl" data-p="hc.${b}.${gi}.rows.${ri}"><b>${esc(r.co)}</b></button>${rosterBadge(r)}${r.isNew?' <span class="chip vis">신규</span>':""}${r.excluded?exclTag(r):""}<div class="sub">${esc(r.gubun)} · 관리 ${mgrCell(r)}${CEO&&r.sales?` · 영업 ${esc(r.sales)}`:""}</div>${recSplitHtml(r)}</div><div class="mv">${isD?attCell(r,`hc.${b}.${gi}.rows.${ri}`,hcRowRO(`hc.${b}.${gi}.rows.${ri}`)):""}<b>${num(r.cur)}</b><span class="sub">${isD?"보유 · ":""}기준 ${num(r.base)} · ${diff(d)}</span></div></div>`}).join("")}<div class="mi mtot"><div class="mt"><b>합계</b></div><div class="mv"><b>${num(c)}</b><span class="sub">기준 ${num(bs)} · ${diff(c-bs)}</span></div></div></div>`;
     html+=`<div class="tw ${ed?"":"only-d"}"><table class="x"><thead><tr><th>순번</th><th>구분</th>${CEO?"<th>영업담당자 🔒</th>":""}<th>관리담당자</th><th>업체</th><th>${isD?"보유 인원":"합계인원"}</th>${isD&&!ed?`<th>${mdShort(attDate())} 출근</th>`:""}<th>${esc(baseLbl())}</th><th>증감</th>${ed?"<th>타 지사 집계</th><th></th>":""}</tr></thead><tbody>`;
     let n=0;
     rs.forEach((r,i)=>{if(hideHQ(r))return;const p=`hc.${b}.${gi}.rows.${i}`;const ms=mgrs(r);n++;
-      const tag=(r.isNew?' <span class="chip vis">신규</span>':"")+(r.excluded?` <span class="chip mute">${esc(r.memo||"타 지사 집계")} · 합계 제외</span>`:"");
+      const tag=(r.isNew?' <span class="chip vis">신규</span>':"")+(r.excluded?exclTag(r," · 합계 제외"):"");
       let curCell=`${num(r.cur)}`,baseCell=num(r.base);
       if(ms.length<=1&&!ed){const L=recSplit(r);if(L)curCell=`<div class="split"><b>${num(r.cur)}</b>${L.map(x=>`<span${x.own?"":' class="recm"'}>${esc(x.n)}<b>${x.c}</b></span>`).join("")}</div>`;}
       if(ms.length>1){
