@@ -207,6 +207,7 @@ tr.dragging td{opacity:.45}tr.dropto td{box-shadow:inset 0 3px 0 var(--brand)}
 .recs{font-size:11.5px;margin-top:2px;color:#7c3aed}
 .recs b{font-weight:700}
 .recm{color:#7c3aed;font-weight:600}
+.realbn{background:#FFF4D6;border-bottom:1px solid #F0D58A;color:#6B4E00;font-size:13px;font-weight:600;padding:7px 16px;text-align:center}
 .lvtag{color:var(--late,#c62828);font-weight:700}.cal .ev.lvev{background:var(--late-soft,#fdecec);color:var(--ink,#222)}@media (max-width:620px){.cal .ev.lvev{display:block;font-size:10.5px}}
 .split .unasg{color:var(--late,#c62828);font-weight:600;font-size:11px;border:0;background:none;cursor:pointer;text-decoration:underline;padding:2px 0;text-align:left}
 .recgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px;margin-top:8px}.recgrid label{display:flex;align-items:center;justify-content:space-between;gap:6px;border:1px solid var(--line);border-radius:6px;padding:4px 6px;font-size:13px}.recgrid select{font-size:12.5px;padding:2px 4px;width:auto}
@@ -448,7 +449,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1793154055";
+const HUB_BUILD="1793154213";
 async function checkBuild(){if(!/^\d+$/.test(HUB_BUILD))return;try{const t=await (await fetch(location.pathname+"?v="+Date.now(),{cache:"no-store"})).text();const m=t.match(/const HUB_BUILD="(\d+)"/);
   if(m&&m[1]!==HUB_BUILD){if(!document.querySelector(".overlay")&&!dirty&&!syncing){toast("새 버전으로 바꾸는 중…");setTimeout(()=>location.reload(),600);}}}catch(e){}}
 async function loadAll(force){if(!force&&(dirty||syncing||document.querySelector(".overlay"))){clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),1500);return;}
@@ -694,6 +695,7 @@ function notifModal(){const L=myNotifs();
 /* ---------- 헤더 ---------- */
 function renderHead(){
   const un=myNotifs().filter(x=>!x.read).length;document.getElementById("role").innerHTML=`<span class="sub" id="syncst" aria-live="polite"></span><b>${esc(me())}</b> <span class="chip mute">${esc(ME.title||ROLE_LABEL[S.role]||"")} · ${esc(ME.branch)}</span><button class="btn sm bell" data-act="notif" aria-label="알림">🔔${un?`<span class="badge">${un}</span>`:""}</button>${PUSH_ON?"":'<button class="btn sm" data-act="pushOn">알림 켜기</button>'}<button class="btn sm" data-act="pw">비밀번호</button>${S.role==="ceo"?'<button class="btn sm" data-act="accounts">직원 계정</button>':""}<button class="btn sm" data-act="logout">로그아웃</button>`;
+  {const bn=document.getElementById("realBanner")||Object.assign(document.createElement("div"),{id:"realBanner"});if(!bn.parentNode){const h=document.getElementById("tabs");h.parentNode.insertBefore(bn,h.nextSibling);}bn.innerHTML=S.realData?`<div class="realbn">📂 실제 허브 데이터로 보는 중 · ${esc(S.realData)} 기준 — 여기서 바꾼 내용은 실제 허브에 저장되지 않습니다</div>`:"";}
   document.getElementById("tabs").innerHTML=TABS.filter(t=>!t[2]||t[2].includes(S.role)).map(([k,l,r])=>`<button data-act="tab" data-v="${k}" ${S.tab===k?'aria-current="page"':""}>${l}${r?'<span class="lock" aria-label="권한 필요">🔒</span>':""}</button>`).join("");
 }
 
@@ -732,6 +734,13 @@ function homeBranchCard(){const m=YM();const rows=BRANCHES.map(b=>{const x=hcSpl
    <tr class="tot"><td>전체</td><td>${num(T.cur)}명</td><td>${num(T.do)}</td><td>${num(T.il)}</td><td>${num(T.ch)}</td><td>${num(goalView(m,"전체").total)}명</td><td>${pct(T.cur,goalView(m,"전체").total)}%</td></tr></tbody></table></div></div>`;}
 
 /* ---------- 홈 ---------- */
+/* 데이터 내려받기 (대표 전용) — 시안에서 실제 데이터로 보기 + 백업용 */
+const HUB_SKIP=["role","tab","ui","viewer","notifs","v","realData"];
+function hubExport(){const o={};Object.keys(S).forEach(k=>{if(!HUB_SKIP.includes(k))o[k]=S[k];});
+  saveBlob(new Blob([JSON.stringify({hubExport:1,at:nowLocal(),by:me(),data:o})],{type:"application/json"}),`하랑허브_데이터_${iso(TODAY)}.json`);toast("내려받았습니다 — 직원 개인정보가 들어 있으니 외부에 공유하지 마세요");}
+async function hubImport(f){try{const j=JSON.parse(await f.text());const d=j&&j.data;if(!d||!d.hc){toast("허브에서 내려받은 데이터 파일이 아닙니다");return;}
+  const keep={role:S.role,tab:S.tab,ui:S.ui,viewer:S.viewer,v:S.v,notifs:[]};S=Object.assign(seed(),d,keep);S.realData=String(j.at||"").slice(0,16).replace("T"," ");
+  save();render();toast(`실제 허브 데이터로 바꿨습니다 (${S.realData} 기준)`);}catch(e){toast("파일을 읽지 못했습니다: "+(e.message||e));}}
 function vHome(){
   const gsc=goalSc();const all=hcAllFor(gsc),ts=toStatFor(gsc),ar=arStat(),g=goalOfSc(YM(),gsc);const net=all.cur-all.base;
   const fill=pct(ts.placed,ts.to);
@@ -743,7 +752,7 @@ function vHome(){
   const payWait=S.pays.filter(p=>p.status!=="지급완료"&&payVisBR().includes(p.branch));
   const conds=condList();const condDone=conds.filter(c=>condPct(c)===100).length;
   const adWk=Object.keys(S.adw).sort().filter(x=>!S.adwSample[x]).pop();const adW=S.ad.rows.filter(r=>visBR().includes(r.branch)).reduce((s,r)=>s+r.week,0),adC=weekCost(adWk,visBR()),adU=adC.total;
-  return ph(`${TODAY.getMonth()+1}월 ${TODAY.getDate()}일 (${DOW[TODAY.getDay()]}) 한눈에 보기`,`${VW().label} ${me()}님 화면 · 숫자는 각 메뉴에서 수정한 값이 바로 반영됩니다.`)+
+  return ph(`${TODAY.getMonth()+1}월 ${TODAY.getDate()}일 (${DOW[TODAY.getDay()]}) 한눈에 보기`,`${VW().label} ${me()}님 화면 · 숫자는 각 메뉴에서 수정한 값이 바로 반영됩니다.`,S.role==="ceo"?'<button class="btn" data-act="hubExport" title="시안에서 실제 데이터로 보기·백업용 (대표 전용)">💾 데이터 내려받기</button>':"")+
   `<div class="grid g4">${goals.map(([l,a,b,u,p])=>`<div class="card kpi">${ring(p)}<div><span>이번 달 목표 · ${l}</span><b>${u==="원"?won(a):num(a)}${u==="원"?"":u}</b><span>목표 ${u==="원"?won(b)+"원":num(b)+u}</span></div></div>`).join("")}</div>${gsc==="전체"&&!limited()?homeBranchCard():""}
   <div class="grid g2" style="margin-top:14px">
    <button class="card cardlink" data-act="tab" data-v="to"><h3>지사별 TO · 투입 예정 · 실제 투입 <span class="go">TO 현황 →</span></h3>
@@ -2013,7 +2022,7 @@ function setPath(path,val,type){const ks=path.split(".");let o=S;for(let i=0;i<k
   const k=ks[ks.length-1];if(type==="num")val=val===""?0:+val;else if(type==="numnull")val=val===""||+val===0?null:+val;else if(type==="bool")val=!!val;
   if(ks.includes("splits")&&val===0&&type==="num"){}o[k]=val;}
 document.addEventListener("change",e=>{const el=e.target;if(el.dataset.docfile){const d=S.docreqs.find(x=>x.id===el.dataset.docfile);uploadDocFiles(d,[...el.files]);return;}
-if(el.dataset.jrec){const j=S.joins.find(x=>x.id===el.dataset.jrec);if(j&&el.value){setJRec(j,el.value);chgNote(`${j.name}(${j.co}) 채용 ${el.value}`);notifyCeoChange("입사예정자 채용 담당 지정","join");save();toast(`${j.name} 채용 담당 — ${el.value}`);render();}return;}if(el.dataset.ui==="docMine"){S.ui.docMine=el.checked;save();render();return;}if(el.dataset.payamt){const p=S.pays.find(x=>x.id===el.dataset.payamt);if(p){p.amt=+el.value||0;notifyCeoChange("주급 금액 입력","pay");save();toast(`${p.name} 주급 ${won(p.amt)}원`);setTimeout(()=>{const y=scrollY;render();scrollTo(0,y);},0);}return;}if(el.id==="arCoSel"){S.ui.arCo=el.value;return;}if(el.id==="arMemoIn")return;if(el.id==="adFile"&&el.files[0]){adFilePicked(el.files[0]);return;}if(el.id==="payFile"&&el.files[0]){payFilePicked(el.files[0]);return;}if(el.id==="rosterFile"&&el.files[0]){rosterFilePicked(el.files[0]);return;}
+if(el.dataset.jrec){const j=S.joins.find(x=>x.id===el.dataset.jrec);if(j&&el.value){setJRec(j,el.value);chgNote(`${j.name}(${j.co}) 채용 ${el.value}`);notifyCeoChange("입사예정자 채용 담당 지정","join");save();toast(`${j.name} 채용 담당 — ${el.value}`);render();}return;}if(el.dataset.ui==="docMine"){S.ui.docMine=el.checked;save();render();return;}if(el.dataset.payamt){const p=S.pays.find(x=>x.id===el.dataset.payamt);if(p){p.amt=+el.value||0;notifyCeoChange("주급 금액 입력","pay");save();toast(`${p.name} 주급 ${won(p.amt)}원`);setTimeout(()=>{const y=scrollY;render();scrollTo(0,y);},0);}return;}if(el.id==="arCoSel"){S.ui.arCo=el.value;return;}if(el.id==="arMemoIn")return;if(el.id==="adFile"&&el.files[0]){adFilePicked(el.files[0]);return;}if(el.id==="payFile"&&el.files[0]){payFilePicked(el.files[0]);return;}if(el.id==="rosterFile"&&el.files[0]){rosterFilePicked(el.files[0]);return;}if(el.id==="hubImp"&&el.files[0]){hubImport(el.files[0]);el.value="";return;}
   if(el.dataset.set){setPath(el.dataset.set,el.type==="checkbox"?el.checked:el.value,el.dataset.type);notifyCeoChange(`${(TABS.find(t=>t[0]===S.tab)||[,""])[1]} 수정`,S.tab);save();
     setTimeout(()=>{const a=document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.set;const y=scrollY;render();scrollTo(0,y);if(a){const n=document.querySelector(`[data-set="${CSS.escape(a)}"]`);if(n)n.focus();}},0);}
   if(el.dataset.ui==="ttDate"){S.ui.ttDate=el.value;save();render();}if(el.dataset.ui==="attDate"){S.ui.attDate=el.value||iso(TODAY);save();render();}
@@ -2029,6 +2038,7 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
     close:()=>closeModal(),
     pw:()=>passwordModal(),accounts:()=>accountsModal(),logout:()=>logout(),budgetEdit:()=>budgetModal(),pushOn:()=>pushSetup(),
     role:()=>{S.viewer=v;S.role=ROLES[v].role||v;S.ui.showSales=false;S.ui.hcEdit=false;S.ui.toEdit=false;if(isBr())S.ui.condBr=myBr();toast(`${ROLES[v].label} 화면으로 바꿨습니다`);},
+    hubExport:()=>hubExport(),
     tab:()=>{S.tab=v;scrollTo(0,0);},
     hcBr:()=>S.ui.hcBr=v,jCt:()=>{const j=S.joins.find(x=>x.id===el.dataset.id);if(!j)return;j.ct=j.ct===v?"":v;toast(`${j.name} 근로계약서 ${j.ct==="O"?"작성 ✓":j.ct==="X"?"미작성":"표시 지움"}`);},jRec:()=>{const j=S.joins.find(x=>x.id===el.dataset.id);if(!j)return;setJRec(j,v);toast(`${j.name} 채용 담당 — ${v||"관리담당"}`);},jDay:()=>{S.ui.joinDay=S.ui.joinDay===v?"":v;},goalYm:()=>{if(+v===0){S.ui.goalYm=YM();return;}const [y,mm]=(S.ui.goalYm||YM()).split("-").map(Number);const d=new Date(y,mm-1+(+v),1);const x=ym(d);S.ui.goalYm=x>goalMaxYm()?goalMaxYm():x;},goalYmSet:()=>{S.ui.goalYm=v;},goalSc:()=>{S.ui.goalSc=v;},rosterUp:()=>rosterUpForm(),att:()=>attModal(el.dataset.p),attDay:()=>{S.ui.attDate=+v===0?iso(TODAY):iso(addDays(new Date(attDate()),+v));},hcPpl:()=>hcPeopleModal(el.dataset.p),hcSales:()=>{S.ui.showSales=!S.ui.showSales;},hcEdit:()=>S.ui.hcEdit=!S.ui.hcEdit,
     hcAdd:()=>{S.hc[S.ui.hcBr][+el.dataset.g].rows.push({id:uid(),gubun:"도급",period:P,pay:"",sales:"",mgr:"",co:"새 업체",cur:0,base:0});S.ui.hcEdit=true;},
