@@ -406,7 +406,7 @@ function canRead(kind,branch){const r=ME.role,boss=r==="ceo"||r==="mgr",hq=ME.br
   if(kind==="ar"||kind==="goal_money")return boss;
   if(kind==="event"&&branch==="팀장급")return boss;
   if(kind==="sale")return boss||hq||!branch||branch===ME.branch||branch==="본사";
-  if(["hcg","to","adw","adbudget","pay","docreq","ct","iv"].includes(kind))return boss||hq||!branch||branch===ME.branch;return true;}
+  if(["hcg","to","adw","adbudget","pay","docreq","iv"].includes(kind))return boss||hq||!branch||branch===ME.branch;return true;}
 function canWrite(kind,branch,data){const r=ME.role,boss=r==="ceo"||r==="mgr";
   if(["goal","goal_money","leave_alloc"].includes(kind))return r==="ceo";if(kind==="adbudget")return boss;
   if(kind==="leave_req")return boss||(r==="branch"&&branch===ME.branch)||(data&&data.name===ME.name&&(data.status||"대기")==="대기");
@@ -489,7 +489,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1793160419";
+const HUB_BUILD="1793254000";
 async function checkBuild(){if(!/^\d+$/.test(HUB_BUILD))return;try{const t=await (await fetch(location.pathname+"?v="+Date.now(),{cache:"no-store"})).text();const m=t.match(/const HUB_BUILD="(\d+)"/);
   if(m&&m[1]!==HUB_BUILD){if(!document.querySelector(".overlay")&&!dirty&&!syncing&&!typing()){toast("새 버전으로 바꾸는 중…");setTimeout(()=>location.reload(),600);}}}catch(e){}}
 /* 입력칸에 글자를 치는 중이면 화면을 새로 그리지 않음 (치던 글자가 사라지지 않게) */
@@ -1250,7 +1250,7 @@ const ctVisBR=()=>limited()?[myBr()]:BRANCHES;
 const dDiff=(a,b)=>Math.round((new Date(a)-new Date(b))/864e5);
 function ctState(c){if(c.renewedTo)return {k:"renew",lbl:"재작성 완료",cls:"mute",ord:5};if(!c.end)return {k:"open",lbl:"기간 없음",cls:"mute",ord:4};
   const d=dDiff(c.end,iso(TODAY));if(d<0)return {k:"late",lbl:`만료 ${-d}일 지남`,cls:"late",ord:0,d};if(d<=7)return {k:"soon",lbl:d===0?"오늘 만료":`D-${d}`,cls:"soon",ord:1,d};return {k:"ok",lbl:`D-${d}`,cls:"ok",ord:3,d};}
-function ctList(){return (S.contracts||[]).filter(c=>ctVisBR().includes(c.branch));}
+function ctList(){return (S.contracts||[]);} /* 근로계약은 본사·지사 전 직원이 전부 봄 (수정·삭제 권한은 그대로) */
 /* 수정·삭제·재계약: 대표·팀장 전부 / 그 외는 계약 담당·등록한 사람·그 업체 영업담당자·관리담당자만 */
 function coStaff(co){const out=new Set();HC_TABS.forEach(t=>(S.hc[t]||[]).forEach(g=>g.rows.forEach(r=>{if(coMatch(r.co,co))[r.sales,r.mgr].forEach(v=>String(v||"").split("/").forEach(n=>{n=n.trim();if(n)out.add(n);}));})));return out;}
 const ctCan=c=>isBoss()||(c&&(c.mgr===me()||c.by===me()||coStaff(c.co).has(me())));
