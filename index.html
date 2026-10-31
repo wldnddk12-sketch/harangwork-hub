@@ -208,6 +208,7 @@ tr.dragging td{opacity:.45}tr.dropto td{box-shadow:inset 0 3px 0 var(--brand)}
 .recs{font-size:11.5px;margin-top:2px;color:#7c3aed}
 .recs b{font-weight:700}
 .recm{color:#7c3aed;font-weight:600}
+.paysec{margin-top:12px}.paysech{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 10px;border-radius:8px;background:var(--brand-soft);margin-bottom:8px}.paysech b{font-size:15px}.gbsec .paysech{background:var(--vis-soft,#fff4d6)}.paysech .tools{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
 .realbn{background:#FFF4D6;border-bottom:1px solid #F0D58A;color:#6B4E00;font-size:13px;font-weight:600;padding:7px 16px;text-align:center}
 .lvtag{color:var(--late,#c62828);font-weight:700}.cal .ev.lvev{background:var(--late-soft,#fdecec);color:var(--ink,#222)}@media (max-width:620px){.cal .ev.lvev{display:block;font-size:10.5px}}
 .split .unasg{color:var(--late,#c62828);font-weight:600;font-size:11px;border:0;background:none;cursor:pointer;text-decoration:underline;padding:2px 0;text-align:left}
@@ -489,7 +490,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1793254000";
+const HUB_BUILD="1793417905";
 async function checkBuild(){if(!/^\d+$/.test(HUB_BUILD))return;try{const t=await (await fetch(location.pathname+"?v="+Date.now(),{cache:"no-store"})).text();const m=t.match(/const HUB_BUILD="(\d+)"/);
   if(m&&m[1]!==HUB_BUILD){if(!document.querySelector(".overlay")&&!dirty&&!syncing&&!typing()){toast("새 버전으로 바꾸는 중…");setTimeout(()=>location.reload(),600);}}}catch(e){}}
 /* 입력칸에 글자를 치는 중이면 화면을 새로 그리지 않음 (치던 글자가 사라지지 않게) */
@@ -1562,15 +1563,17 @@ const payDaysTxt=p=>p.days.map(d=>`${mdShort(d.date)} ${d.start?d.start+"~"+d.en
 function paySheets(L){const g={};L.forEach(p=>{const k=p.by+"|"+payWk(p.at);(g[k]=g[k]||[]).push(p);});
   return Object.entries(g).map(([k,ps])=>({k,by:ps[0].by,wk:payWk(ps[0].at),ps:ps.sort((a,b)=>(a.type===b.type?0:a.type==="가불"?-1:1)||String(a.co).localeCompare(String(b.co),"ko")||String(a.name).localeCompare(String(b.name),"ko"))}))
    .sort((a,b)=>b.wk.localeCompare(a.wk)||a.by.localeCompare(b.by,"ko"));}
-function paySheetCard(sh){const ps=sh.ps,wait=ps.filter(p=>p.status!=="지급완료");const gb=ps.filter(p=>p.type==="가불"),jb=ps.filter(p=>p.type==="주급");
-  const sum=a=>a.reduce((t,p)=>t+(+p.amt||0),0);const nB=new Set(ps.map(p=>p.batch)).size;
-  return `<div class="card paysheet"><h3><span>${esc(sh.by)} <span class="sub">${wkLabel(sh.wk)} 주 · 신청 ${nB}회 · ${ps.length}명 (가불 ${gb.length} · 주급 ${jb.length})</span></span>
-   <span class="tools">${canPay()&&wait.length?`<button class="btn sm primary" data-act="paySheetDone" data-v="${wait.map(p=>p.id).join(",")}">대기 ${wait.length}명 모두 지급완료</button>`:""}<button class="btn sm" data-act="payCsv" data-v="${esc(sh.k)}">엑셀로 받기</button>${canPay()?'<button class="btn sm" data-act="payUp">금액 엑셀 올리기</button>':""}</span></h3>
-   <div class="paycards">${ps.map(p=>{const paid=p.status==="지급완료";return `<div class="paycard ${paid?"paid":""} ${p.type==="가불"?"gb":""}">
+const PAYCARD=p=>{const paid=p.status==="지급완료";return `<div class="paycard ${paid?"paid":""} ${p.type==="가불"?"gb":""}">
      <div class="pch"><span class="chip ${p.type==="가불"?"vis":""}">${p.type}</span><b>${esc(p.co)}</b> <b class="pnm">${esc(p.name)}</b><span class="pat">${payAtTxt(p)} 신청</span></div>
      <ol class="pdays">${p.days.map(d=>`<li><span class="pd">${mdShort(d.date)} <small>${d.date?DOW[new Date(d.date).getDay()]:""}</small></span>${d.start?`<span class="pt">${d.start} ~ ${d.end}</span>${d.note?`<span class="pn">${esc(d.note)}</span>`:""}`:`<span class="pt pn0">${esc(d.note||"")}</span>`}</li>`).join("")||(p.type==="가불"?`<li class="sub">가불 신청 ${payAtTxt(p,1)}</li>`:'<li class="sub">근무 내역 없음</li>')}</ol>
      <div class="pcf"><span class="sub">${p.type==="가불"&&!p.days.length?`신청 <b>${mdShort(String(p.at).slice(0,10))}</b>`:`근무 <b>${p.workDays}</b>일`}</span><span class="pamt">${p.type==="주급"&&canPay()&&!paid?`<input type="number" data-payamt="${p.id}" value="${p.amt||""}" placeholder="금액" step="1000" min="0" aria-label="${esc(p.name)} 주급 금액">원`:p.amt?`<b>${won(p.amt)}원</b>`:'<span class="sub">금액 -</span>'}</span></div>
-     <div class="pcb">${paid?`<span class="chip ok">지급완료${p.paidBy?" · "+esc(p.paidBy):""}</span>${canPay()?` <button class="btn sm" data-act="payUndo" data-id="${p.id}">되돌리기</button>`:""}`:`${canPay()?`<button class="btn sm primary" data-act="payDone" data-id="${p.id}">지급완료</button>`:'<span class="chip mute">대기</span>'}`}${!paid&&(p.by===me()||canPay())?` <button class="btn sm" data-act="payEdit" data-id="${p.id}">수정</button>`:""}</div></div>`}).join("")}</div>
+     <div class="pcb">${paid?`<span class="chip ok">지급완료${p.paidBy?" · "+esc(p.paidBy):""}</span>${canPay()?` <button class="btn sm" data-act="payUndo" data-id="${p.id}">되돌리기</button>`:""}`:`${canPay()?`<button class="btn sm primary" data-act="payDone" data-id="${p.id}">지급완료</button>`:'<span class="chip mute">대기</span>'}`}${!paid&&(p.by===me()||canPay())?` <button class="btn sm" data-act="payEdit" data-id="${p.id}">수정</button>`:""}</div></div>`};
+function paySheetCard(sh){const ps=sh.ps,wait=ps.filter(p=>p.status!=="지급완료");const gb=ps.filter(p=>p.type==="가불"),jb=ps.filter(p=>p.type==="주급");
+  const sum=a=>a.reduce((t,p)=>t+(+p.amt||0),0);const nB=new Set(ps.map(p=>p.batch)).size;
+  return `<div class="card paysheet"><h3><span>${esc(sh.by)} <span class="sub">${wkLabel(sh.wk)} 주 · 신청 ${nB}회 · ${ps.length}명 (가불 ${gb.length} · 주급 ${jb.length})</span></span>
+   <span class="tools">${canPay()&&wait.length?`<button class="btn sm primary" data-act="paySheetDone" data-v="${wait.map(p=>p.id).join(",")}">대기 ${wait.length}명 모두 지급완료</button>`:""}${canPay()?'<button class="btn sm" data-act="payUp">금액 엑셀 올리기</button>':""}</span></h3>
+   ${[["가불",gb],["주급",jb]].filter(([,a])=>a.length).map(([t,a])=>{const w=a.filter(p=>p.status!=="지급완료");return `<div class="paysec ${t==="가불"?"gbsec":""}"><div class="paysech"><b>${t}</b><span class="sub">${a.length}명${sum(a)?` · ${won(sum(a))}원`:""}${w.length?` · 대기 ${w.length}`:" · 모두 완료"}</span><span class="tools">${canPay()&&w.length?`<button class="btn sm primary" data-act="paySheetDone" data-v="${w.map(p=>p.id).join(",")}">${t} 대기 ${w.length}명 지급완료</button>`:""}<button class="btn sm" data-act="payCsv" data-v="${esc(sh.k)}" data-t="${t}">${t} 엑셀로 받기</button></span></div>
+   <div class="paycards">${a.map(PAYCARD).join("")}</div></div>`;}).join("")}
    <div class="paytot"><b>합계 ${ps.length}명</b><span>${gb.length?`가불 ${won(sum(gb))}원`:""}${gb.length&&sum(jb)?" · ":""}${sum(jb)?`주급 ${won(sum(jb))}원`:""}</span><span>${wait.length?`대기 ${wait.length}`:"모두 완료"}</span></div></div>`;}
 /* 간단한 엑셀(.xlsx) 만들기 — 외부 라이브러리 없이 */
 const CRC_T=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}return t;})();
@@ -1626,11 +1629,11 @@ function saveBlob(blob,name){const a=document.createElement("a");a.href=URL.crea
 /* 엑셀도 화면처럼 사람별 카드(A4 용지 느낌)로: 한 줄에 카드 2장, 날짜는 세로로.
    노란 칸에 금액을 적어 '금액 엑셀 올리기'로 다시 올리면 허브에 들어감 (숨긴 D·I열에 신청 번호) */
 const PAY_MARK="HARANG-PAY";
-function payXlsx(k){const [by,wk]=k.split("|");const ps=(paySheets(S.pays.filter(p=>payVisBR().includes(p.branch))).find(x=>x.k===k)||{ps:[]}).ps;
+function payXlsx(k,T){const [by,wk]=k.split("|");const ps=((paySheets(S.pays.filter(p=>payVisBR().includes(p.branch))).find(x=>x.k===k)||{ps:[]}).ps).filter(p=>!T||p.type===T);const TT=T||"주급·가불";
   const C=[],M=[];const put=(r,c,v,s,f)=>C.push({r,c,v,s,f});const ref=(r,c)=>colL(c)+(r+1);const merge=(r,c1,c2)=>M.push(ref(r,c1)+":"+ref(r,c2));
   const gb=ps.filter(p=>p.type==="가불"),jb=ps.filter(p=>p.type==="주급");const sum=a=>a.reduce((t,p)=>t+(+p.amt||0),0);const wait=ps.filter(p=>p.status!=="지급완료").length;
-  put(0,0,`주급·가불 취합 — ${by} (${wkLabel(wk)} 주)`,7);put(0,3,PAY_MARK);
-  put(1,0,`총 ${ps.length}명 · 가불 ${gb.length}명${gb.length?` ${won(sum(gb))}원`:""} · 주급 ${jb.length}명${sum(jb)?` ${won(sum(jb))}원`:""} · ${wait?`지급 대기 ${wait}명`:"모두 지급완료"}`,8);
+  put(0,0,`${TT} 취합 — ${by} (${wkLabel(wk)} 주)`,7);put(0,3,PAY_MARK);
+  put(1,0,`${TT} ${ps.length}명${sum(ps)?` · 합계 ${won(sum(ps))}원`:""} · ${wait?`지급 대기 ${wait}명`:"모두 지급완료"}`,8);
   put(2,0,`내려받은 시각 ${nowLocal().replace("T"," ").slice(0,16)} · 노란 칸에 금액을 적어 허브 '금액 엑셀 올리기'로 올리면 그대로 들어갑니다`,8);
   let r=4;
   for(let i=0;i<ps.length;i+=2){const pair=ps.slice(i,i+2);const nd=Math.max(...pair.map(p=>Math.max(1,p.days.length)));
@@ -1643,7 +1646,7 @@ function payXlsx(k){const [by,wk]=k.split("|");const ps=(paySheets(S.pays.filter
       const f=r+1+nd;put(f,c,g&&!p.days.length?`신청 ${mdShort(String(p.at).slice(0,10))}`:`근무 ${p.workDays}일`,16);put(f,c+1,g?"가불 금액":"주급 금액",16);put(f,c+2,p.amt?+p.amt:"",19);put(f,c+3,p.id);
       put(f+1,c,paid?`지급완료 · ${p.paidBy||""} · ${p.paidAt?mdShort(p.paidAt):""}`:"지급 대기",18);put(f+1,c+1,"",18);put(f+1,c+2,"",18);merge(f+1,c,c+2);});
     r+=nd+4;}
-  saveBlob(xlsxBlob(`${by} ${wk.slice(5)}`,C,[12,17,15,0,3,12,17,15,0],0,{merges:M,fit:true}),`주급가불_${by}_${wk}.xlsx`);toast("엑셀 파일로 내려받습니다");}
+  if(!ps.length){toast(`${TT} 신청이 없습니다`);return;}saveBlob(xlsxBlob(`${T||"주급가불"} ${wk.slice(5)}`,C,[12,17,15,0,3,12,17,15,0],0,{merges:M,fit:true}),`${T||"주급가불"}_${by}_${wk}.xlsx`);toast("엑셀 파일로 내려받습니다");}
 /* 노란 칸에 금액을 적은 엑셀을 다시 올리기 */
 function payUpForm(){modal("주급 금액 엑셀 올리기",`<p class="sub" style="margin-top:0">'엑셀로 받기'로 내려받은 파일의 <b>노란 칸</b>에 금액을 적어서 그대로 올려 주세요. 여러 사람 파일을 하나씩 올려도 됩니다. 비어 있는 칸은 건너뜁니다.</p>
   <label class="field"><span>엑셀 파일 (.xlsx)</span><input type="file" id="payFile" accept=".xlsx"></label><div id="payUpPrev" class="sub"></div>`,{wide:true,submit:"금액 반영",onSubmit:()=>{const L=(window.__payUp||[]).filter(x=>x.ch);window.__payUp=null;if(!L.length){toast("바뀐 금액이 없습니다");return;}
@@ -1669,7 +1672,7 @@ function vPay(){const f=S.ui.payF||"wait";const brs=payVisBR();const L=S.pays.fi
    <div class="card"><span class="sub">업체별 대기</span>${Object.entries(wait.reduce((a,p)=>(a[p.co]=(a[p.co]||0)+1,a),{})).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([c,n])=>`<div class="prow"><span>${esc(c)}</span>${bar(pct(n,wait.length)," ")}<span class="v">${n}명</span></div>`).join("")||'<span class="sub">없음</span>'}</div></div>
   <div class="tools" style="justify-content:space-between;margin-bottom:10px"><div class="subtabs" style="margin:0">${[["wait","지급 대기"],["done","지급완료"],["all","전체"]].map(([k,l])=>`<button data-act="payF" data-v="${k}" aria-pressed="${f===k}">${l}</button>`).join("")}</div>
    <div class="subtabs" style="margin:0">${[["sheet","담당자별 취합"],["list","신청한 순서대로"]].map(([k,l])=>`<button data-act="payView" data-v="${k}" aria-pressed="${(S.ui.payView||"sheet")===k}">${l}</button>`).join("")}</div></div>
-  ${(S.ui.payView||"sheet")==="sheet"?`<p class="sub" style="margin-top:0">한 사람이 그 주(월~일)에 올린 신청을 한 장으로 모았습니다. 가불이 위, 주급이 아래에 업체순으로 정리됩니다.</p><div class="grid">${paySheets(show).map(paySheetCard).join("")||'<div class="empty">해당하는 신청이 없습니다.</div>'}</div>`:`<div class="grid">${bl.map(ps=>{const p0=ps[0];const nw=ps.filter(p=>p.status!=="지급완료").length;
+  ${(S.ui.payView||"sheet")==="sheet"?`<p class="sub" style="margin-top:0">한 사람이 그 주(월~일)에 올린 신청을 한 장으로 모으고, 그 안에서 <b>가불</b>과 <b>주급</b>을 나눴습니다. 엑셀도 가불·주급 따로 받습니다 (금액 엑셀 올리기는 어느 파일이든 그대로 됩니다).</p><div class="grid">${paySheets(show).map(paySheetCard).join("")||'<div class="empty">해당하는 신청이 없습니다.</div>'}</div>`:`<div class="grid">${bl.map(ps=>{const p0=ps[0];const nw=ps.filter(p=>p.status!=="지급완료").length;
     return `<div class="card"><h3><span>${esc(p0.by)} <span class="sub">${mdShort(p0.at.slice(0,10))} ${p0.at.slice(11,16)} · ${p0.branch} · ${ps.length}명</span></span>${canPay()&&nw>1?`<button class="btn sm primary" data-act="payBatch" data-v="${p0.batch}">${nw}명 모두 지급완료</button>`:""}</h3>${ps.map(payLine).join("")}</div>`;}).join("")||'<div class="empty">해당하는 신청이 없습니다.</div>'}</div>`}`;}
 function payNewForm(){modal("주급·가불 신청",`<div class="row2">${F("구분",sel("type",["주급","가불"],"주급"))}${F("지사",sel("branch",payVisBR(),myBr()))}</div>
   <label class="field"><span>카톡에 쓰던 그대로 붙여 넣기</span><textarea name="t" id="payT" style="min-height:200px" placeholder="세연기술 권대욱&#10;10/7 08:30 ~ 19:30&#10;10/8 08:30 ~ 19:30&#10;&#10;PCM 최도영&#10;10/6 9:00~18:00&#10;10/7 9:00~16:00"></textarea></label>
@@ -2174,7 +2177,7 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
     docUndo:()=>{const d=S.docreqs.find(x=>x.id===el.dataset.id);d.status="대기";delete d.doneBy;delete d.doneAt;},
     docDel:()=>{if(confirm("이 요청을 취소할까요?"))S.docreqs=S.docreqs.filter(x=>x.id!==el.dataset.id);},
     docFileDel:()=>{const d=S.docreqs.find(x=>x.id===el.dataset.id);const f=d.files.splice(+el.dataset.i,1)[0];if(f&&f.path)sb.storage.from("hub-files").remove([f.path]);},
-    payNew:()=>payNewForm(),payF:()=>S.ui.payF=v,payView:()=>S.ui.payView=v,payCsv:()=>payXlsx(v),payUp:()=>payUpForm(),
+    payNew:()=>payNewForm(),payF:()=>S.ui.payF=v,payView:()=>S.ui.payView=v,payCsv:()=>payXlsx(v,el.dataset.t||""),payUp:()=>payUpForm(),
     paySheetDone:()=>{const ids=v.split(",");const ps=S.pays.filter(p=>ids.includes(p.id)&&p.status!=="지급완료");ps.forEach(p=>{p.status="지급완료";p.paidBy=me();p.paidAt=iso(TODAY);});const by=[...new Set(ps.map(p=>p.by))];by.forEach(b=>{const m=ps.filter(p=>p.by===b);notify([b],`주급·가불 ${m.length}명 지급완료 (${m.map(p=>p.name).slice(0,3).join(", ")}${m.length>3?" 외":""})`,"pay");});toast(`${ps.length}명 지급완료`);},payEdit:()=>payEditForm(S.pays.find(p=>p.id===el.dataset.id)),
     payDel:()=>{S.pays=S.pays.filter(p=>p.id!==el.dataset.id);closeModal();},
     payDone:()=>{const p=S.pays.find(x=>x.id===el.dataset.id);p.status="지급완료";p.paidBy=me();p.paidAt=iso(TODAY);notify([p.by],`${p.type} 지급완료: ${p.co} ${p.name}${p.amt?" "+won(p.amt)+"원":""}`,"pay");toast(`${p.name} 지급완료`);},
