@@ -456,6 +456,14 @@ async function resolveConflict(d,old){for(let t=0;t<3;t++){
     const {data,error}=await sb.from("hub_data").update({branch:d.branch,data:merged,version:cur.version+1,updated_by:ME.id,updated_at:new Date().toISOString()}).eq("kind",d.kind).eq("key",d.key).eq("version",cur.version).select("version");
     if(error)return false;if(data&&data.length){SNAP.set(d.kind+"|"+d.key,{version:data[0].version,json:docJson(nd),branch:d.branch,data:dc(merged)});MERGED=true;return true;}}
   return false;}
+/* 다른 지사 표에 '관리담당자'로 들어간 줄: 표 전체는 못 고치므로 그 줄의 명단·인원·출근만 서버 함수로 올림 */
+async function hcRowPush(d,old){const oR=(old.data&&old.data.rows)||[],nR=(d.data&&d.data.rows)||[];if(oR.length!==nR.length)return false;let ver=null;const base=dc(old.data);
+  for(let i=0;i<nR.length;i++){const a=oR[i],b=nR[i];if(!a||!b||jeq(a,b)||a.co!==b.co)continue;
+    if(!String(a.mgr||"").replace(/\s/g,"").split("/").includes(ME.name))continue;
+    const row={};["people","cur","att","recs"].forEach(k=>{if(b[k]!==undefined)row[k]=b[k];});
+    const {data,error}=await sb.rpc("hub_hc_row",{p_key:d.key,p_idx:i,p_co:a.co,p_row:row});if(error){console.warn("hc row",error);continue;}
+    ver=data;base.rows[i]={...base.rows[i],...dc(row)};}
+  if(ver==null)return false;SNAP.set(d.kind+"|"+d.key,{version:ver,json:docJson({...d,data:base}),branch:d.branch,data:base});MERGED=true;return true;}
 /* 저장: 바뀐 문서만 버전 확인 후 올림 */
 let SNAP=new Map(),syncT=null,syncing=false,dirty=false;
 const docJson=d=>stable(d.data)+"#"+(d.branch||"");
@@ -465,7 +473,7 @@ async function sync(){if(syncing){clearTimeout(syncT);syncT=setTimeout(sync,300)
   try{
     for(const [k,d] of now){const old=SNAP.get(k);const j=docJson(d);if(old&&old.json===j)continue;
       if(!old){const empty=d.data&&Array.isArray(d.data.rows)&&!d.data.rows.length;if(empty&&d.kind!=="adw")continue;}
-      if(!canWrite(d.kind,d.branch,d.data)||(old&&old.version&&["ct","bl"].includes(d.kind)&&!canWrite(d.kind,old.branch,old.data))){if(old)old.skip=true;continue;}
+      if(!canWrite(d.kind,d.branch,d.data)||(old&&old.version&&["ct","bl"].includes(d.kind)&&!canWrite(d.kind,old.branch,old.data))){if(d.kind==="hcg"&&old&&old.version&&await hcRowPush(d,old))n++;else if(old)old.skip=true;continue;}
       const row={kind:d.kind,key:d.key,branch:d.branch,data:d.data,updated_by:ME.id,updated_at:new Date().toISOString()};
       if(old&&old.version){const {data,error}=await sb.from("hub_data").update({...row,version:old.version+1}).eq("kind",d.kind).eq("key",d.key).eq("version",old.version).select("version");
         if(error){if(isNet(error))net=true;else denied=true;why=why||(d.kind+": "+(error.message||error.code||""));continue;}if(!data||!data.length){if(await resolveConflict(d,old))n++;else conflict=true;continue;}SNAP.set(k,{version:data[0].version,json:j,branch:d.branch,data:dc(d.data)});n++;}
@@ -490,7 +498,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1793582449";
+const HUB_BUILD="1793585591";
 /* 날짜가 바뀌었으면 (화면을 며칠 켜 둔 채 쓰는 경우) 새로고침해서 오늘 날짜로 맞춤 */
 function checkDay(){const n=new Date();n.setHours(0,0,0,0);if(n.getTime()===TODAY.getTime())return false;
   if(!document.querySelector(".overlay")&&!dirty&&!syncing&&!typing()){toast("날짜가 바뀌어 오늘 기준으로 다시 불러옵니다…");setTimeout(()=>location.reload(),600);}else setTimeout(checkDay,5000);return true;}
@@ -679,7 +687,7 @@ function hcTot(b){const rs=hcRows(b);if(b==="일용직"){const d=iso(TODAY);cons
   return {cur:rs.reduce((s,r)=>s+(+r.cur||0),0),base:rs.reduce((s,r)=>s+(+r.base||0),0)};}
 function hcAll(){return visHC().reduce((a,b)=>{const t=hcTot(b);a.cur+=t.cur;a.base+=t.base;return a;},{cur:0,base:0});}
 function hcSharedRows(){const out=[];if(!limited())return out;HC_TABS.forEach(t=>(S.hc[t]||[]).forEach((g,gi)=>{if(g.branch===myBr())return;g.rows.forEach((r,i)=>{if(mgrs(r).includes(me())||recExtra(r).includes(me()))out.push({r,g,rp:`hc.${t}.${gi}.rows.${i}`});});}));return out;}
-const hcRowRO=rp=>{const m=String(rp).match(/^hc\.([^.]+)\.(\d+)\./);const g=m&&(S.hc[m[1]]||[])[+m[2]];return !!(g&&limited()&&g.branch!==myBr());};
+const hcRowRO=rp=>{const m=String(rp).match(/^hc\.([^.]+)\.(\d+)\.rows\.(\d+)/);const g=m&&(S.hc[m[1]]||[])[+m[2]];if(!(g&&limited()&&g.branch!==myBr()))return false;const r=g.rows[+m[3]];return !(r&&mgrs(r).includes(me()));};
 function mgrs(r){return String(r.mgr||"").split("/").map(s=>s.trim()).filter(Boolean);}
 /* 다른 사람이 채용해 넣은 인원: 그 사람 몫으로 따로 셈 (cur=지금 재직, base=기준일에 재직) */
 const baseStart=()=>{const y=S.baseYm||YM();return y==="2026-10"?"2026-10-21":y+"-01";};
@@ -2017,7 +2025,7 @@ document.addEventListener("drop",e=>{if(!hcDrag)return;const tr=e.target.closest
 document.addEventListener("dragend",()=>{hcDrag=null;document.querySelectorAll("tr.dropto,tr.dragging").forEach(x=>x.classList.remove("dropto","dragging"));});
 function bumpPath(p,d){if(p.startsWith("hcid:")){const r=findHcRow(p.slice(5))[1];if(r)r.cur=Math.max(0,(+r.cur||0)+d);return;}const ks=p.split(".");const k=ks.pop();const o=ks.reduce((x,y)=>x[y],S);o[k]=Math.max(0,(+o[k]||0)+d);}
 function coScore(a,b){const x=norm(a),y=norm(b);if(!x||!y)return 0;if(x===y)return 3;if(x.includes(y)||y.includes(x))return 2;return 0;}
-function hcCands(co){const out=[];HC_TABS.forEach(t=>(S.hc[t]||[]).forEach((g,gi)=>{if(!visG(g))return;g.rows.forEach((r,i)=>{const sc=coScore(co,r.co)-(r.excluded?1.5:0);
+function hcCands(co){const out=[];HC_TABS.forEach(t=>(S.hc[t]||[]).forEach((g,gi)=>{const own=visG(g);g.rows.forEach((r,i)=>{if(!own&&!mgrs(r).includes(me()))return;const sc=coScore(co,r.co)-(r.excluded?1.5:0);
   out.push({path:`hcid:${r.id}`,label:`${g.name} · ${r.co} (현재 ${r.cur}명)${r.excluded?" · 합계 제외 줄":""}`,sc});});}));
   return out.sort((a,b)=>b.sc-a.sc);}
 function toCands(co){const out=[];visBR().forEach(b=>(S.to[b]||[]).forEach((r,i)=>{out.push({path:`toid:${r.id}`,label:`${b} · ${r.co}${r.job?" / "+r.job:""} (TO ${r.to??"상시"} · 투입 ${r.placed})`,sc:coScore(co,r.co)});}));return out.sort((a,b)=>b.sc-a.sc);}
