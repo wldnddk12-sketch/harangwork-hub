@@ -498,7 +498,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1793866244";
+const HUB_BUILD="1793870861";
 /* 날짜가 바뀌었으면 (화면을 며칠 켜 둔 채 쓰는 경우) 새로고침해서 오늘 날짜로 맞춤 */
 function checkDay(){const n=new Date();n.setHours(0,0,0,0);if(n.getTime()===TODAY.getTime())return false;
   if(!document.querySelector(".overlay")&&!dirty&&!syncing&&!typing()){toast("날짜가 바뀌어 오늘 기준으로 다시 불러옵니다…");setTimeout(()=>location.reload(),600);}else setTimeout(checkDay,5000);return true;}
@@ -860,16 +860,21 @@ function hcMultiCell(r,p,ms,sp){sp=sp||r.splits||{};const RC=recCounts(r);const 
 /* '타 지사 집계'로 빠졌는데 다른 표 어디에도 같은 업체가 없으면 → 어디에도 안 세지는 상태 */
 function exclOrphan(r){if(!r||!r.excluded)return false;const n=norm(r.co);return !HC_TABS.some(t=>(S.hc[t]||[]).some(g=>g.rows.some(x=>x!==r&&!x.excluded&&norm(x.co)===n)));}
 const exclTag=(r,tail)=>exclOrphan(r)?` <span class="chip late" title="'타 지사 집계'에 체크돼 있는데 다른 표에 같은 업체가 없어서 어떤 합계·담당자별 숫자에도 안 들어갑니다. ✎ 수정하기에서 체크를 풀어 주세요">⚠ 어디에도 안 세짐 (타 지사 집계 체크됨)</span>`:` <span class="chip mute">${esc(r.memo||"타 지사 집계")}${tail||""}</span>`;
-function hcSubtabs(b){return `<div class="subtabs">${isBoss()?`<button data-act="hcBr" data-v="전체" aria-pressed="${b==="전체"}" title="대표·팀장만 보입니다">전체<small>${num(hcGrand().cur)}명</small></button>`:""}${visHC().map(x=>{const tt=hcTot(x);return `<button data-act="hcBr" data-v="${x}" aria-pressed="${x===b}">${x}<small>${tt.daily?`출근 ${tt.cur}/${tt.pool}`:tt.cur+"명"}</small></button>`}).join("")}</div>`;}
+/* 내 업체: 내가 관리담당·영업담당·채용 담당으로 들어간 업체 (지사 상관없이) */
+const hcMine=r=>mgrs(r).includes(me())||String(r.sales||"").replace(/\s/g,"").split("/").includes(me())||recExtra(r).includes(me());
+function hcMineRows(){const out=[];HC_TABS.forEach(t=>(S.hc[t]||[]).forEach((g,gi)=>g.rows.forEach((r,ri)=>{if(!r.excluded&&hcMine(r))out.push({t,g,gi,r,ri});})));return out;}
+function hcMineTot(){const d=iso(TODAY);return hcMineRows().reduce((s,x)=>s+(x.t==="일용직"?(attOf(x.r,d)||0):(+x.r.cur||0)),0);}
+function hcSubtabs(b){const mn=hcMineRows().length;return `<div class="subtabs">${mn?`<button data-act="hcBr" data-v="내업체" aria-pressed="${b==="내업체"}" title="내가 관리·영업·채용 담당인 업체를 지사 상관없이 모아 봅니다">내 업체 전체<small>${num(hcMineTot())}명</small></button>`:""}${isBoss()?`<button data-act="hcBr" data-v="전체" aria-pressed="${b==="전체"}" title="대표·팀장만 보입니다">전체<small>${num(hcGrand().cur)}명</small></button>`:""}${visHC().map(x=>{const tt=hcTot(x);return `<button data-act="hcBr" data-v="${x}" aria-pressed="${x===b}">${x}<small>${tt.daily?`출근 ${tt.cur}/${tt.pool}`:tt.cur+"명"}</small></button>`}).join("")}</div>`;}
 function hcGrand(){return BRANCHES.map(hcSplitFor).reduce((a,x)=>({cur:a.cur+x.cur,do:a.do+x.do,il:a.il+x.il,ch:a.ch+x.ch,base:a.base+x.base}),{cur:0,do:0,il:0,ch:0,base:0});}
 /* 전체 보기 (대표·팀장 전용): 모든 지사·분류를 한 표로 */
-function vHCAll(){const CEO=canSales()&&!!S.ui.showSales;const T=hcGrand();const d=iso(TODAY);const q=S.ui.hcQ||"";
-  let html=ph("현재 인원 현황 · 전체",`대표·팀장만 보는 화면입니다. 모든 지사·분류를 한 표로 봅니다 (보기 전용 — 수정은 각 지사 탭에서). 증감은 '${esc(baseLbl())}' 대비 · '타 지사 집계' 줄은 두 번 세지 않도록 뺐습니다.`,
-   `${canSales()?`<button class="btn" data-act="hcSales" aria-pressed="${!!S.ui.showSales}">${S.ui.showSales?"🔓 영업담당자 숨기기":"🔒 영업담당자 보기"}</button>`:""}`)+hcSubtabs("전체");
-  html+=`<div class="grid g4" style="margin-bottom:14px"><div class="card"><span class="sub">전체 합계</span><div class="big">${num(T.cur)}명</div><span class="sub">도급+일용직(오늘 출근)+채용대행</span></div><div class="card"><span class="sub">도급</span><div class="big">${num(T.do)}명</div></div><div class="card"><span class="sub">일용직 오늘 출근</span><div class="big">${num(T.il)}명</div></div><div class="card"><span class="sub">채용대행</span><div class="big">${num(T.ch)}명</div></div></div>`;
+function vHCAll(mine){const CEO=canSales()&&!!S.ui.showSales;const d=iso(TODAY);const q=S.ui.hcQ||"";
+  const T=mine?hcMineRows().reduce((a,x)=>{const n=x.t==="일용직"?(attOf(x.r,d)||0):(+x.r.cur||0);if(x.t==="일용직")a.il+=n;else if(x.t==="채용대행")a.ch+=n;else a.do+=n;a.cur+=n;return a;},{cur:0,do:0,il:0,ch:0}):hcGrand();
+  let html=ph(mine?`현재 인원 현황 · 내 업체 전체 (${me()})`:"현재 인원 현황 · 전체",mine?`내가 관리담당·영업담당·채용 담당으로 들어간 업체를 <b>본사·지사 상관없이</b> 모두 모았습니다 (보기 전용 — 수정은 각 지사 탭에서). 증감은 '${esc(baseLbl())}' 대비.`:`대표·팀장만 보는 화면입니다. 모든 지사·분류를 한 표로 봅니다 (보기 전용 — 수정은 각 지사 탭에서). 증감은 '${esc(baseLbl())}' 대비 · '타 지사 집계' 줄은 두 번 세지 않도록 뺐습니다.`,
+   `${canSales()?`<button class="btn" data-act="hcSales" aria-pressed="${!!S.ui.showSales}">${S.ui.showSales?"🔓 영업담당자 숨기기":"🔒 영업담당자 보기"}</button>`:""}`)+hcSubtabs(mine?"내업체":"전체");
+  html+=`<div class="grid g4" style="margin-bottom:14px"><div class="card"><span class="sub">${mine?"내 업체 합계":"전체 합계"}</span><div class="big">${num(T.cur)}명</div><span class="sub">도급+일용직(오늘 출근)+채용대행</span></div><div class="card"><span class="sub">도급</span><div class="big">${num(T.do)}명</div></div><div class="card"><span class="sub">일용직 오늘 출근</span><div class="big">${num(T.il)}명</div></div><div class="card"><span class="sub">채용대행</span><div class="big">${num(T.ch)}명</div></div></div>`;
   const all=[],allA=[];let mob="";html+=`<div class="layout"><div><div class="tools" style="margin-bottom:8px"><input class="btn" style="min-width:220px" placeholder="업체·담당자 검색" data-ui="hcQ" value="${esc(q)}" aria-label="업체·담당자 검색"></div>
    @@MOB@@<div class="tw only-d"><table class="x resp hcalltbl"><thead><tr><th>지사</th><th>구분</th>${CEO?"<th>영업 🔒</th>":""}<th>관리담당자</th><th>업체</th><th>합계인원</th><th>${esc(baseLbl())}</th><th>증감</th></tr></thead><tbody>`;
-  HC_TABS.forEach(t=>{const gs=(S.hc[t]||[]).map((g,gi)=>({g,gi})).filter(x=>visG(x.g));const rows=[];gs.forEach(({g,gi})=>g.rows.forEach((r,ri)=>{if(!r.excluded)rows.push({r,g,rp:`hc.${t}.${gi}.rows.${ri}`});}));if(!rows.length)return;
+  HC_TABS.forEach(t=>{const gs=(S.hc[t]||[]).map((g,gi)=>({g,gi})).filter(x=>mine||visG(x.g));const rows=[];gs.forEach(({g,gi})=>g.rows.forEach((r,ri)=>{if(!r.excluded&&(!mine||hcMine(r)))rows.push({r,g,rp:`hc.${t}.${gi}.rows.${ri}`});}));if(!rows.length)return;
     const isD=t==="일용직";const c=rows.reduce((s,x)=>s+(+x.r.cur||0),0),bs=rows.reduce((s,x)=>s+(+x.r.base||0),0),at=isD?rows.reduce((s,x)=>s+(attOf(x.r,d)||0),0):0;
     mob+=`<div class="gname" style="margin-top:12px"><b>${t==="일용직"||t==="채용대행"?t:t+" 도급"}</b><span class="sub">${rows.length}곳 · ${isD?`보유 ${num(c)} · 오늘 ${num(at)}`:`${num(c)}명 ${diff(c-bs)}`}</span></div><div class="mlist hcallm">`;
     html+=`<tr class="gh"><td colspan="${CEO?8:7}" class="l"><b>${t==="일용직"||t==="채용대행"?t:t+" 도급"}</b> <span class="sub">${rows.length}곳 · ${isD?`보유 ${num(c)}명 · 오늘 출근 ${num(at)}명`:`${num(c)}명 (${diff(c-bs)})`}</span></td></tr>`;
@@ -884,6 +889,8 @@ function vHCAll(){const CEO=canSales()&&!!S.ui.showSales;const T=hcGrand();const
   return html;}
 function vHC(){
   if(S.ui.hcBr==="전체"&&isBoss())return vHCAll();
+  if(S.ui.hcBr==="내업체"&&hcMineRows().length)return vHCAll(true);
+  if(S.ui.hcBr==="내업체")S.ui.hcBr=visHC()[0];
   const b=S.ui.hcBr,groups=S.hc[b],canHC=groups.some(canEditG),ed=S.ui.hcEdit&&canHC,edAll=ed;const CEO=canSales()&&!!S.ui.showSales;const t=hcTot(b);
   let html=ph("현재 인원 현황",`엑셀 양식 그대로 · 담당자가 2명 이상이면 칸을 나눠 인원을 적을 수 있습니다. 증감은 '${esc(baseLbl())}' 대비.`,
    `${canSales()?`<button class="btn" data-act="hcSales" aria-pressed="${!!S.ui.showSales}">${S.ui.showSales?"🔓 영업담당자 숨기기":"🔒 영업담당자 보기"}</button>`:""}${canHC&&!ed?'<button class="btn" data-act="rosterUp">명단 엑셀 올리기</button>':""}${canHC?`<button class="btn ${ed?"vis":""}" data-act="hcEdit">${ed?"수정 마치기":"✎ 수정하기"}</button>`:`<span class="chip mute">보기 전용 · ${myBr()} 지사만 수정 가능</span>`}`)+
@@ -1208,16 +1215,17 @@ function parseAdSheet(sh,forceBr){const grid={};let maxR=0;
   return {br,week:mon,rows,warn,empty,guessed,sheet:sh.name};}
 /* 엑셀 올리기는 덮어쓰지 않고 합칩니다: 이 파일에 나온 사람의 기록만 새 내용으로 바꾸고, 다른 사람이 올린 기록은 그대로 둡니다 */
 const AD_MS=["j","r","o","k","u"];const adP=e=>typeof e==="string"?e:e&&e.p;
-function adUpPeople(rows){const U=new Set();rows.forEach(r=>r.d.forEach(x=>AD_MS.forEach(m=>LS(x,m).forEach(e=>U.add(pName(adP(e)))))));return U;}
-function adMerge(ex,up){const U=adUpPeople(up);const out=clone(ex||[]);
-  out.forEach(r=>r.d.forEach(x=>AD_MS.forEach(m=>{if(x[m])x[m]=x[m].filter(e=>!U.has(pName(adP(e))));})));
+/* 지사 시트 약칭까지 풀어서 사람을 구분 (예: 천안 시트의 '김' = 김태경, '김대리' = 김유균) */
+function adUpPeople(rows,br){const U=new Set();rows.forEach(r=>r.d.forEach(x=>AD_MS.forEach(m=>LS(x,m).forEach(e=>U.add(pName(adWho(adP(e),br)))))));return U;}
+function adMerge(ex,up,br){const U=adUpPeople(up,br);const out=clone(ex||[]);
+  out.forEach(r=>r.d.forEach(x=>AD_MS.forEach(m=>{if(x[m])x[m]=x[m].filter(e=>!U.has(pName(adWho(adP(e),br))));})));
   up.forEach(u=>{let t=out.find(r=>coMatch(r.co,u.co));if(!t){t={co:u.co,d:Array.from({length:7},emptyDay)};out.push(t);}
     u.d.forEach((x,i)=>{t.d[i]=t.d[i]||emptyDay();AD_MS.forEach(m=>{const add=LS(x,m);if(add.length)t.d[i][m]=[...(t.d[i][m]||[]),...clone(add)];});});});
   return out;}
 function adUploadForm(){
   modal("주간 광고표 엑셀 올리기",`<p class="sub" style="margin-top:0">‘하랑 주간광고현황 양식’을 올려 주세요. 시트 이름에 본사·천안·아산이 들어 있는 시트를 읽고, M점프·M지역·114114·당근마켓 줄을 나눠서 광고비까지 계산합니다. 여러 사람이 각자 올려도 덮어쓰지 않고 합쳐집니다 — 파일에 나온 사람의 기록만 새 내용으로 바뀝니다.</p>
    <label class="field"><span>엑셀 파일 (.xlsx)</span><input type="file" id="adFile" accept=".xlsx"></label><div id="adPrev" class="sub"></div>`,{submit:"허브에 반영",onSubmit:fd=>{const P=window.__adParsed||[];if(!P.length){toast("먼저 파일을 골라 주세요");return;}window.__adParsed=null;
-    const go=()=>{let n=0;P.forEach(p=>{if(p.error||!visBR().includes(p.br)||p.empty)return;S.adw[p.week]=S.adw[p.week]||{};const ex=S.adwSample[p.week]?null:S.adw[p.week][p.br];S.adw[p.week][p.br]=ex&&ex.length?adMerge(ex,p.rows):p.rows;delete S.adwSample[p.week];n++;S.ui.adWk=p.week;S.ui.adBr=p.br;});toast(`${n}개 시트를 반영했습니다 (다른 사람 기록과 합침)`);};
+    const go=()=>{let n=0;P.forEach(p=>{if(p.error||!visBR().includes(p.br)||p.empty)return;S.adw[p.week]=S.adw[p.week]||{};const ex=S.adwSample[p.week]?null:S.adw[p.week][p.br];S.adw[p.week][p.br]=ex&&ex.length?adMerge(ex,p.rows,p.br):p.rows;delete S.adwSample[p.week];n++;S.ui.adWk=p.week;S.ui.adBr=p.br;});toast(`${n}개 시트를 반영했습니다 (다른 사람 기록과 합침)`);};
     /* 실제 허브: 합치기 직전에 서버의 최신 내용을 먼저 불러와서, 방금 다른 사람이 올린 기록도 빠짐없이 합칩니다 */
     if(typeof hubRefresh==="function"){toast("최신 내용을 불러와 합치는 중…");hubRefresh().then(()=>{go();save();render();});}else go();}});}
 async function adFilePicked(f){const box=document.getElementById("adPrev");box.textContent="읽는 중…";
@@ -1228,7 +1236,7 @@ async function adFilePicked(f){const box=document.getElementById("adPrev");box.t
     if(!P.length){box.innerHTML=`<p class="up">광고표를 찾지 못했습니다. ‘하랑 주간광고현황 양식’이 맞는지, ‘업체 · 매체 · 날짜’ 제목줄이 있는지 확인해 주세요.</p><p class="sub">읽은 시트: ${sheets.map(s=>esc(s.name)).join(", ")||"없음"}</p>`;return;}
     box.innerHTML=`<div class="tw"><table class="x"><thead><tr><th>시트</th><th>주</th><th>업체</th><th>M점프</th><th>M지역</th><th>114114</th><th>당근</th><th>광고비</th><th>결과</th></tr></thead><tbody>${P.map(p=>{if(p.error)return `<tr><td>${p.br}</td><td colspan="7" class="l up">${esc(p.error)}</td><td>건너뜀</td></tr>`;
       const s=p.rows.map(r=>rowCost(r,p.week,p.br)).reduce((a,c)=>({j:a.j+c.j,r:a.r+c.r,o:a.o+c.o,k:a.k+c.k,u:a.u+c.u,t:a.t+c.total}),{j:0,r:0,o:0,k:0,u:0,t:0});const ex=(S.adw[p.week]||{})[p.br];const own=visBR().includes(p.br);
-      return `<tr><td>${p.br}</td><td>${wkLabel(p.week)}</td><td>${p.rows.length}곳</td><td>${s.j}</td><td>${s.r}</td><td>${s.o}</td><td>${s.k}</td><td>${won(s.t)}원${s.u?`<div class="sub">미구분 ${s.u}</div>`:""}</td><td>${p.empty?'<span class="chip mute">빈 시트 · 건너뜀</span>':!own?'<span class="chip mute">권한 없음 · 건너뜀</span>':ex&&!S.adwSample[p.week]?`<span class="chip vis">기존 내용과 합침</span><div class="sub">이 파일에 나온 ${[...adUpPeople(p.rows)].map(esc).join("·")||"사람"} 기록만 새로 바뀌고, 다른 사람 기록은 그대로</div>`:'<span class="chip ok">새로 추가</span>'}</td></tr>`}).join("")}</tbody></table></div>
+      return `<tr><td>${p.br}</td><td>${wkLabel(p.week)}</td><td>${p.rows.length}곳</td><td>${s.j}</td><td>${s.r}</td><td>${s.o}</td><td>${s.k}</td><td>${won(s.t)}원${s.u?`<div class="sub">미구분 ${s.u}</div>`:""}</td><td>${p.empty?'<span class="chip mute">빈 시트 · 건너뜀</span>':!own?'<span class="chip mute">권한 없음 · 건너뜀</span>':ex&&!S.adwSample[p.week]?`<span class="chip vis">기존 내용과 합침</span><div class="sub">이 파일에 나온 ${[...adUpPeople(p.rows,p.br)].map(esc).join("·")||"사람"} 기록만 새로 바뀌고, 다른 사람 기록은 그대로</div>`:'<span class="chip ok">새로 추가</span>'}</td></tr>`}).join("")}</tbody></table></div>
       ${P.some(p=>p.guessed)?`<p class="banner" style="margin:8px 0 0">시트 이름(${P.filter(p=>p.guessed).map(p=>esc(p.sheet||"")).join(", ")})에 지사 이름이 없어서 지금 보고 있는 <b>${P.find(p=>p.guessed).br}</b> 광고표로 읽었습니다. 다른 지사면 닫고 그 지사 탭을 고른 뒤 다시 올려 주세요.</p>`:""}${P.some(p=>p.warn&&p.warn.length)?`<p class="sub">확인할 점: ${P.flatMap(p=>p.warn||[]).slice(0,6).map(esc).join(" · ")}</p>`:""}`;}
   catch(err){box.innerHTML=`<p class="up">읽지 못했습니다: ${esc(err.message)}</p>`;window.__adParsed=null;}}
 
@@ -2104,7 +2112,7 @@ function adFloat(){let f=document.getElementById("adFloat");const tw=document.qu
     tw.addEventListener("scroll",adFloat,{passive:true});}
   f.style.display="block";f.style.top=off+"px";f.style.left=wr.left+"px";f.style.width=tw.clientWidth+"px";f.firstChild.style.transform=`translateX(${-tw.scrollLeft}px)`;const c0=f.querySelector("th");if(c0&&getComputedStyle(th.rows[0].cells[0]).position==="sticky"){c0.style.position="relative";c0.style.zIndex=2;c0.style.transform=`translateX(${tw.scrollLeft}px)`;}}
 addEventListener("scroll",adFloat,{passive:true});addEventListener("resize",()=>{const f=document.getElementById("adFloat");if(f)f.__src=null;adFloat();});
-function render(){if(!ME.id){return;}setTimeout(()=>{const f=document.getElementById("adFloat");if(f)f.__src=null;adFloat();},0);if(typeof monthRoll==="function")monthRoll();if(!visHC().includes(S.ui.hcBr)&&!(S.ui.hcBr==="전체"&&isBoss()))S.ui.hcBr=visHC()[0];if(!visBR().includes(S.ui.toBr))S.ui.toBr=visBR()[0];const t=TABS.find(x=>x[0]===S.tab);if(!t)S.tab="home";if(t&&t[2]&&!t[2].includes(S.role))S.tab="home";renderHead();document.getElementById("main").innerHTML=VIEWS[S.tab]();labelTables();const at=document.querySelector('nav.tabs [aria-current="page"]');if(at&&at.scrollIntoView)at.scrollIntoView({block:"nearest",inline:"nearest"});}
+function render(){if(!ME.id){return;}setTimeout(()=>{const f=document.getElementById("adFloat");if(f)f.__src=null;adFloat();},0);if(typeof monthRoll==="function")monthRoll();if(!visHC().includes(S.ui.hcBr)&&!(S.ui.hcBr==="전체"&&isBoss())&&S.ui.hcBr!=="내업체")S.ui.hcBr=visHC()[0];if(!visBR().includes(S.ui.toBr))S.ui.toBr=visBR()[0];const t=TABS.find(x=>x[0]===S.tab);if(!t)S.tab="home";if(t&&t[2]&&!t[2].includes(S.role))S.tab="home";renderHead();document.getElementById("main").innerHTML=VIEWS[S.tab]();labelTables();const at=document.querySelector('nav.tabs [aria-current="page"]');if(at&&at.scrollIntoView)at.scrollIntoView({block:"nearest",inline:"nearest"});}
 function labelTables(){document.querySelectorAll("table.resp").forEach(t=>{const hs=[...t.querySelectorAll("thead th")].map(th=>th.textContent.trim());t.querySelectorAll("tbody tr").forEach(tr=>{if(tr.classList.contains("tot"))return;[...tr.children].forEach((td,i)=>{if(hs[i]&&!td.hasAttribute("colspan"))td.setAttribute("data-label",hs[i]);});});});}
 /* 업체 이름 바꾸기: 인원현황에서 이름을 고치면 같은 이름으로 연결된 자료(채용조건·TO·입사/퇴사·계약·주급·광고표 등)도 같이 바꿈 */
 const coK=s=>String(s||"").replace(/\s/g,"").toLowerCase(); /* 괄호까지 같은 정확한 이름 */
