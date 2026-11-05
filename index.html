@@ -405,7 +405,7 @@ function buildS(rows,ui){const s=emptyS();if(ui)s.ui={...s.ui,...ui};const gs=[]
 const isFin=()=>ME.team==="경영지원팀";
 function canRead(kind,branch){const r=ME.role,boss=r==="ceo"||r==="mgr",hq=ME.branch==="본사";
   if(kind==="ar"||kind==="goal_money")return boss;
-  if(kind==="event"&&branch==="팀장급")return boss;
+  if(kind==="event"&&branch==="팀장급")return boss||TT_MGR_ONLY.includes(ME.name);
   if(kind==="sale")return boss||hq||!branch||branch===ME.branch||branch==="본사";
   if(["hcg","to","adw","adbudget","pay","docreq","iv"].includes(kind))return boss||hq||!branch||branch===ME.branch;return true;}
 function canWrite(kind,branch,data){const r=ME.role,boss=r==="ceo"||r==="mgr";
@@ -498,7 +498,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1793675222";
+const HUB_BUILD="1793866244";
 /* 날짜가 바뀌었으면 (화면을 며칠 켜 둔 채 쓰는 경우) 새로고침해서 오늘 날짜로 맞춤 */
 function checkDay(){const n=new Date();n.setHours(0,0,0,0);if(n.getTime()===TODAY.getTime())return false;
   if(!document.querySelector(".overlay")&&!dirty&&!syncing&&!typing()){toast("날짜가 바뀌어 오늘 기준으로 다시 불러옵니다…");setTimeout(()=>location.reload(),600);}else setTimeout(checkDay,5000);return true;}
@@ -686,7 +686,7 @@ function hcRows(b){return (S.hc[b]||[]).filter(visG).flatMap(g=>g.rows.filter(r=
 function hcTot(b){const rs=hcRows(b);if(b==="일용직"){const d=iso(TODAY);const n=rs.reduce((s,r)=>s+(attOf(r,d)||0),0);return {cur:n,base:n,pool:rs.reduce((s,r)=>s+(+r.cur||0),0),daily:true};}
   return {cur:rs.reduce((s,r)=>s+(+r.cur||0),0),base:rs.reduce((s,r)=>s+(+r.base||0),0)};}
 function hcAll(){return visHC().reduce((a,b)=>{const t=hcTot(b);a.cur+=t.cur;a.base+=t.base;return a;},{cur:0,base:0});}
-function hcSharedRows(){const out=[];if(!limited())return out;HC_TABS.forEach(t=>(S.hc[t]||[]).forEach((g,gi)=>{if(g.branch===myBr())return;g.rows.forEach((r,i)=>{if(mgrs(r).includes(me())||recExtra(r).includes(me()))out.push({r,g,rp:`hc.${t}.${gi}.rows.${i}`});});}));return out;}
+function hcSharedRows(){const out=[];if(!limited())return out;HC_TABS.forEach(t=>(S.hc[t]||[]).forEach((g,gi)=>{if(g.branch===myBr())return;g.rows.forEach((r,i)=>{if(mgrs(r).includes(me())||recExtra(r).includes(me())||String(r.sales||"").replace(/\s/g,"").split("/").includes(me()))out.push({r,g,rp:`hc.${t}.${gi}.rows.${i}`});});}));return out;}
 const hcRowRO=rp=>{const m=String(rp).match(/^hc\.([^.]+)\.(\d+)\.rows\.(\d+)/);const g=m&&(S.hc[m[1]]||[])[+m[2]];if(!(g&&limited()&&g.branch!==myBr()))return false;const r=g.rows[+m[3]];return !(r&&mgrs(r).includes(me()));};
 function mgrs(r){return String(r.mgr||"").split("/").map(s=>s.trim()).filter(Boolean);}
 /* 다른 사람이 채용해 넣은 인원: 그 사람 몫으로 따로 셈 (cur=지금 재직, base=기준일에 재직) */
@@ -923,7 +923,7 @@ function vHC(){
   const all=b==="일용직"?hcRows(b).map(r=>attRow(r)):hcRows(b);const ST=b==="일용직"?{cur:all.reduce((s,r)=>s+r.cur,0),base:all.reduce((s,r)=>s+r.base,0)}:t;const bym=attribute(all,"mgr"),bys=attribute(all,"sales");
   const sideT=(title,m)=>`<div class="card"><h3>${title}</h3><table class="x"><thead><tr><th>담당자</th><th>현재</th><th>기준</th><th>증감</th></tr></thead><tbody>${Object.entries(m).sort((a,b)=>b[1].cur-a[1].cur).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="num">${v.cur}</td><td class="num">${v.base}</td><td>${diff(v.cur-v.base)}</td></tr>`).join("")}<tr class="tot"><td>합계</td><td>${ST.cur}</td><td>${ST.base}</td><td>${diff(ST.cur-ST.base)}</td></tr></tbody></table>${b==="일용직"?`<p class="sub" style="margin:6px 0 0">${mdShort(attDate())} 출근 체크한 인원 기준 (보유 인원 아님)</p>`:""}</div>`;
   if(limited()&&b===visHC()[0]){const sh=hcSharedRows();if(sh.length){const sc=sh.reduce((t,x)=>t+(+x.r.cur||0),0),sb=sh.reduce((t,x)=>t+(+x.r.base||0),0);
-    html+=`<div class="gname" style="margin-top:18px"><b>다른 지사 업체 중 내가 관리하는 곳</b><span class="chip mute">보기 전용 · 수정은 해당 지사·본사에서</span></div>
+    html+=`<div class="gname" style="margin-top:18px"><b>다른 지사 업체 중 내가 관리·영업하는 곳</b><span class="chip mute">보기 전용 · 수정은 해당 지사·본사에서</span></div>
     <div class="tw"><table class="x resp"><thead><tr><th>지사·분류</th><th>구분</th><th>관리담당자</th><th>업체</th><th>합계인원</th><th>${esc(baseLbl())}</th><th>증감</th></tr></thead><tbody>
     ${sh.map(({r,g,rp})=>{const d=(+r.cur||0)-(+r.base||0);return `<tr><td>${esc(g.name)}</td><td>${esc(r.gubun)}</td><td>${mgrCell(r)}</td><td class="l"><button class="colink" data-act="hcPpl" data-p="${rp}">${esc(r.co)}</button>${rosterBadge(r)}</td><td class="num cur">${num(r.cur)}</td><td class="num">${num(r.base)}</td><td class="num">${diff(d)}</td></tr>`}).join("")}
     <tr class="tot"><td colspan="4">합계 (내 지사 합계에는 안 들어감)</td><td>${num(sc)}</td><td>${num(sb)}</td><td>${diff(sc-sb)}</td></tr></tbody></table></div>`;}}
@@ -1235,12 +1235,12 @@ async function adFilePicked(f){const box=document.getElementById("adPrev");box.t
 /* ---------- 타임트리 ---------- */
 const PEOPLE=()=>[CEO_NAME,...STAFF].filter(Boolean);
 /* 타임트리: 대표 칸은 빼고, TT_MGR_ONLY 사람의 일정은 대표·팀장만 봄 */
-const TT_MGR_ONLY=["서영은"];
+const TT_MGR_ONLY=["서영은","공병규"];
 const hm=h=>h==null?"":`${pad(Math.floor(h))}:${(h%1)?"30":"00"}`;
 const TT_SLOTS=Array.from({length:29},(_,i)=>8+i/2); /* 08:00 ~ 22:00, 30분 단위 */
 const hourOpts=sel=>`<option value="">종일</option>${TT_SLOTS.map(h=>`<option value="${h}" ${sel===h?"selected":""}>${hm(h)}</option>`).join("")}`;
-const ttVis=e=>(e.staff!==PEOPLE()[0]||me()===PEOPLE()[0])&&(!TT_MGR_ONLY.includes(e.staff)||isBoss());
-const TT_PEOPLE=()=>STAFF.filter(n=>n!==PEOPLE()[0]&&(isBoss()||!TT_MGR_ONLY.includes(n)));
+const ttVis=e=>(e.staff!==PEOPLE()[0]||me()===PEOPLE()[0])&&(!TT_MGR_ONLY.includes(e.staff)||isBoss()||e.staff===me());
+const TT_PEOPLE=()=>STAFF.filter(n=>n!==PEOPLE()[0]&&(isBoss()||n===me()||!TT_MGR_ONLY.includes(n)));
 const ttEvents=()=>S.events.filter(ttVis);
 const ttDef=()=>TT_PEOPLE().includes(me())?me():TT_PEOPLE()[0];
 /* 타임트리: 승인된 연차·반차를 그날 이름 옆에 빨간색으로 */
