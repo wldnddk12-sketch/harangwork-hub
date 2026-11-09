@@ -498,7 +498,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1794218930";
+const HUB_BUILD="1794219845";
 /* 날짜가 바뀌었으면 (화면을 며칠 켜 둔 채 쓰는 경우) 새로고침해서 오늘 날짜로 맞춤 */
 function checkDay(){const n=new Date();n.setHours(0,0,0,0);if(n.getTime()===TODAY.getTime())return false;
   if(!document.querySelector(".overlay")&&!dirty&&!syncing&&!typing()){toast("날짜가 바뀌어 오늘 기준으로 다시 불러옵니다…");setTimeout(()=>location.reload(),600);}else setTimeout(checkDay,5000);return true;}
@@ -623,7 +623,7 @@ function boot(){if(!window.supabase){document.getElementById("main").innerHTML='
 
 const brOf=n=>(ORG.find(o=>o[0]===n)||[])[1]||"본사";
 const titleOf=n=>n===CEO_NAME?"대표":(ORG.find(o=>o[0]===n)||[])[2]||"";
-const TABS=[["home","홈"],["join","금주 입사예정자"],["hc","현재 인원 현황"],["to","TO 현황"],["iv","지원 DB"],["bl","블랙리스트 지원자"],["quit","퇴사자 공유"],["ct","근로계약"],["ad","광고 보고"],["pay","주급·가불 신청"],["tt","타임트리"],["notes","특이사항 공유"],["docs","서류요청"],["sales","영업성과"],["cond","업체별 채용조건"],["leave","연차 현황"],["ar","미수금 현황",["ceo","mgr"]],["goal","목표 설정",["ceo"]]];
+const TABS=[["home","홈"],["join","금주 입사예정자"],["to","TO 현황"],["ad","광고 보고"],["hc","현재 인원 현황"],["sales","영업성과"],["tt","타임트리"],["notes","특이사항 공유"],["quit","퇴사자 공유"],["pay","주급·가불 신청"],["ct","근로계약"],["iv","지원 DB"],["bl","블랙리스트 지원자"],["docs","서류요청"],["leave","연차 현황"],["cond","업체별 채용조건"],["ar","미수금 현황",["ceo","mgr"]],["goal","목표 설정",["ceo"]]];
 const clone=o=>JSON.parse(JSON.stringify(o));
 const pad=n=>String(n).padStart(2,"0");
 const iso=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
