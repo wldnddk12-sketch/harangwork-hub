@@ -498,7 +498,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1793870861";
+const HUB_BUILD="1794210213";
 /* 날짜가 바뀌었으면 (화면을 며칠 켜 둔 채 쓰는 경우) 새로고침해서 오늘 날짜로 맞춤 */
 function checkDay(){const n=new Date();n.setHours(0,0,0,0);if(n.getTime()===TODAY.getTime())return false;
   if(!document.querySelector(".overlay")&&!dirty&&!syncing&&!typing()){toast("날짜가 바뀌어 오늘 기준으로 다시 불러옵니다…");setTimeout(()=>location.reload(),600);}else setTimeout(checkDay,5000);return true;}
@@ -1039,7 +1039,7 @@ function adPersonCard(w,brs){const wk=S.ui.adPM==="w";const mon=w.slice(0,7);con
   let names=[...new Set([...Object.keys(pm),...Object.keys(B).filter(n=>B[n]>0&&(!limited()||brs.includes(brOf(n))))])];
   const mem=limited()&&brs.length===1?(S.adMembers||{})[brs[0]]:null;if(mem&&mem.length)names=[...new Set([...mem,...names])].filter(n=>mem.includes(n));
   names.sort((a,b)=>((pm[b]||{}).cost||0)-((pm[a]||{}).cost||0)||(B[b]||0)-(B[a]||0));
-  /* 팀 합계 줄 (영업관리1팀 = 박진호 + 이관영, 영업관리2팀 = 전우성 + 김유균): 예산·사용액·매체 횟수 모두 더함 */
+  /* 팀 합계 줄 (영업관리1팀 = 박진호 + 이관영 + 양희찬, 영업관리2팀 = 전우성 + 김유균 + 백재열): 예산·사용액·매체 횟수 모두 더함 */
   const grpRows=Object.entries(typeof AD_GROUPS!=="undefined"?AD_GROUPS:{}).filter(([g,ns])=>ns.some(n=>names.includes(n))).map(([g,ns])=>{const o={cost:0,j:0,r:0,o:0,k:0,u:0};ns.forEach(n=>{const x=pm[n]||{};["cost","j","r","o","k","u"].forEach(k=>o[k]+=x[k]||0);});const mb=adBudgetFor(ns,mon);const bud=wk?weekBudget(mb,w):mb;const p=bud?pct(o.cost,bud):0;
     return `<div class="apr grp"><div class="apt"><span><span class="pc" style="--pc:#1D4A6E">👥</span> <button class="colink" data-act="adWP" data-v="${esc(g)}" title="${esc(g)} 광고만 표로 보기"><b>${esc(g)}</b></button> <small class="sub">${ns.join("+")}</small></span><span class="v"><b>${won(o.cost)}</b>${bud?` / ${manwon(bud)}`:""}원</span></div>
       ${bud?`<div class="pbar ${p>100?"bad":p>=80?"warn":"ok"}"><i style="width:${Math.min(100,p)}%"></i></div>`:""}
@@ -1059,7 +1059,7 @@ function adPBForm(mon){mon=mon||(S.ui.adWk||iso(TODAY)).slice(0,7);const B=budge
     const mm={};BRANCHES.filter(b=>b!=="본사").forEach(b=>{const v=fd.getAll("mem_"+b);if(v.length)mm[b]=v;});S.adMembers=mm;toast(`${mo}월 개인 예산을 저장했습니다`);}});}
 /* 주간 광고표를 한 사람 기록만 보기: 다른 사람 체크는 숨기고, 그 사람 광고비만 계산 */
 /* 팀으로 묶어 보기 (팀 이름 → 사람들) */
-const AD_GROUPS={"영업관리1팀":["박진호","이관영"],"영업관리2팀":["전우성","김유균"]};
+const AD_GROUPS={"영업관리1팀":["박진호","이관영","양희찬"],"영업관리2팀":["전우성","김유균","백재열"]};
 const adWhoIn=P=>AD_GROUPS[P]||[P];
 /* 월 예산: 개인 예산 합계, 없으면 광고비 사용내역의 팀 예산 줄 */
 function adBudgetFor(names,mon){const BM=budgetMap(mon||YM());let b=names.reduce((t,n)=>t+(+BM[n]||0),0);if(!b){const rs=((S.ad&&S.ad.rows)||[]).filter(r=>String(r.mgr||"").split("/").some(n=>names.includes(n.trim())));b=rs.reduce((t,r)=>t+(+r.month||0),0);}return b;}
@@ -1344,7 +1344,7 @@ const GRADES=["최상","상","중","하","최하","상태미정"];const GCLS={"�
 const ivCanDel=v=>isBoss()||(v&&v.by===me());
 function ivList(){return (S.interviews||[]).filter(v=>ctVisBR().includes(v.branch));}
 /* 지원 DB 담당자 (신입이 생기면 여기에 이름 추가) */
-const IV_MGRS=["전우성","박진호","김유균","이관영","추성운","장민혁","김태경","공병규"];
+const IV_MGRS=["전우성","박진호","김유균","이관영","양희찬","백재열","추성운","장민혁","김태경","공병규"];
 function vIV(){const f=S.ui.ivF||"all",q=(S.ui.ivQ||"").trim();const full=ivList();const mg=S.ui.ivM||"all";
   const mgrs=[...IV_MGRS,...[...new Set(full.map(v=>v.mgr).filter(Boolean))].filter(n=>!IV_MGRS.includes(n))];
   const all=mg==="all"?full:full.filter(v=>v.mgr===mg);
