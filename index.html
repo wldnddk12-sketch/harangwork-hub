@@ -498,7 +498,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1794214338";
+const HUB_BUILD="1794218930";
 /* 날짜가 바뀌었으면 (화면을 며칠 켜 둔 채 쓰는 경우) 새로고침해서 오늘 날짜로 맞춤 */
 function checkDay(){const n=new Date();n.setHours(0,0,0,0);if(n.getTime()===TODAY.getTime())return false;
   if(!document.querySelector(".overlay")&&!dirty&&!syncing&&!typing()){toast("날짜가 바뀌어 오늘 기준으로 다시 불러옵니다…");setTimeout(()=>location.reload(),600);}else setTimeout(checkDay,5000);return true;}
@@ -623,7 +623,7 @@ function boot(){if(!window.supabase){document.getElementById("main").innerHTML='
 
 const brOf=n=>(ORG.find(o=>o[0]===n)||[])[1]||"본사";
 const titleOf=n=>n===CEO_NAME?"대표":(ORG.find(o=>o[0]===n)||[])[2]||"";
-const TABS=[["home","홈"],["hc","현재 인원 현황"],["to","TO 현황"],["iv","지원 DB"],["bl","블랙리스트 지원자"],["join","금주 입사예정자"],["quit","퇴사자 공유"],["ct","근로계약"],["ad","광고 보고"],["pay","주급·가불 신청"],["tt","타임트리"],["notes","특이사항 공유"],["docs","서류요청"],["sales","영업성과"],["cond","업체별 채용조건"],["leave","연차 현황"],["ar","미수금 현황",["ceo","mgr"]],["goal","목표 설정",["ceo"]]];
+const TABS=[["home","홈"],["join","금주 입사예정자"],["hc","현재 인원 현황"],["to","TO 현황"],["iv","지원 DB"],["bl","블랙리스트 지원자"],["quit","퇴사자 공유"],["ct","근로계약"],["ad","광고 보고"],["pay","주급·가불 신청"],["tt","타임트리"],["notes","특이사항 공유"],["docs","서류요청"],["sales","영업성과"],["cond","업체별 채용조건"],["leave","연차 현황"],["ar","미수금 현황",["ceo","mgr"]],["goal","목표 설정",["ceo"]]];
 const clone=o=>JSON.parse(JSON.stringify(o));
 const pad=n=>String(n).padStart(2,"0");
 const iso=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
@@ -1460,7 +1460,7 @@ function pickGrp(btn,g){const box=btn.closest(".picker");const cs=[...box.queryS
   const m=g==="all"?()=>true:g==="none"?()=>false:g==="fin"?c=>FIN_TEAM.includes(c.value):g.startsWith("br:")?c=>c.dataset.br===g.slice(3):c=>c.dataset.t===g.slice(2);
   if(g==="none"||g==="all"){cs.forEach(c=>c.checked=m(c));return;}const sel=cs.filter(m);const on=sel.some(c=>!c.checked);sel.forEach(c=>c.checked=on);}
 function postForm(){
-  modal("특이사항 글쓰기",`${F("제목",inp("title","","text","required"))}<div class="row2">${F("관련 업체 (선택)",inp("co"))}${F("중요도",`<select name="level"><option value="">일반</option><option value="imp">중요</option><option value="urgent">긴급</option></select>`)}</div>${F("내용",'<textarea name="body" required></textarea>')}
+  modal("특이사항 글쓰기",`${F("제목",inp("title","","text","required"))}<div class="row2">${F("관련 업체 (선택)",inp("co"))}${F("중요도",`<select name="level"><option value="">일반</option><option value="imp">중요</option><option value="urgent">긴급</option></select>`)}</div>${F("내용 <small class=\"sub\">길게 써도 됩니다 · 칸 오른쪽 아래를 끌면 더 커집니다</small>",'<textarea name="body" rows="10" style="min-height:230px" required></textarea>')}
    <div class="field"><span>우선 확인할 사람 <small class="sub">(아무도 안 고르면 전체)</small></span>${toPicker()}</div>`,
    {submit:"올리기",onSubmit:fd=>{const to=fd.getAll("to");S.posts.push({id:uid(),date:iso(TODAY),author:me(),title:fd.get("title"),body:fd.get("body"),co:fd.get("co"),level:fd.get("level"),to:to.length?to:["전체"],reads:[]});const rc=to.length&&!to.includes("전체")?to:allPeople();notify([...rc,...mentions(fd.get("title")+" "+fd.get("body"))],`특이사항${fd.get("level")==="urgent"?" [긴급]":fd.get("level")==="imp"?" [중요]":""}: ${fd.get("title")}`,"notes");toast("글을 올렸습니다");}});
 }
