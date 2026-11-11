@@ -492,13 +492,33 @@ async function sync(){if(syncing){clearTimeout(syncT);syncT=setTimeout(sync,300)
   else{setSyncState(n?"저장됨":"");if(RELOAD_AFTER&&!dirty){RELOAD_AFTER=false;await loadAll(true);}}}
 let RELOAD_AFTER=false;
 function setSyncState(t){const e=document.getElementById("syncst");if(e)e.textContent=t;if(t==="저장됨")setTimeout(()=>{if(e&&e.textContent==="저장됨")e.textContent="";},1500);}
-async function fetchAll(){const out=[];for(let from=0;;from+=1000){const {data,error}=await sb.from("hub_data").select("kind,key,branch,data,version,created_at").order("kind").order("key").range(from,from+999);
+async function fetchFull(){const out=[];for(let from=0;;from+=1000){const {data,error}=await sb.from("hub_data").select("kind,key,branch,data,version,created_at").order("kind").order("key").range(from,from+999);
   if(error)throw error;out.push(...data);if(data.length<1000)break;}return out;}
+/* ---------- 빠른 불러오기: 이 기기에 지난 자료를 저장해 두고, 바뀐 문서만 받아옴 ---------- */
+const HCACHE={db:null,open(){if(this.db)return Promise.resolve(this.db);return new Promise(res=>{try{const r=indexedDB.open("harang-hub",1);r.onupgradeneeded=()=>r.result.createObjectStore("c");r.onsuccess=()=>{this.db=r.result;res(this.db);};r.onerror=()=>res(null);}catch(e){res(null);}});},
+  async get(k){const db=await this.open();if(!db)return null;return new Promise(res=>{try{const q=db.transaction("c").objectStore("c").get(k);q.onsuccess=()=>res(q.result||null);q.onerror=()=>res(null);}catch(e){res(null);}});},
+  async set(k,v){const db=await this.open();if(!db)return;try{db.transaction("c","readwrite").objectStore("c").put(v,k);}catch(e){}},
+  async clear(){const db=await this.open();if(!db)return;try{db.transaction("c","readwrite").objectStore("c").clear();}catch(e){}}};
+let ROWS=null; /* 마지막으로 받은 서버 문서들 */
+async function fetchAll(){const ck="rows:"+ME.id;if(!ROWS){const c=await HCACHE.get(ck);if(c&&c.rows&&Date.now()-(c.at||0)<12*3600e3)ROWS=c.rows;}
+  if(!ROWS){ROWS=await fetchFull();HCACHE.set(ck,{at:Date.now(),rows:ROWS});return ROWS;}
+  /* 버전 목록만 가볍게 받아 비교 */
+  const vs=[];for(let from=0;;from+=1000){const {data,error}=await sb.from("hub_data").select("kind,key,version").order("kind").order("key").range(from,from+999);if(error)throw error;vs.push(...data);if(data.length<1000)break;}
+  const have=new Map(ROWS.map(r=>[r.kind+"|"+r.key,r]));const need={};let nNeed=0;
+  vs.forEach(v=>{const o=have.get(v.kind+"|"+v.key);if(!o||o.version!==v.version){(need[v.kind]=need[v.kind]||[]).push(v.key);nNeed++;}});
+  if(nNeed>400){ROWS=await fetchFull();}
+  else{const got=[];for(const [k,keys] of Object.entries(need))for(let i=0;i<keys.length;i+=80){const {data,error}=await sb.from("hub_data").select("kind,key,branch,data,version,created_at").eq("kind",k).in("key",keys.slice(i,i+80));if(error)throw error;got.push(...data);}
+    const live=new Set(vs.map(v=>v.kind+"|"+v.key));const m=new Map(ROWS.filter(r=>live.has(r.kind+"|"+r.key)).map(r=>[r.kind+"|"+r.key,r]));got.forEach(r=>m.set(r.kind+"|"+r.key,r));ROWS=[...m.values()];}
+  HCACHE.set(ck,{at:Date.now(),rows:ROWS,full:nNeed>400?Date.now():undefined});return ROWS;}
+/* 이 기기에 저장된 자료로 화면을 먼저 보여줌 (서버 최신본은 뒤에서 확인) */
+async function showCached(){const c=await HCACHE.get("rows:"+ME.id);if(!c||!c.rows||Date.now()-(c.at||0)>3*86400e3)return false;
+  try{ROWS=c.rows;const ver=new Map(ROWS.map(r=>[r.kind+"|"+r.key,r.version]));const tab=S.tab;S=buildS(ROWS,S.ui);if(tab)S.tab=tab;S.notifs=[];
+    SNAP=new Map();for(const [k,d] of docsOf(S))SNAP.set(k,{version:ver.get(k)||null,json:docJson(d),branch:d.branch,data:dc(d.data)});render();setSyncState("최신 내용 확인 중…");return true;}catch(e){ROWS=null;return false;}}
 let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1794275896";
+const HUB_BUILD="1794381338";
 /* 날짜가 바뀌었으면 (화면을 며칠 켜 둔 채 쓰는 경우) 새로고침해서 오늘 날짜로 맞춤 */
 function checkDay(){const n=new Date();n.setHours(0,0,0,0);if(n.getTime()===TODAY.getTime())return false;
   if(!document.querySelector(".overlay")&&!dirty&&!syncing&&!typing()){toast("날짜가 바뀌어 오늘 기준으로 다시 불러옵니다…");setTimeout(()=>location.reload(),600);}else setTimeout(checkDay,5000);return true;}
@@ -568,15 +588,14 @@ async function loadProfiles(){const [{data:ps},{data:bs}]=await Promise.all([sb.
   ORG=act.filter(p=>p.role!=="ceo").map(p=>[p.name||p.login_id,BRMAP[p.branch_id]||"본사",p.title||ROLE_LABEL[p.role]||"직원"])
     .sort((a,b)=>BRANCHES.indexOf(a[1])-BRANCHES.indexOf(b[1])||(TITLE_RANK[a[2]]??9)-(TITLE_RANK[b[2]]??9)||a[0].localeCompare(b[0]));
   STAFF.length=0;STAFF.push(...ORG.map(o=>o[0]));FIN_TEAM.length=0;FIN_TEAM.push(...act.filter(p=>p.team==="경영지원팀").map(p=>p.name||p.login_id));}
-async function afterLogin(u){const {data:p}=await sb.from("profiles").select("*").eq("id",u.id).maybeSingle();
+async function afterLogin(u){const [{data:p}]=await Promise.all([sb.from("profiles").select("*").eq("id",u.id).maybeSingle(),loadProfiles()]);
   if(!p||!p.active){await sb.auth.signOut();loginView("사용이 중지된 계정입니다. 대표에게 문의하세요.");return;}
-  await loadProfiles();
   ME={id:u.id,name:p.name||p.login_id,role:p.ceo_level?"ceo":["ceo","mgr","branch","staff"].includes(p.role)?p.role:(p.role==="admin"?"ceo":"staff"),branch:BRMAP[p.branch_id]||"본사",title:p.title||"",team:p.team||"",loginId:p.login_id};
   let saved={};try{saved=JSON.parse(localStorage.getItem("harang-ui-"+ME.id)||"{}");}catch(e){}
   S=emptyS();if(saved.ui)S.ui={...S.ui,...saved.ui};if(saved.tab)S.tab=saved.tab;
   const qsp=new URLSearchParams(location.search);const qt=qsp.get("tab");if(qt&&TABS.some(t=>t[0]===qt))S.tab=qt;if(qt==="ad"&&qsp.get("p")){S.ui.adView="person";S.ui.adP=qsp.get("p");}if(qt)history.replaceState(null,"",location.pathname);
   document.getElementById("main").innerHTML='<div class="empty">불러오는 중…</div>';
-  await loadAll(true);loadNotifs();checkPush();
+  if(await showCached()){loadNotifs();checkPush();loadAll().then(()=>setSyncState(""));}else{await loadAll(true);loadNotifs();checkPush();}
   sb.channel("hub").on("postgres_changes",{event:"*",schema:"public",table:"hub_data"},()=>{clearTimeout(loadT);loadT=setTimeout(()=>loadAll(),800);})
     .on("postgres_changes",{event:"*",schema:"public",table:"hub_notifs",filter:`to_name=eq.${ME.name}`},()=>loadNotifs()).subscribe();
   setInterval(()=>{if(document.visibilityState==="visible"){loadAll();loadNotifs();checkBuild();}},60000);
@@ -613,7 +632,7 @@ function budgetModal(){const rows=S.ad.rows.filter(r=>visBR().includes(r.branch)
     if(fd.get("m_new").trim()){const mo=+fd.get("mo_new")||0;S.ad.rows.push({id:uid(),branch:fd.get("b_new"),mgr:fd.get("m_new").trim(),team:fd.get("t_new").trim(),month:mo,week:+fd.get("w_new")||Math.round(mo*7/30.4),sort:S.ad.rows.length});}
     toast("예산을 저장했습니다");}});}
 async function logout(){try{const reg=navigator.serviceWorker&&await navigator.serviceWorker.getRegistration();const sub=reg&&reg.pushManager&&await reg.pushManager.getSubscription();if(sub){await sb.from("push_subs").delete().eq("endpoint",sub.endpoint);await sub.unsubscribe();}}catch(e){}
-  await sb.auth.signOut();location.reload();}
+  try{await HCACHE.clear();}catch(e){}await sb.auth.signOut();location.reload();}
 function boot(){if(!window.supabase){document.getElementById("main").innerHTML='<div class="banner">접속 모듈을 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침하세요.</div>';return;}
   sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true}});
   sb.auth.getSession().then(async({data})=>{if(data&&data.session)await afterLogin(data.session.user);else loginView();});}
