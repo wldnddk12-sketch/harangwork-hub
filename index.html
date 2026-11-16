@@ -518,7 +518,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1794794500";
+const HUB_BUILD="1794795600";
 /* 날짜가 바뀌었으면 (화면을 며칠 켜 둔 채 쓰는 경우) 새로고침해서 오늘 날짜로 맞춤 */
 function checkDay(){const n=new Date();n.setHours(0,0,0,0);if(n.getTime()===TODAY.getTime())return false;
   if(!document.querySelector(".overlay")&&!dirty&&!syncing&&!typing()){toast("날짜가 바뀌어 오늘 기준으로 다시 불러옵니다…");setTimeout(()=>location.reload(),600);}else setTimeout(checkDay,5000);return true;}
@@ -746,11 +746,16 @@ const toStart=r=>r.toAt||toMon();
 const toKey=(b,r)=>b+"|"+String(r.co||"").replace(/\s/g,"")+"|"+String(r.job||"").replace(/\s/g,"");
 function toFind(co,ref){let best=null,bs=0;Object.entries(S.to||{}).forEach(([b,rs])=>(rs||[]).forEach((r,i)=>{if(ref&&toKey(b,r)===ref){best={b,i,r};bs=99;return;}const sc=coScore(co,r.co);if(sc>bs){bs=sc;best={b,i,r};}}));return best;}
 let TO_CACHE=null;
-function toAssign(){const sig=(S.joins||[]).length+"|"+(S.quits||[]).length+"|"+JSON.stringify(S.to).length+"|"+(S.joins||[]).filter(j=>j.status==="완료").length;if(TO_CACHE&&TO_CACHE.sig===sig&&TO_CACHE.S===S)return TO_CACHE.M;
+function toOfJoin(j){let f=null;if(j.toRef)f=toFind(j.co,j.toRef);if(!f&&j.link&&j.link.to){const ks=j.link.to.split(".");const r=(S.to[ks[1]]||[])[+ks[2]];if(r&&coScore(j.co,r.co)>0)f={b:ks[1],i:+ks[2],r};}return f||toFind(j.co);}
+/* 퇴사자 → TO 줄: ① 같은 사람이 입사 처리된 TO 줄 ② 퇴사자 지사의 TO ③ 전체에서 이름 비슷한 줄 */
+function toOfQuit(q){const nm=norm(q.name);const j=nm&&(S.joins||[]).find(j=>j.status==="완료"&&norm(j.name)===nm&&coScore(j.co,q.co)>0);if(j){const f=toOfJoin(j);if(f)return f;}
+  const b=q.branch;if(b&&S.to&&S.to[b]){let best=null,bs=0;S.to[b].forEach((r,i)=>{const sc=coScore(q.co,r.co);if(sc>bs){bs=sc;best={b,i,r};}});if(best)return best;}
+  return toFind(q.co);}
+function toAssign(){const sig=(S.joins||[]).map(j=>j.status+j.co+j.date+(j.toRef||"")+j.name).join("|")+"#"+(S.quits||[]).map(q=>q.co+q.outDate+q.branch+q.name).join("|")+"#"+JSON.stringify(S.to).length;if(TO_CACHE&&TO_CACHE.sig===sig&&TO_CACHE.S===S)return TO_CACHE.M;
   const M=new Map();const t=iso(TODAY);const get=f=>{const k=toKey(f.b,f.r);if(!M.has(k))M.set(k,{joins:[],quits:[]});return M.get(k);};
-  (S.joins||[]).forEach(j=>{if(j.status!=="완료")return;let f=null;if(j.toRef)f=toFind(j.co,j.toRef);if(!f&&j.link&&j.link.to){const ks=j.link.to.split(".");const r=(S.to[ks[1]]||[])[+ks[2]];if(r&&coScore(j.co,r.co)>0)f={b:ks[1],i:+ks[2],r};}if(!f)f=toFind(j.co);
+  (S.joins||[]).forEach(j=>{if(j.status!=="완료")return;const f=toOfJoin(j);
     if(!f)return;const d=j.date&&j.date<=t?j.date:t;if(d<toStart(f.r))return;get(f).joins.push(j);});
-  (S.quits||[]).forEach(q=>{const f=toFind(q.co);if(!f)return;const d=q.outDate||q.inDate||"";if(!d||d<toStart(f.r)||d>t)return;get(f).quits.push(q);});
+  (S.quits||[]).forEach(q=>{const f=toOfQuit(q);if(!f)return;const d=q.outDate||q.inDate||"";if(!d||d<toStart(f.r)||d>t)return;get(f).quits.push(q);});
   TO_CACHE={sig,S,M};return M;}
 function toCalc(b,r){const x=toAssign().get(toKey(b,r))||{joins:[],quits:[]};const jn=x.joins.length,qn=x.quits.length;const net=jn-qn;const to=+r.to||0;
   const jnames=new Set(x.joins.map(j=>norm(j.name)));const qNew=x.quits.filter(q=>jnames.has(norm(q.name))).length;
@@ -1976,7 +1981,7 @@ function jPasteForm(mode){
   modal(q?"퇴사자 적어 넣기":"입사예정자 정보등록",`<p class="sub" style="margin-top:0">${q?"업체를 &lt; &gt;로 묶고, 한 줄에 '입사일 이름 퇴사일 사유' 순서로 적어 주세요.":"업체를 &lt; &gt;로 묶고, 한 줄에 '날짜 이름 연락처' 순서로 적어 주세요. 날짜는 첫 사람에게만 써도 아래 사람에게 이어집니다. ✓(V)는 사전 연락 확인 표시."}</p>
    <label class="field"><span>내용</span><textarea name="t" id="pasteT" style="min-height:170px;font-family:var(--font)" placeholder="${q?"<코스원>\n9/29 김민수 10/2 업무 강도\n9/22 이영희 10/6":"<코스원>\n10/8 이국화 3218 8515\n최현지 3097 2545 V\n\n<하이뷰티>\n10/12 이도림 8156 7058"}"></textarea></label><div id="pasteP" class="sub">미리보기가 여기에 나옵니다.</div>`,
    {wide:true,submit:"추가",onSubmit:fd=>{const rs=parseBoard(fd.get("t"),q?"quit":"join");
-     if(q)rs.forEach(r=>{const c=hcCands(r.co)[0];const link=c&&c.sc>0?{hc:c.path}:null;const qid=uid();if(link)hcMove(link.hc,-1,{name:r.name,date:r.outDate,inDate:r.inDate,src:"q:"+qid});S.quits.push({id:qid,...r,co:r.co||"업체 미정",branch:"본사",mgr:mgrOfCo(r.co),link,at:nowLocal(),by:me()});});if(q)chgNote(...rs.map(r=>`${r.name}(${r.co||"업체 미정"})`));
+     if(q)rs.forEach(r=>{const c=hcCands(r.co)[0];const link=c&&c.sc>0?{hc:c.path}:null;const qid=uid();if(link)hcMove(link.hc,-1,{name:r.name,date:r.outDate,inDate:r.inDate,src:"q:"+qid});S.quits.push({id:qid,...r,co:r.co||"업체 미정",branch:(isBr()&&myBr())||(link&&String(linkLabel(link.hc)).startsWith("천안")?"천안":link&&String(linkLabel(link.hc)).startsWith("아산")?"아산":"본사"),mgr:mgrOfCo(r.co),link,at:nowLocal(),by:me()});});if(q)chgNote(...rs.map(r=>`${r.name}(${r.co||"업체 미정"})`));
      else rs.forEach(r=>S.joins.push({id:uid(),...r,co:r.co||"업체 미정",mgr:mgrOfCo(r.co),status:"대기",memo:"",hist:[],at:nowLocal(),by:me()}));if(!q)chgNote(...rs.map(r=>`${r.name}(${r.co||"업체 미정"})`));toast(`${rs.length}명 추가했습니다`);}});
   const ta=document.getElementById("pasteT");ta.dataset.mode=q?"quit":"join";
 }
