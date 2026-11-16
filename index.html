@@ -518,7 +518,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1794793900";
+const HUB_BUILD="1794794500";
 /* 날짜가 바뀌었으면 (화면을 며칠 켜 둔 채 쓰는 경우) 새로고침해서 오늘 날짜로 맞춤 */
 function checkDay(){const n=new Date();n.setHours(0,0,0,0);if(n.getTime()===TODAY.getTime())return false;
   if(!document.querySelector(".overlay")&&!dirty&&!syncing&&!typing()){toast("날짜가 바뀌어 오늘 기준으로 다시 불러옵니다…");setTimeout(()=>location.reload(),600);}else setTimeout(checkDay,5000);return true;}
@@ -2045,12 +2045,13 @@ function hcPeopleModal(rp){const r=getPath(rp);if(!r)return;const ro=hcRowRO(rp)
   const insN=act.filter(x=>x.ins==="가입").length,insX=act.filter(x=>x.ins==="미가입").length;
   const pill=x=>`<span class="pp ${isNewP(x)?"pnew":""} ${x.out?"pout":""}">${ro?`<span class="pn">${esc(x.name)}</span>`:`<button type="button" class="pn" onclick="hcPplEdit('${rp}','${x.id}')" title="눌러서 정보 수정">${esc(x.name)}</button>`}${insB(x)}${recOf(x,r)?` <small class="rec">채용 ${esc(recOf(x,r))}</small>`:""}${isNewP(x)?` <small>신규 ${mdShort(x.in)}</small>`:""}${x.out?` <small>퇴사 ${mdShort(x.out)}</small>`:""}${x.phone?` <a class="tel" href="tel:${esc(x.phone.replace(/\D/g,""))}">${esc(x.phone)}</a>`:""}${ro?"":`<button type="button" class="px" aria-label="${esc(x.name)} 명단에서 빼기" onclick="hcPplDel('${rp}','${x.id}')">✕</button>`}</span>`;
   modal(`${esc(r.co)} 근무자 명단`,`<p class="sub" style="margin-top:0">${hasRoster(r)?`재직 <b>${act.length}명</b> — 합계인원이 이 명단 수로 자동 계산됩니다. 입사 처리하면 파란색, 퇴사 등록하면 빨간색으로 이번 주(화~월) 동안 표시됩니다.${ro?"":" 이름을 누르면 전화번호·4대보험을 고칠 수 있습니다."}${insN||insX?`<br>4대보험 가입 <b>${insN}명</b>${insX?` · <span class="up">미가입 ${insX}명</span>`:""}${act.length-insN-insX?` · 미입력 ${act.length-insN-insX}명`:""}`:""}`:`아직 명단이 없습니다. 아래에 이름을 넣으면 그때부터 합계인원(지금 ${num(r.cur)}명)이 명단 수로 자동 계산됩니다.`}</p>
-   ${recSplit(r)?`<p class="sub">채용 담당별: ${recSplit(r).map(x=>`${esc(x.n)} <b>${x.c}명</b>`).join(" · ")}</p>`:""}${act.length||recentOut.length?`<div class="pplist">${act.map(pill).join("")}${recentOut.map(pill).join("")}</div>`:""}
+   ${recSplit(r)?`<p class="sub">채용 담당별: ${recSplit(r).map(x=>`${esc(x.n)} <b>${x.c}명</b>`).join(" · ")}</p>`:""}${act.length||recentOut.length?`<div class="pplist">${act.map(pill).join("")}${recentOut.map(pill).join("")}</div>`:""}${!hasRoster(r)&&(r.recs||[]).length?`<p class="sub" style="margin-bottom:4px">입사 처리로 들어온 사람 <b>${r.recs.length}명</b> — 숫자(${num(r.cur)}명)에는 이미 들어가 있습니다. 아래에 기존 근무자 이름을 넣어 명단을 만들면 이 사람들도 명단에 같이 들어갑니다.</p><div class="pplist">${r.recs.map(x=>`<span class="pp ${x.in&&x.in>=iso(new Date(TODAY.getTime()-6*864e5))?"pnew":""}"><span class="pn">${esc(x.name||"?")}</span>${x.rec?` <small class="rec">채용 ${esc(x.rec)}</small>`:""}${x.in?` <small>입사 ${mdShort(x.in)}</small>`:""}</span>`).join("")}</div>`:""}
    ${(isBoss()||(!ro&&mgrs(r).length>1))&&act.length?hcRecTable(rp,r,act):""}${isBoss()&&!hasRoster(r)&&(r.recs||[]).length?hcRecsTable(rp,r):""}
    ${oldOut.length?`<details style="margin-top:8px"><summary class="sub">지난 퇴사자 ${oldOut.length}명</summary><div class="pplist">${oldOut.map(pill).join("")}</div></details>`:""}
    ${ro?'<p class="sub" style="margin-top:12px">보기 전용입니다. 명단 수정은 이 업체가 있는 지사(본사) 담당이 합니다.</p>':`<div class="field" style="margin-top:12px"><span>이름 추가 <small class="sub">한 줄에 한 명 (또는 쉼표). 전화번호·입사일도 같이 쓸 수 있습니다: "홍길동 010-1234-5678 10/15". 이미 있는 이름을 다시 쓰면 번호·입사일만 바뀝니다.</small></span><textarea name="names" rows="4" placeholder="홍길동 010-1234-5678\n김철수 01098765432 10/15"></textarea></div>
    <label class="checks"><label><input type="checkbox" name="asNew">날짜 없는 사람도 오늘 신규 입사로 표시 (파란색)</label></label>`}`,
-   ro?{}:{submit:"명단 추가",onSubmit:fd=>{const add=parseRosterLines(fd.get("names"),!!fd.get("asNew"));if(!add.length){toast("추가할 이름이 없습니다");return;}r.people=r.people||[];let nAdd=0,nUp=0;
+   ro?{}:{submit:"명단 추가",onSubmit:fd=>{const add=parseRosterLines(fd.get("names"),!!fd.get("asNew"));if(!add.length){toast("추가할 이름이 없습니다");return;}const first=!hasRoster(r);r.people=r.people||[];let nAdd=0,nUp=0;
+     if(first&&(r.recs||[]).length){r.recs.forEach(x=>{if(!x.name||add.some(a=>norm(a.name)===norm(x.name)&&(a.src=x.src,a.in=a.in||x.in,x.rec&&(a.rec=x.rec),true)))return;r.people.push(Object.assign({id:uid(),name:x.name,phone:"",in:x.in||"",src:x.src},x.rec?{rec:x.rec}:{}));});delete r.recs;}
      add.forEach(a=>{const ex=r.people.find(y=>!y.out&&norm(y.name)===norm(a.name));if(ex){if(a.phone)ex.phone=a.phone;if(a.in)ex.in=a.in;nUp++;}else{r.people.push(a);nAdd++;}});
      rosterSync(r);toast(`${nAdd?nAdd+"명 추가":""}${nAdd&&nUp?" · ":""}${nUp?nUp+"명 정보 수정":""} · 재직 ${rosterAct(r).length}명`);setTimeout(()=>hcPeopleModal(rp),0);}});}
 /* ---------- 일용직 매일 출근 체크: 보유 인원(명단)은 그대로 두고, 그날 나온 사람만 체크 ---------- */
