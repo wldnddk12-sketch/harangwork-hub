@@ -518,7 +518,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1794791514";
+const HUB_BUILD="1794792715";
 /* 날짜가 바뀌었으면 (화면을 며칠 켜 둔 채 쓰는 경우) 새로고침해서 오늘 날짜로 맞춤 */
 function checkDay(){const n=new Date();n.setHours(0,0,0,0);if(n.getTime()===TODAY.getTime())return false;
   if(!document.querySelector(".overlay")&&!dirty&&!syncing&&!typing()){toast("날짜가 바뀌어 오늘 기준으로 다시 불러옵니다…");setTimeout(()=>location.reload(),600);}else setTimeout(checkDay,5000);return true;}
@@ -903,7 +903,7 @@ function vHCAll(mine){const CEO=canSales()&&!!S.ui.showSales;const d=iso(TODAY);
   const ac=all.reduce((s,r)=>s+(+r.cur||0),0),ab=all.reduce((s,r)=>s+(+r.base||0),0);html=html.replace("@@MOB@@",`<div class="only-m">${mob}</div>`);
   html+=`<tr class="tot"><td colspan="${CEO?5:4}">전체 (일용직은 보유 인원)</td><td>${num(ac)}</td><td>${num(ab)}</td><td>${diff(ac-ab)}</td></tr></tbody></table></div></div>`;
   const sc=allA.reduce((s,r)=>s+(+r.cur||0),0),sb=allA.reduce((s,r)=>s+(+r.base||0),0);
-  const side=(title,m)=>`<div class="card"><h3>${title}</h3><table class="x"><thead><tr><th>담당자</th><th>현재</th><th>기준</th><th>증감</th></tr></thead><tbody>${Object.entries(m).sort((a,b)=>b[1].cur-a[1].cur).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="num">${v.cur}</td><td class="num">${v.base}</td><td>${diff(v.cur-v.base)}</td></tr>`).join("")}<tr class="tot"><td>합계</td><td>${sc}</td><td>${sb}</td><td>${diff(sc-sb)}</td></tr></tbody></table><p class="sub" style="margin:6px 0 0">전 지사·분류 합산 · 일용직은 오늘(${mdShort(d)}) 출근 체크 인원</p></div>`;
+  const side=(title,m)=>`<div class="card"><h3>${title}</h3><table class="x"><thead><tr><th>담당자</th><th>현재</th><th>기준</th><th>증감</th></tr></thead><tbody>${Object.entries(m).filter(([k,v])=>v.cur||v.base).sort((a,b)=>b[1].cur-a[1].cur).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="num">${v.cur}</td><td class="num">${v.base}</td><td>${diff(v.cur-v.base)}</td></tr>`).join("")}<tr class="tot"><td>합계</td><td>${sc}</td><td>${sb}</td><td>${diff(sc-sb)}</td></tr></tbody></table><p class="sub" style="margin:6px 0 0">전 지사·분류 합산 · 일용직은 오늘(${mdShort(d)}) 출근 체크 인원</p></div>`;
   html+=`<div>${side("관리담당자별 (전체)",attribute(allA,"mgr"))}${CEO?side("영업담당자별 (전체) 🔒",attribute(allA,"sales")):""}</div></div>`;
   return html;}
 function vHC(){
@@ -947,7 +947,7 @@ function vHC(){
   });
   // side
   const all=b==="일용직"?hcRows(b).map(r=>attRow(r)):hcRows(b);const ST=b==="일용직"?{cur:all.reduce((s,r)=>s+r.cur,0),base:all.reduce((s,r)=>s+r.base,0)}:t;const bym=attribute(all,"mgr"),bys=attribute(all,"sales");
-  const sideT=(title,m)=>`<div class="card"><h3>${title}</h3><table class="x"><thead><tr><th>담당자</th><th>현재</th><th>기준</th><th>증감</th></tr></thead><tbody>${Object.entries(m).sort((a,b)=>b[1].cur-a[1].cur).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="num">${v.cur}</td><td class="num">${v.base}</td><td>${diff(v.cur-v.base)}</td></tr>`).join("")}<tr class="tot"><td>합계</td><td>${ST.cur}</td><td>${ST.base}</td><td>${diff(ST.cur-ST.base)}</td></tr></tbody></table>${b==="일용직"?`<p class="sub" style="margin:6px 0 0">${mdShort(attDate())} 출근 체크한 인원 기준 (보유 인원 아님)</p>`:""}</div>`;
+  const sideT=(title,m)=>`<div class="card"><h3>${title}</h3><table class="x"><thead><tr><th>담당자</th><th>현재</th><th>기준</th><th>증감</th></tr></thead><tbody>${Object.entries(m).filter(([k,v])=>v.cur||v.base).sort((a,b)=>b[1].cur-a[1].cur).map(([k,v])=>`<tr><td>${esc(k)}</td><td class="num">${v.cur}</td><td class="num">${v.base}</td><td>${diff(v.cur-v.base)}</td></tr>`).join("")}<tr class="tot"><td>합계</td><td>${ST.cur}</td><td>${ST.base}</td><td>${diff(ST.cur-ST.base)}</td></tr></tbody></table>${b==="일용직"?`<p class="sub" style="margin:6px 0 0">${mdShort(attDate())} 출근 체크한 인원 기준 (보유 인원 아님)</p>`:""}</div>`;
   if(limited()&&b===visHC()[0]){const sh=hcSharedRows();if(sh.length){const sc=sh.reduce((t,x)=>t+(+x.r.cur||0),0),sb=sh.reduce((t,x)=>t+(+x.r.base||0),0);
     html+=`<div class="gname" style="margin-top:18px"><b>다른 지사 업체 중 내가 관리·영업하는 곳</b><span class="chip mute">보기 전용 · 수정은 해당 지사·본사에서</span></div>
     <div class="tw"><table class="x resp"><thead><tr><th>지사·분류</th><th>구분</th><th>관리담당자</th><th>업체</th><th>합계인원</th><th>${esc(baseLbl())}</th><th>증감</th></tr></thead><tbody>
@@ -1105,7 +1105,7 @@ function personWeek(w,brs){const out={};const bs=S.adw[w]||{};brs.forEach(b=>((b
 /* 주 예산 = 월 예산 × 7 ÷ 그 달 일수 (천원 단위 반올림) */
 function weekBudget(bud,w){const d=new Date(w);const dim=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();return Math.round(bud*7/dim/1000)*1000;}
 function adPersonCard(w,brs){const wk=S.ui.adPM==="w";const mon=w.slice(0,7);const mo=+mon.slice(5,7);const pm=wk?personWeek(w,brs):personMonth(mon,brs);const B0=budgetMap(mon);const B=wk?Object.fromEntries(Object.entries(B0).map(([n,v])=>[n,weekBudget(+v||0,w)])):B0;
-  let names=[...new Set([...Object.keys(pm),...Object.keys(B).filter(n=>B[n]>0&&(!limited()||brs.includes(brOf(n))))])];
+  let names=[...new Set([...Object.keys(pm),...Object.keys(B).filter(n=>B[n]>0&&(!limited()||brs.includes(brOf(n)))),...(limited()?[]:Object.values(AD_GROUPS).flat().filter(n=>STAFF.includes(n)))])];
   const mem=limited()&&brs.length===1?(S.adMembers||{})[brs[0]]:null;if(mem&&mem.length)names=[...new Set([...mem,...names])].filter(n=>mem.includes(n));
   names.sort((a,b)=>((pm[b]||{}).cost||0)-((pm[a]||{}).cost||0)||(B[b]||0)-(B[a]||0));
   /* 팀 합계 줄 (영업관리1팀 = 박진호 + 이관영 + 양희창, 영업관리2팀 = 전우성 + 김유균 + 백재열 + 이슬기): 예산·사용액·매체 횟수 모두 더함 */
@@ -1215,7 +1215,7 @@ function adPersonRows(name,mon){const out=[];
         out.push({day,w,b,co:r.co,m,n:es.length,cost,oFree:m==="o"&&es.every(e=>e.free),free:SPAN_M.includes(m)&&!cost,amts:m==="k"?es.map(e=>+e.amt||0):null});});});}));});
   return out.sort((a,b)=>a.day.localeCompare(b.day)||a.co.localeCompare(b.co,"ko")||"jrokuX".indexOf(a.m)-"jrokuX".indexOf(b.m));}
 function adPeople(){const set=new Set();Object.entries(S.adw).forEach(([w,bs])=>{visBR().forEach(b=>((bs||{})[b]||[]).forEach(r=>r.d.forEach(x=>["j","r","o","k","u"].forEach(m=>LS(x,m).forEach(e=>set.add(pName(adWho(adP(e),b))))))));});
-  const mem=limited()?((S.adMembers||{})[myBr()]||[]):[...new Set([...Object.values(S.adAlias||{}),...Object.keys(budgetMap(YM()))])].filter(n=>STAFF.includes(n)||n===ceoName());return [...new Set([...mem,...set])].filter(Boolean).sort((a,b)=>(a===me()?-1:b===me()?1:0)||a.localeCompare(b,"ko"));}
+  const mem=limited()?((S.adMembers||{})[myBr()]||[]):[...new Set([...Object.values(S.adAlias||{}),...Object.keys(budgetMap(YM())),...Object.values(AD_GROUPS).flat()])].filter(n=>STAFF.includes(n)||n===ceoName());return [...new Set([...mem,...set])].filter(Boolean).sort((a,b)=>(a===me()?-1:b===me()?1:0)||a.localeCompare(b,"ko"));}
 function vADperson(){const ppl=adPeople();let name=S.ui.adP&&ppl.includes(S.ui.adP)?S.ui.adP:(ppl.includes(me())?me():ppl[0]);
   const mon=S.ui.adPM2||ym(TODAY);const mo=+mon.slice(5,7);
   if(!name)return '<div class="empty">아직 광고 기록이 없습니다.</div>';
@@ -2001,7 +2001,9 @@ function recPick(j){const ms=mgrNames({mgr:j.mgr||mgrOfCo(j.co)});const cur=jRec
   const btn=(n,on)=>`<button type="button" data-act="jRec" data-id="${j.id}" data-v="${esc(n)}" aria-pressed="${on}">${esc(n)}</button>`;
   return `<div class="recpick"><small>채용</small><span class="seg" role="group" aria-label="${esc(j.name)} 채용 담당 (한 명만)">${ms.map(n=>btn(n,cur===n||(one&&!cur))).join("")}${other?btn(other,true):""}</span><select data-jrec="${j.id}" aria-label="다른 채용 담당 고르기"><option value="">${other?"바꾸기":"+ 다른 사람"}</option>${REC_NAMES().filter(n=>!ms.includes(n)&&n!==other).map(n=>`<option>${n}</option>`).join("")}</select>${!cur&&!one?'<span class="chip late">한 명 골라 주세요</span>':""}</div>`;}
 function setJRec(j,v){j.rec=v||"";if(j.link&&j.link.hc){const rr=rowOf(j.link.hc);const px=rr&&(rr.people||[]).find(y=>y.src==="j:"+j.id);if(px){px.rec=v||"";}const rx=rr&&(rr.recs||[]).find(y=>y.src==="j:"+j.id);if(rx)rx.rec=v||"";else if(rr&&!hasRoster(rr)&&v)rr.recs=(rr.recs||[]).concat([{src:"j:"+j.id,rec:v,name:j.name,in:j.date||iso(TODAY)}]);}}
-function jRec(j){if(!j)return "";if(j.rec==="-")return "";if(j.rec)return j.rec;const m=String(j.memo||"");return REC_NAMES().find(n=>m.includes(n))||"";}
+/* 채용 담당: 직접 고른 값만 셈 (메모에 이름이 있으면 고를 때 미리 골라 두기만 함) */
+function jRec(j){if(!j)return "";if(j.rec==="-")return "";return j.rec||"";}
+function jRecGuess(j){if(!j||j.rec)return jRec(j);const m=String(j.memo||"");return REC_NAMES().find(n=>m.includes(n))||"";}
 const mgrNames=r=>String((r&&r.mgr)||"").split("/").map(x=>x.trim()).filter(Boolean);
 function recOf(x,r){let n=x.rec;if(!("rec" in x)&&x.src&&String(x.src).startsWith("j:")){const j=(S.joins||[]).find(y=>"j:"+y.id===x.src);n=jRec(j);}
   const ms=mgrNames(r);return n&&!(ms.length===1&&ms[0]===n)?n:"";}
@@ -2136,7 +2138,7 @@ function candSel(name,list,emptyLbl){const best=list[0]&&list[0].sc>0?list[0].pa
 function linkLabel(p){if(!p)return "";if(p.startsWith("hcid:")){const [g,r]=findHcRow(p.slice(5));return r?`${g.name} · ${r.co}`:"";}if(p.startsWith("toid:")){const [b,r]=findToRow(p.slice(5));return r?`${b} TO · ${r.co}${r.job?" / "+r.job:""}`:"";}const ks=p.split(".");if(ks[0]==="hc"){const g=S.hc[ks[1]][+ks[2]],r=g&&g.rows[+ks[4]];return r?`${g.name} · ${r.co}`:"";}const r=S.to[ks[1]][+ks[2]];return r?`${ks[1]} TO · ${r.co}${r.job?" / "+r.job:""}`:"";}
 function jDone(j){const hc=hcCands(j.co),to=toCands(j.co);
   modal(`${esc(j.name)} 입사 처리`,`<p class="sub" style="margin-top:0">${esc(j.co)} 입사로 표시하면서 인원현황 숫자를 1 올리고, TO 충원에도 셉니다. 업체가 다르면 직접 골라 주세요.</p>
-   ${(()=>{const ms=mgrNames({mgr:j.mgr||mgrOfCo(j.co)}),cur=jRec(j)||(ms.length===1?ms[0]:"");return F("채용 담당 <small class=\"sub\">인센티브·인사점수 기준 — 한 명만</small>",`<select name="rec" required><option value="">골라 주세요</option>${[...new Set([...ms,...REC_NAMES()])].map(n=>`<option ${cur===n?"selected":""}>${n}</option>`).join("")}</select>`);})()}
+   ${(()=>{const ms=mgrNames({mgr:j.mgr||mgrOfCo(j.co)}),cur=jRecGuess(j)||(ms.length===1?ms[0]:"");return F("채용 담당 <small class=\"sub\">인센티브·인사점수 기준 — 한 명만</small>",`<select name="rec" required><option value="">골라 주세요</option>${[...new Set([...ms,...REC_NAMES()])].map(n=>`<option ${cur===n?"selected":""}>${n}</option>`).join("")}</select>`);})()}
    ${F("인원현황 · 합계인원 +1",candSel("hc",hc,"인원현황에는 반영 안 함"))}${F("TO 현황 · 어느 TO로 셀지",candSel("to",to,"TO에는 세지 않음"))}
    ${!(hc[0]&&hc[0].sc>0)?`<p class="banner">인원현황에서 '${esc(j.co)}'와 비슷한 업체를 찾지 못했습니다. 목록에서 고르거나 '반영 안 함'으로 두세요.</p>`:""}`,
    {submit:"입사 처리",onSubmit:fd=>{if(fd.get("rec"))j.rec=fd.get("rec");const L={hc:fd.get("hc")||"",to:fd.get("to")||"",planDec:false};
