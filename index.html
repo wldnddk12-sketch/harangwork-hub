@@ -519,7 +519,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1794814400";
+const HUB_BUILD="1794880000";
 /* 날짜가 바뀌었으면 (화면을 며칠 켜 둔 채 쓰는 경우) 새로고침해서 오늘 날짜로 맞춤 */
 function checkDay(){const n=new Date();n.setHours(0,0,0,0);if(n.getTime()===TODAY.getTime())return false;
   if(!document.querySelector(".overlay")&&!dirty&&!syncing&&!typing()){toast("날짜가 바뀌어 오늘 기준으로 다시 불러옵니다…");setTimeout(()=>location.reload(),600);}else setTimeout(checkDay,5000);return true;}
@@ -1894,7 +1894,7 @@ const inGoal=(d,sc)=>{const g=SG(sc);return d>=g.from&&d<=g.due;};
 function salesStat(list,sc){sc=sc||goalSc();const g=SG(sc);const L=list||(sc==="전체"?salesList():S.sales.filter(d=>d.branch===sc));const inGoal=d=>d>=g.from&&d<=g.due;
   const meetDone=L.filter(d=>d.status!=="예정"&&inGoal(d.meetDate));const meetAll=L.filter(d=>inGoal(d.meetDate));
   const deals=L.filter(d=>DEAL_TYPES.includes(d.result)&&inGoal(d.resultDate||d.meetDate));
-  return {meet:meetDone.length,meetPlan:meetAll.length-meetDone.length,to:meetDone.reduce((s,d)=>s+(+d.to||0),0),deal:deals.length,dealTo:deals.reduce((s,d)=>s+(+d.to||0),0),
+  return {meet:meetDone.length,meetPlan:meetAll.length-meetDone.length,/* 확보 TO = 계약 현황에 올라간(도급·채용대행·일용직) 건의 TO만. 협의 중 TO는 따로 */to:deals.reduce((s,d)=>s+(+d.to||0),0),meetTo:meetDone.filter(d=>!d.result||d.result==="진행중").reduce((s,d)=>s+(+d.to||0),0),deal:deals.length,dealTo:deals.reduce((s,d)=>s+(+d.to||0),0),
     byType:Object.fromEntries(DEAL_TYPES.map(t=>[t,deals.filter(d=>d.result===t).length])),lost:L.filter(d=>d.result==="무산"&&inGoal(d.resultDate||d.meetDate)).length,
     upcoming:L.filter(d=>d.status==="예정").sort((a,b)=>(a.meetDate+a.meetTime).localeCompare(b.meetDate+b.meetTime)),
     pending:L.filter(d=>d.status!=="예정"&&(!d.result||d.result==="진행중")),
@@ -1907,13 +1907,13 @@ function dealRow(d){const past=d.status==="예정"&&d.meetDate<iso(TODAY);
 function vSales(){const brs=salesVisBR();
   const f=S.ui.salesBr||"전체";const sc=limited()?goalSc():(GOAL_SC.includes(f)?f:"전체");const g=SG(sc);const st=salesStat(undefined,sc);const L=salesList().filter(d=>f==="전체"||d.branch===f);const fs=salesStat(L,sc);
   const rate=g.deal?pct(fs.deal,g.deal):0;
-  const byMgr={};L.forEach(d=>{const m=byMgr[d.mgr]=byMgr[d.mgr]||{meet:0,to:0,deal:0};if(d.status!=="예정"&&inGoal(d.meetDate,sc)){m.meet++;m.to+=+d.to||0;}if(DEAL_TYPES.includes(d.result)&&inGoal(d.resultDate||d.meetDate,sc))m.deal++;});
+  const byMgr={};L.forEach(d=>{const m=byMgr[d.mgr]=byMgr[d.mgr]||{meet:0,to:0,deal:0};if(d.status!=="예정"&&inGoal(d.meetDate,sc))m.meet++;if(DEAL_TYPES.includes(d.result)&&inGoal(d.resultDate||d.meetDate,sc)){m.deal++;m.to+=+d.to||0;}});
   return ph("영업성과",`미팅 일정 → 미팅 후 TO → 계약형태(도급·채용대행·일용직)까지 기록합니다. ${limited()?`${myBr()} 지사와 본사 자료가 보입니다.`:"본사는 전체 지사가 보입니다."}`,`<button class="btn primary" data-act="dlNew">+ 미팅 등록</button>`)+
   `<div class="banner">목표 기간 <b>${mdShort(g.from)} ~ ${mdShort(g.due)}</b> · ${st.dueLeft>=0?`기한까지 <b>D-${st.dueLeft}</b>`:`<span class="up">기한 ${-st.dueLeft}일 지남</span>`}${S.role==="ceo"?' · <button class="chip vis" style="border:0;cursor:pointer" data-act="tab" data-v="goal">목표·기한 바꾸기</button>':""}</div>
   <div class="subtabs">${["전체",...brs].map(x=>`<button data-act="salesBr" data-v="${x}" aria-pressed="${x===f}">${x}</button>`).join("")}</div>
   <div class="grid g4" style="margin-bottom:14px">
    <div class="card kpi">${ring(g.meet?pct(fs.meet,g.meet):0)}<div><span>미팅 완료</span><b>${fs.meet} / ${g.meet||"-"}회</b><span>예정 ${fs.meetPlan}회 더</span></div></div>
-   <div class="card kpi">${ring(g.to?pct(fs.to,g.to):0)}<div><span>미팅으로 확보한 TO</span><b>${num(fs.to)} / ${g.to||"-"}명</b><span>성사된 TO ${num(fs.dealTo)}명</span></div></div>
+   <div class="card kpi">${ring(g.to?pct(fs.to,g.to):0)}<div><span>미팅으로 확보한 TO <small class="sub">계약된 건만</small></span><b>${num(fs.to)} / ${g.to||"-"}명</b><span>협의 중 TO ${num(fs.meetTo)}명 (계약되면 반영)</span></div></div>
    <div class="card kpi">${ring(rate)}<div><span>영업 성사</span><b>${fs.deal} / ${g.deal||"-"}건</b><span>${DEAL_TYPES.map(t=>`${t} ${fs.byType[t]}`).join(" · ")}${fs.lost?` · <span class="up">무산 ${fs.lost}</span>`:""}</span></div></div>
    <div class="card"><h3>담당자별</h3>${Object.entries(byMgr).sort((a,b)=>b[1].deal-a[1].deal||b[1].meet-a[1].meet).map(([m,v])=>`<div class="prow"><span>${esc(m)}</span>${bar(g.deal?pct(v.deal,Math.max(1,Math.round(g.deal/Math.max(1,Object.keys(byMgr).length)))):0," ")}<span class="v">미팅 ${v.meet} · TO ${v.to} · 성사 ${v.deal}</span></div>`).join("")||'<span class="sub">기록 없음</span>'}</div></div>
   <div class="grid g2">
