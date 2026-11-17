@@ -521,7 +521,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1794901000";
+const HUB_BUILD="1794902000";
 /* 날짜가 바뀌었으면 (화면을 며칠 켜 둔 채 쓰는 경우) 새로고침해서 오늘 날짜로 맞춤 */
 function checkDay(){const n=new Date();n.setHours(0,0,0,0);if(n.getTime()===TODAY.getTime())return false;
   if(!document.querySelector(".overlay")&&!dirty&&!syncing&&!typing()){toast("날짜가 바뀌어 오늘 기준으로 다시 불러옵니다…");setTimeout(()=>location.reload(),600);}else setTimeout(checkDay,5000);return true;}
@@ -1188,7 +1188,9 @@ function vADweek(){const [weeks,w,brs,br]=adWeekPick();
   return h;
 }
 function vADcost(){const [weeks,w]=adWeekPick();const t=weekCost(w,adBR());
-  const rows=S.ad.rows.filter(r=>adBR().includes(r.branch)).map(r=>({...r,ppl:[]}));
+  /* 팀 예산 줄은 팀원이 새로 생겨도 담당 명단에 같이 나오게 (예: 영업관리2팀에 이슬기) */
+  const grpOf=m=>{const ms=String(m||"").split("/").map(x=>x.trim()).filter(Boolean);const g=Object.values(typeof AD_GROUPS!=="undefined"?AD_GROUPS:{}).find(ns=>ms.some(n=>ns.includes(n)));return g?[...new Set([...ms,...g])].join("/"):String(m||"");};
+  const rows=S.ad.rows.filter(r=>adBR().includes(r.branch)).map(r=>({...r,mgr:grpOf(r.mgr),ppl:[]}));
   Object.entries(t.by).forEach(([a,o])=>{const n=pName(a);let row=rows.find(r=>r.mgr.split("/").includes(n));if(!row&&limited())return;if(!row){row={branch:Object.keys(o.br)[0]||brOf(n),mgr:n,month:0,week:0,ppl:[],nobudget:NO_AD_BUDGET[n]||"예산 미설정"};rows.push(row);}row.ppl.push([a,o]);});
   rows.forEach(r=>{r.c={j:0,r:0,o:0,k:0,cost:0};r.ppl.forEach(([a,o])=>["j","r","o","k","cost"].forEach(k=>r.c[k]+=o[k]));});
   const legacyRep=w===AD_SEED_WEEK;const W=rows.reduce((s,r)=>s+r.week,0),U=rows.reduce((s,r)=>s+r.c.cost,0),M=rows.reduce((s,r)=>s+r.month,0);
