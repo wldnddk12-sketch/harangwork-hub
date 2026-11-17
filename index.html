@@ -519,7 +519,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1794880000";
+const HUB_BUILD="1794888000";
 /* 날짜가 바뀌었으면 (화면을 며칠 켜 둔 채 쓰는 경우) 새로고침해서 오늘 날짜로 맞춤 */
 function checkDay(){const n=new Date();n.setHours(0,0,0,0);if(n.getTime()===TODAY.getTime())return false;
   if(!document.querySelector(".overlay")&&!dirty&&!syncing&&!typing()){toast("날짜가 바뀌어 오늘 기준으로 다시 불러옵니다…");setTimeout(()=>location.reload(),600);}else setTimeout(checkDay,5000);return true;}
@@ -1063,6 +1063,10 @@ const manwon=n=>n>=10000?(Math.round(n/1000)/10)+"만":num(n);
 function lev1(a,b){if(Math.abs(a.length-b.length)>1)return false;let i=0,j=0,e=0;while(i<a.length&&j<b.length){if(a[i]===b[j]){i++;j++;continue;}if(++e>1)return false;if(a.length>b.length)i++;else if(b.length>a.length)j++;else{i++;j++;}}return e+(a.length-i)+(b.length-j)<=1;}
 const CO_ALIAS={"에스엘아이앤디":"slind","slind":"slind","알에프에이치아이씨":"rfhic","rfhic":"rfhic","유팩스":"유펙스","피에프네이쳐":"피에프네이처","마그나코스메틱":"마스나코스메틱"};
 function coMatch(a,b){const x=CO_ALIAS[norm(a)]||norm(a),y=CO_ALIAS[norm(b)]||norm(b);if(!x||!y)return false;return x===y||x.includes(y)||y.includes(x)||(x.length>=3&&lev1(x,y));}
+/* 광고표에 올릴 수 있는 업체: 그 지사 TO + 다른 지사 표에 있어도 이 지사 사람이 관리·영업하는 업체 + 이 지사에서 계약된 영업 건 */
+function adCands(br){const L=[];(S.to[br]||[]).forEach(t=>L.push(t.co));
+  HC_TABS.forEach(t=>(S.hc[t]||[]).forEach(g=>{if(g.branch===br)return;g.rows.forEach(r=>{if(r.excluded||!r.co)return;const ps=[...mgrs(r),...String(r.sales||"").split("/").map(x=>x.trim())].filter(Boolean);if(ps.some(n=>brOf(n)===br))L.push(r.co);});}));
+  (S.sales||[]).forEach(d=>{if(d.branch===br&&DEAL_TYPES.includes(d.result)&&d.co)L.push(d.co);});return L;}
 function toFor(br,co){const rs=(S.to[br]||[]).filter(r=>coMatch(r.co,co));return {n:rs.length,to:rs.reduce((s,r)=>s+(+r.to||0),0),always:rs.some(r=>!r.to)};}
 function wkLabel(w){const d=new Date(w);return `${d.getMonth()+1}/${d.getDate()} ~ ${mdShort(iso(addDays(d,6)))}`;}
 /* 한 업체·한 주의 광고 건수와 비용.
@@ -1150,7 +1154,7 @@ function vADweek(){const [weeks,w,brs,br]=adWeekPick();
   const showRow=ri=>!P||S.ui.adWAll||cs[ri].cnt>0||Object.keys(cs[ri].cover).length>0;const nHide=P?rows.filter((r,ri)=>!(cs[ri].cnt>0||Object.keys(cs[ri].cover).length>0)).length:0;
   const meds=MED.filter(([m])=>m!=="u"||tot.u>0);const pmax=Math.max(1,...Object.values(tot.by).map(o=>o.j+o.r+o.o+o.k+o.u));
   const noAd=items.map((x,i)=>({r:x.r,c:cs[i],t:toFor(x.b,x.r.co)})).filter(x=>(x.t.to>0||x.t.always)&&x.c.days===0);
-  const missing=ALL?[]:(S.to[br]||[]).filter(t=>!rows.some(r=>coMatch(r.co,t.co))).map(t=>t.co).filter((c,i,a)=>a.indexOf(c)===i);
+  const missing=ALL?[]:adCands(br).filter(c=>!rows.some(r=>coMatch(r.co,c))).filter((c,i,a)=>a.findIndex(x=>coMatch(x,c))===i);
   const d0=new Date(w);const dayIso=i=>iso(addDays(d0,i));
   const trend=weeks.map(wk=>({...weekCost(wk,B),wk}));const tmax=Math.max(1,...trend.map(t=>t.cnt));
   const pBud=P?adBudgetFor(adWhoIn(P),w.slice(0,7)):0;const pMon=P?(()=>{const pm=personMonth(w.slice(0,7),brs);return adWhoIn(P).reduce((t,n)=>t+((pm[n]||{}).cost||0),0);})():0;
@@ -1174,7 +1178,7 @@ function vADweek(){const [weeks,w,brs,br]=adWeekPick();
       (mi===0?`<td class="num" rowspan="${rm.length}"><div class="dots">${r.d.map(x=>`<i class="${nAll(x)?"on":""}"></i>`).join("")}</div>${c.days}/7</td><td class="num cur" rowspan="${rm.length}">${c.total?won(c.total):""}${c.missing?'<div class="up sub">금액?</div>':""}</td>`:"")+`</tr>`;});});
   h+=meds.map(([m],i)=>`<tr class="tot"><td class="l" colspan="2">${i===0?"합계":""}</td><td><span class="mtag m${m}">${MSHORT[m]}</span></td>${[0,1,2,3,4,5,6].map(d=>{const n=rows.reduce((q,r)=>q+ppl(r.d[d],m).length,0);return `<td>${n||""}</td>`}).join("")}<td>${tot[m]}회</td><td>${m==="u"?"":won(tot.cost[m])}</td></tr>`).join("")+`<tr class="tot"><td class="l" colspan="10">이번 주 광고비 합계</td><td colspan="2">${won(tot.total)}원</td></tr></tbody></table></div>
   <div class="tools" style="margin-top:10px">${ALL?'<span class="chip mute">업체 추가는 지사 탭에서</span>':'<button class="btn sm" data-act="adAddCo">+ 업체 추가</button>'}<span class="sub">칸을 누르면 누가 올렸는지 체크합니다. M점프는 ${S.adPrice.jDays}일(첫날 무료+다음날 결제), M지역은 ${S.adPrice.rDays}일(첫날 무료+2일 결제) 동안 이어져 첫날만 체크하면 1건(같은 날 2개면 2), 114114는 최초 결제일만 체크하면 ${won(S.adPrice.o)}원으로 ${S.adPrice.oDays}일 유지(↳ 표시, 주를 넘어가도 이어짐), 무료로 올린 건 '114114 무료'에 체크(0원). 당근은 금액을 같이 적습니다.</span></div>`;
-  if(missing.length)h+=`<div class="banner" style="margin-top:12px">TO 현황에는 있는데 광고표에 없는 업체: ${missing.map(c=>`<button class="chip vis" style="border:0;cursor:pointer" data-act="adAddCo" data-v="${esc(c)}">+ ${esc(c)}</button>`).join(" ")}</div>`;
+  if(missing.length)h+=`<div class="banner" style="margin-top:12px">광고표에 아직 없는 업체 <span class="sub">(TO · 우리 지사 사람이 관리·영업하는 업체 · 계약된 업체)</span> — 눌러서 추가: ${missing.map(c=>`<button class="chip vis" style="border:0;cursor:pointer" data-act="adAddCo" data-v="${esc(c)}">+ ${esc(c)}</button>`).join(" ")}</div>`;
   h+=`<div class="card" style="margin-top:14px"><h3>${br} 주별 추이</h3><div class="tw" style="border:0"><table class="x"><thead><tr><th>주</th><th style="min-width:200px">광고 횟수</th><th>M점프</th><th>M지역</th><th>114114</th><th>당근</th>${trend.some(t=>t.u)?"<th>미구분</th>":""}<th>광고비</th></tr></thead><tbody>${trend.map(t=>`<tr class="${t.wk===w?"selw":""}"><td>${wkLabel(t.wk)}${S.adwSample[t.wk]?' <span class="chip vis">예시</span>':""}</td><td><div class="prow" style="grid-template-columns:1fr auto;margin:0">${mbar(t,tmax)}<span class="v">${t.cnt}회</span></div></td><td>${t.j}</td><td>${t.r}</td><td>${t.o}</td><td>${t.k}</td>${trend.some(x=>x.u)?`<td>${t.u}</td>`:""}<td class="cur">${t.total?won(t.total):"-"}</td></tr>`).join("")}</tbody></table></div>
    ${trend.some(t=>t.u)?'<p class="sub">‘미구분’은 매체 없이 적던 예전 엑셀 기록이라 금액이 계산되지 않습니다. 새 양식으로 올리는 주부터 M점프·M지역·114114·당근으로 나뉘고 광고비가 자동으로 잡힙니다.</p>':""}</div>`;
   return h;
@@ -1493,7 +1497,7 @@ function condList(){const L=[];
       if(c){const k=b+"|"+t.co;if(k!==c.key&&!c.alts.includes(k))c.alts.push(k);}else c=add(t.co,{mgr:t.mgr,sales:"",pay:"",period:"",gubun:"",cur:null});c.to.push(t);});});
   /* 업체 이름이 바뀌었거나 줄이 지워져 연결이 끊긴 채용조건도 그대로 보여 줌 */
   const used=new Set(L.flatMap(c=>[c.key,...c.alts]));Object.entries(S.conds||{}).forEach(([k,d])=>{if(used.has(k)||!d||!Object.values(d).some(v=>String(v||"").trim()))return;const i=k.indexOf("|");const b=k.slice(0,i),co=k.slice(i+1);if(!BRANCHES.includes(b))return;
-    const c=L.find(x=>x.branch===b&&coSame(x.co,co));if(c){c.alts.push(k);return;}L.push({key:k,alts:[],branch:b,co,mgr:"",sales:"",pay:"",period:"",gubun:"",cur:null,to:[],orphan:true});});
+    const c=L.find(x=>x.branch===b&&coSame(x.co,co))||L.find(x=>coSame(x.co,co));if(c){c.alts.push(k);return;}L.push({key:k,alts:[],branch:b,co,mgr:"",sales:"",pay:"",period:"",gubun:"",cur:null,to:[],orphan:true});});
   return L;}
 /* TO에서 업체 이름을 고치면 그 이름으로 써 둔 채용조건도 새 이름으로 옮김 */
 function condMove(b,oldCo,newCo){const o=b+"|"+oldCo,nk=b+"|"+String(newCo||"").trim();if(o===nk||!S.conds||!S.conds[o])return 0;const src=S.conds[o],dst=S.conds[nk]||{};Object.entries(src).forEach(([f,v])=>{if(String(v||"").trim()&&!String(dst[f]||"").trim())dst[f]=v;});S.conds[nk]=dst;delete S.conds[o];CONDDEL.add(o);return 1;}
