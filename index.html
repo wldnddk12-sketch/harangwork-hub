@@ -407,13 +407,15 @@ function canRead(kind,branch){const r=ME.role,boss=r==="ceo"||r==="mgr",hq=ME.br
   if(kind==="ar"||kind==="goal_money")return boss;
   if(kind==="event"&&branch==="팀장급")return boss||TT_MGR_ONLY.includes(ME.name);
   if(kind==="sale")return boss||hq||!branch||branch===ME.branch||branch==="본사";
-  if(["hcg","to","adw","adbudget","pay","docreq","iv"].includes(kind))return boss||hq||!branch||branch===ME.branch;return true;}
+  if(kind==="adw"||kind==="adbudget")return boss||hq||!branch||branch===ME.branch||branch==="본사";
+  if(["hcg","to","pay","docreq","iv"].includes(kind))return boss||hq||!branch||branch===ME.branch;return true;}
 function canWrite(kind,branch,data){const r=ME.role,boss=r==="ceo"||r==="mgr";
   if(["goal","goal_money","leave_alloc"].includes(kind))return r==="ceo";if(kind==="adbudget")return boss;
   if(kind==="leave_req")return boss||(r==="branch"&&branch===ME.branch)||(data&&data.name===ME.name&&(data.status||"대기")==="대기");
   if(kind==="pay")return canRead(kind,branch)&&((data&&data.status)!=="지급완료"||isFin()||r==="ceo");
   if(kind==="docreq")return canRead(kind,branch)&&((data&&data.status)!=="전달완료"||isFin()||r==="ceo");
   if(kind==="sale")return boss||ME.branch==="본사"||branch===ME.branch;
+  if(kind==="adw")return boss||ME.branch==="본사"||!branch||branch===ME.branch;
   if(kind==="bl")return boss||(data&&(data.mgr===ME.name||data.by===ME.name));
   if(kind==="ct")return canRead(kind,branch)&&(boss||(data&&(data.mgr===ME.name||data.by===ME.name||coStaffOf(data.co).has(ME.name))));
   return canRead(kind,branch);}
@@ -519,7 +521,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1794888000";
+const HUB_BUILD="1794901000";
 /* 날짜가 바뀌었으면 (화면을 며칠 켜 둔 채 쓰는 경우) 새로고침해서 오늘 날짜로 맞춤 */
 function checkDay(){const n=new Date();n.setHours(0,0,0,0);if(n.getTime()===TODAY.getTime())return false;
   if(!document.querySelector(".overlay")&&!dirty&&!syncing&&!typing()){toast("날짜가 바뀌어 오늘 기준으로 다시 불러옵니다…");setTimeout(()=>location.reload(),600);}else setTimeout(checkDay,5000);return true;}
@@ -673,6 +675,8 @@ const limited=()=>!isBoss()&&myBr()!=="본사"; /* 지사 소속(지사장·지�
 const visG=g=>!limited()||g.branch===myBr();
 const visHC=()=>HC_TABS.filter(t=>(S.hc[t]||[]).some(visG)||(!limited()));
 const visBR=()=>limited()?[myBr()]:BRANCHES;
+const adBR=()=>limited()?BRANCHES.filter(b=>b===myBr()||b==="본사"):BRANCHES; /* 지사 사람은 자기 지사 + 본사 광고 (천안↔아산 서로 안 봄) */
+const adEd=b=>!limited()||b===myBr(); /* 광고표 고치기는 자기 지사만 */
 const arList=()=>isBoss()?S.ar:[];
 const canEditG=g=>true;
 const canSales=()=>S.role==="ceo"||S.role==="mgr"||S.role==="branch"; /* 대표·팀장 전체, 지사장 자기 지사 */
@@ -1106,7 +1110,7 @@ const mbar=(o,max)=>`<div class="mbar">${["j","r","o","k","u"].map(m=>o[m]?`<i c
 const legend=u=>`<div class="legend"><span><i class="mj"></i>M점프</span><span><i class="mr"></i>M지역</span><span><i class="mo"></i>114114</span><span><i class="mk"></i>당근</span>${u?'<span><i class="mu"></i>미구분</span>':""}</div>`;
 function adHead(weeks,w,brs,br){return `<div class="tools" style="margin-bottom:10px;justify-content:space-between"><div class="subtabs" style="margin:0">${(brs.length>1?["전체",...brs]:brs).map(x=>`<button data-act="adBr" data-v="${x}" aria-pressed="${x===br}">${x}</button>`).join("")}</div>
    <div class="tools"><button class="btn sm" data-act="adWk" data-v="-1" aria-label="이전 주" ${weeks.indexOf(w)===0?"disabled":""}>◀</button><b>${wkLabel(w)}${S.adwSample[w]?' <span class="chip vis">예시</span>':""}</b><button class="btn sm" data-act="adWk" data-v="1" aria-label="다음 주" ${weeks.indexOf(w)===weeks.length-1?"disabled":""}>▶</button><button class="btn sm primary" data-act="adUp">⬆ 엑셀 올리기</button><button class="btn sm" data-act="adNewWk">+ 새 주 시작</button><button class="btn sm" data-act="adAlias">약칭·단가 설정</button></div></div>`;}
-function adWeekPick(){const weeks=Object.keys(S.adw).sort();if(!weeks.includes(S.ui.adWk))S.ui.adWk=weeks.filter(w=>!S.adwSample[w]).pop()||weeks[weeks.length-1];const brs=visBR();const tabs=brs.length>1?["전체",...brs]:brs;if(!tabs.includes(S.ui.adBr))S.ui.adBr=brs[0];return [weeks,S.ui.adWk,brs,S.ui.adBr];}
+function adWeekPick(){const weeks=Object.keys(S.adw).sort();if(!weeks.includes(S.ui.adWk))S.ui.adWk=weeks.filter(w=>!S.adwSample[w]).pop()||weeks[weeks.length-1];const brs=adBR();const tabs=brs.length>1?["전체",...brs]:brs;if(!tabs.includes(S.ui.adBr))S.ui.adBr=brs[0];return [weeks,S.ui.adWk,brs,S.ui.adBr];}
 
 /* 사람별 이번 달 광고 누적 금액·사용량 (개인 예산 대비) */
 function personMonth(mon,brs){const out={};Object.entries(S.adw).forEach(([w,bs])=>{brs.forEach(b=>((bs||{})[b]||[]).forEach(r=>rowCost(r,w,b).ch.forEach(c=>{const d=iso(addDays(new Date(w),c.i));if(!d.startsWith(mon))return;
@@ -1177,14 +1181,14 @@ function vADweek(){const [weeks,w,brs,br]=adWeekPick();
         return `<td class="adc ${dayIso(di)===iso(TODAY)?"tday":""}" data-act="adCell" data-r="${items[ri].ri}" data-b="${IB}" data-d="${di}" tabindex="0" aria-label="${esc(r.co)} ${mdShort(dayIso(di))} ${lab} 수정">${inner}</td>`;}).join("")+
       (mi===0?`<td class="num" rowspan="${rm.length}"><div class="dots">${r.d.map(x=>`<i class="${nAll(x)?"on":""}"></i>`).join("")}</div>${c.days}/7</td><td class="num cur" rowspan="${rm.length}">${c.total?won(c.total):""}${c.missing?'<div class="up sub">금액?</div>':""}</td>`:"")+`</tr>`;});});
   h+=meds.map(([m],i)=>`<tr class="tot"><td class="l" colspan="2">${i===0?"합계":""}</td><td><span class="mtag m${m}">${MSHORT[m]}</span></td>${[0,1,2,3,4,5,6].map(d=>{const n=rows.reduce((q,r)=>q+ppl(r.d[d],m).length,0);return `<td>${n||""}</td>`}).join("")}<td>${tot[m]}회</td><td>${m==="u"?"":won(tot.cost[m])}</td></tr>`).join("")+`<tr class="tot"><td class="l" colspan="10">이번 주 광고비 합계</td><td colspan="2">${won(tot.total)}원</td></tr></tbody></table></div>
-  <div class="tools" style="margin-top:10px">${ALL?'<span class="chip mute">업체 추가는 지사 탭에서</span>':'<button class="btn sm" data-act="adAddCo">+ 업체 추가</button>'}<span class="sub">칸을 누르면 누가 올렸는지 체크합니다. M점프는 ${S.adPrice.jDays}일(첫날 무료+다음날 결제), M지역은 ${S.adPrice.rDays}일(첫날 무료+2일 결제) 동안 이어져 첫날만 체크하면 1건(같은 날 2개면 2), 114114는 최초 결제일만 체크하면 ${won(S.adPrice.o)}원으로 ${S.adPrice.oDays}일 유지(↳ 표시, 주를 넘어가도 이어짐), 무료로 올린 건 '114114 무료'에 체크(0원). 당근은 금액을 같이 적습니다.</span></div>`;
-  if(missing.length)h+=`<div class="banner" style="margin-top:12px">광고표에 아직 없는 업체 <span class="sub">(TO · 우리 지사 사람이 관리·영업하는 업체 · 계약된 업체)</span> — 눌러서 추가: ${missing.map(c=>`<button class="chip vis" style="border:0;cursor:pointer" data-act="adAddCo" data-v="${esc(c)}">+ ${esc(c)}</button>`).join(" ")}</div>`;
+  <div class="tools" style="margin-top:10px">${ALL?'<span class="chip mute">업체 추가는 지사 탭에서</span>':!adEd(br)?'<span class="chip mute">'+br+' 광고표는 보기 전용 (고치기는 '+br+' 지사)</span>':'<button class="btn sm" data-act="adAddCo">+ 업체 추가</button>'}<span class="sub">칸을 누르면 누가 올렸는지 체크합니다. M점프는 ${S.adPrice.jDays}일(첫날 무료+다음날 결제), M지역은 ${S.adPrice.rDays}일(첫날 무료+2일 결제) 동안 이어져 첫날만 체크하면 1건(같은 날 2개면 2), 114114는 최초 결제일만 체크하면 ${won(S.adPrice.o)}원으로 ${S.adPrice.oDays}일 유지(↳ 표시, 주를 넘어가도 이어짐), 무료로 올린 건 '114114 무료'에 체크(0원). 당근은 금액을 같이 적습니다.</span></div>`;
+  if(missing.length&&adEd(br))h+=`<div class="banner" style="margin-top:12px">광고표에 아직 없는 업체 <span class="sub">(TO · 우리 지사 사람이 관리·영업하는 업체 · 계약된 업체)</span> — 눌러서 추가: ${missing.map(c=>`<button class="chip vis" style="border:0;cursor:pointer" data-act="adAddCo" data-v="${esc(c)}">+ ${esc(c)}</button>`).join(" ")}</div>`;
   h+=`<div class="card" style="margin-top:14px"><h3>${br} 주별 추이</h3><div class="tw" style="border:0"><table class="x"><thead><tr><th>주</th><th style="min-width:200px">광고 횟수</th><th>M점프</th><th>M지역</th><th>114114</th><th>당근</th>${trend.some(t=>t.u)?"<th>미구분</th>":""}<th>광고비</th></tr></thead><tbody>${trend.map(t=>`<tr class="${t.wk===w?"selw":""}"><td>${wkLabel(t.wk)}${S.adwSample[t.wk]?' <span class="chip vis">예시</span>':""}</td><td><div class="prow" style="grid-template-columns:1fr auto;margin:0">${mbar(t,tmax)}<span class="v">${t.cnt}회</span></div></td><td>${t.j}</td><td>${t.r}</td><td>${t.o}</td><td>${t.k}</td>${trend.some(x=>x.u)?`<td>${t.u}</td>`:""}<td class="cur">${t.total?won(t.total):"-"}</td></tr>`).join("")}</tbody></table></div>
    ${trend.some(t=>t.u)?'<p class="sub">‘미구분’은 매체 없이 적던 예전 엑셀 기록이라 금액이 계산되지 않습니다. 새 양식으로 올리는 주부터 M점프·M지역·114114·당근으로 나뉘고 광고비가 자동으로 잡힙니다.</p>':""}</div>`;
   return h;
 }
-function vADcost(){const [weeks,w]=adWeekPick();const t=weekCost(w,visBR());
-  const rows=S.ad.rows.filter(r=>visBR().includes(r.branch)).map(r=>({...r,ppl:[]}));
+function vADcost(){const [weeks,w]=adWeekPick();const t=weekCost(w,adBR());
+  const rows=S.ad.rows.filter(r=>adBR().includes(r.branch)).map(r=>({...r,ppl:[]}));
   Object.entries(t.by).forEach(([a,o])=>{const n=pName(a);let row=rows.find(r=>r.mgr.split("/").includes(n));if(!row&&limited())return;if(!row){row={branch:Object.keys(o.br)[0]||brOf(n),mgr:n,month:0,week:0,ppl:[],nobudget:NO_AD_BUDGET[n]||"예산 미설정"};rows.push(row);}row.ppl.push([a,o]);});
   rows.forEach(r=>{r.c={j:0,r:0,o:0,k:0,cost:0};r.ppl.forEach(([a,o])=>["j","r","o","k","cost"].forEach(k=>r.c[k]+=o[k]));});
   const legacyRep=w===AD_SEED_WEEK;const W=rows.reduce((s,r)=>s+r.week,0),U=rows.reduce((s,r)=>s+r.c.cost,0),M=rows.reduce((s,r)=>s+r.month,0);
@@ -1201,7 +1205,7 @@ function cntStep(b,d){const i=b.parentElement.querySelector("input");i.value=Mat
 /* "15000, 8000" · "1.5만+8천" → [15000,8000] */
 function parseAmts(v){const t=String(v||"").replace(/(\d),(?=\d{3}(?!\d))/g,"$1").replace(/\s*원/g,"").replace(/\s+(만|천)/g,"$1");
   return t.split(/[,+\/·]|\s+/).map(x=>x.trim()).filter(Boolean).map(x=>{const m=x.match(/^(\d+(?:\.\d+)?)(만|천)?$/);if(!m)return 0;let a=parseFloat(m[1]);if(m[2]==="만")a*=1e4;else if(m[2]==="천")a*=1e3;return Math.round(a);}).filter(a=>a>0);}
-function adCellForm(ri,di,bb){const w=S.ui.adWk,br=bb&&bb!=="전체"?bb:S.ui.adBr;const r=S.adw[w][br][ri];const x=r.d[di];const day=iso(addDays(new Date(w),di));
+function adCellForm(ri,di,bb){const w=S.ui.adWk,br=bb&&bb!=="전체"?bb:S.ui.adBr;if(!adEd(br)){toast(`${br} 광고표는 보기만 할 수 있습니다 (고치기는 ${br} 지사)`);return;}const r=S.adw[w][br][ri];const x=r.d[di];const day=iso(addDays(new Date(w),di));
   const aliasOne=Object.keys(S.adAlias).filter(k=>!Object.keys(S.adAlias).some(k2=>k2!==k&&S.adAlias[k2]===S.adAlias[k]&&(k2.length>k.length||(k2.length===k.length&&k2<k))));
   const opts=[...new Set([...aliasOne,...LS(x,"j"),...LS(x,"r"),...LS(x,"u"),...LS(x,"o").map(e=>e.p),...LS(x,"k").map(e=>e.p)])];
   const grp=(m,lab,note)=>`<div class="field"><span><span class="mtag m${m}">${lab}</span> ${note}</span><div class="checks">${opts.map(p=>`<label><input type="checkbox" name="${m}" value="${esc(p)}" ${(m==="o"?LS(x,"o").filter(e=>!e.free).map(e=>e.p):ppl(x,m)).includes(p)?"checked":""}>${pChip(p)} ${esc(pName(p))}</label>`).join("")}</div></div>`;
@@ -1219,13 +1223,13 @@ function vAD(){const v=S.ui.adView||"week";
   `<div class="subtabs"><button data-act="adView" data-v="week" aria-pressed="${v==="week"}">업체별 주간 광고표</button><button data-act="adView" data-v="cost" aria-pressed="${v==="cost"}">광고비 사용내역</button><button data-act="adView" data-v="person" aria-pressed="${v==="person"}">담당자별 광고</button></div>`+(v==="week"?vADweek():v==="person"?vADperson():vADcost());}
 /* 담당자 한 사람이 올린 광고를 날짜 순서대로 (여러 사람이 같은 업체에 올려도 내 것만) */
 function adPersonRows(name,mon){const out=[];
-  Object.keys(S.adw).sort().forEach(w=>{visBR().forEach(b=>((S.adw[w]||{})[b]||[]).forEach(r=>{const c=rowCost(r,w,b);
+  Object.keys(S.adw).sort().forEach(w=>{adBR().forEach(b=>((S.adw[w]||{})[b]||[]).forEach(r=>{const c=rowCost(r,w,b);
     r.d.forEach((x,i)=>{const day=iso(addDays(new Date(w),i));if(mon&&!day.startsWith(mon))return;
       ["j","r","o","k","u"].forEach(m=>{const es=LS(x,m).filter(e=>pName(adWho(adP(e),b))===name);if(!es.length)return;
         const cost=c.ch.filter(z=>z.i===i&&z.m===m&&pName(z.p)===name).reduce((t,z)=>t+z.amt,0);
         out.push({day,w,b,co:r.co,m,n:es.length,cost,oFree:m==="o"&&es.every(e=>e.free),free:SPAN_M.includes(m)&&!cost,amts:m==="k"?es.map(e=>+e.amt||0):null});});});}));});
   return out.sort((a,b)=>a.day.localeCompare(b.day)||a.co.localeCompare(b.co,"ko")||"jrokuX".indexOf(a.m)-"jrokuX".indexOf(b.m));}
-function adPeople(){const set=new Set();Object.entries(S.adw).forEach(([w,bs])=>{visBR().forEach(b=>((bs||{})[b]||[]).forEach(r=>r.d.forEach(x=>["j","r","o","k","u"].forEach(m=>LS(x,m).forEach(e=>set.add(pName(adWho(adP(e),b))))))));});
+function adPeople(){const set=new Set();Object.entries(S.adw).forEach(([w,bs])=>{adBR().forEach(b=>((bs||{})[b]||[]).forEach(r=>r.d.forEach(x=>["j","r","o","k","u"].forEach(m=>LS(x,m).forEach(e=>set.add(pName(adWho(adP(e),b))))))));});
   const mem=limited()?((S.adMembers||{})[myBr()]||[]):[...new Set([...Object.values(S.adAlias||{}),...Object.keys(budgetMap(YM())),...Object.values(AD_GROUPS).flat()])].filter(n=>STAFF.includes(n)||n===ceoName());return [...new Set([...mem,...set])].filter(Boolean).sort((a,b)=>(a===me()?-1:b===me()?1:0)||a.localeCompare(b,"ko"));}
 function vADperson(){const ppl=adPeople();let name=S.ui.adP&&ppl.includes(S.ui.adP)?S.ui.adP:(ppl.includes(me())?me():ppl[0]);
   const mon=S.ui.adPM2||ym(TODAY);const mo=+mon.slice(5,7);
@@ -1241,7 +1245,7 @@ function vADperson(){const ppl=adPeople();let name=S.ui.adP&&ppl.includes(S.ui.a
    <div class="card"><span class="sub">${mo}월 광고비</span><div class="big">${won(tot.cost)}<span class="sub">원</span></div>${bud?`<span class="sub">월 예산 ${won(bud)}원 · <b class="${pct(tot.cost,bud)>100?"up":""}">${pct(tot.cost,bud)}%</b></span>`:""}</div>
    <div class="card"><span class="sub">올린 업체</span><div class="big">${new Set(L.map(x=>x.co)).size}<span class="sub">곳</span></div><span class="sub">${[...new Set(L.map(x=>x.co))].slice(0,4).map(esc).join(", ")}${new Set(L.map(x=>x.co)).size>4?" 외":""}</span></div></div>
   ${L.length?Object.entries(byDay).map(([d,xs])=>{const dd=new Date(d);return `<div class="adpday ${d===iso(TODAY)?"today":""}"><h4>${dd.getMonth()+1}/${dd.getDate()} (${DOW[dd.getDay()]}) <span class="sub">${xs.length}건 · ${won(xs.reduce((t,x)=>t+x.cost,0))}원</span></h4>
-    ${xs.map(x=>`<div class="adpi"><span class="mtag m${x.m}">${MSHORT[x.m]}</span><b>${esc(x.co)}</b>${visBR().length>1?` <span class="chip mute">${x.b}</span>`:""}${x.n>1?` <span class="chip vis">${x.n}개</span>`:""}<span class="v">${x.m==="k"?x.amts.map(a=>a?won(a):"금액?").join(" + ")+"원":x.m==="u"?'<span class="sub">매체 미구분</span>':x.oFree?'<span class="sub">무료 광고</span>':x.free?'<span class="sub">이어서 노출 (추가 비용 없음)</span>':won(x.cost)+"원"}</span></div>`).join("")}</div>`;}).join(""):`<div class="empty">${mo}월에 ${esc(name)}이(가) 올린 광고가 없습니다.</div>`}`;}
+    ${xs.map(x=>`<div class="adpi"><span class="mtag m${x.m}">${MSHORT[x.m]}</span><b>${esc(x.co)}</b>${adBR().length>1?` <span class="chip mute">${x.b}</span>`:""}${x.n>1?` <span class="chip vis">${x.n}개</span>`:""}<span class="v">${x.m==="k"?x.amts.map(a=>a?won(a):"금액?").join(" + ")+"원":x.m==="u"?'<span class="sub">매체 미구분</span>':x.oFree?'<span class="sub">무료 광고</span>':x.free?'<span class="sub">이어서 노출 (추가 비용 없음)</span>':won(x.cost)+"원"}</span></div>`).join("")}</div>`;}).join(""):`<div class="empty">${mo}월에 ${esc(name)}이(가) 올린 광고가 없습니다.</div>`}`;}
 
 /* ---------- 엑셀(.xlsx) 읽기: 외부 라이브러리 없이 ---------- */
 async function unzipXlsx(buf){const dv=new DataView(buf),u8=new Uint8Array(buf);let e=-1;
