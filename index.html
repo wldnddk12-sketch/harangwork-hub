@@ -471,7 +471,7 @@ let SNAP=new Map(),syncT=null,syncing=false,dirty=false;
 const docJson=d=>stable(d.data)+"#"+(d.branch||"");
 function save(){try{localStorage.setItem("harang-ui-"+ME.id,JSON.stringify({ui:S.ui,tab:S.tab}));}catch(e){}if(!ME.id)return;dirty=true;clearTimeout(syncT);syncT=setTimeout(sync,350);}
 async function sync(){if(syncing){clearTimeout(syncT);syncT=setTimeout(sync,300);return;}syncing=true;dirty=false;setSyncState("저장 중…");
-  const now=docsOf(S);let conflict=false,denied=false,n=0,why="",net=false;const isNet=e=>/fetch|network|timeout|load failed|offline|502|503|504/i.test(String((e&&(e.message||e.code))||e||""));
+  const now=docsOf(S);for(const [k,d] of now){const o=SNAP.get(k);if(!o||o.json!==docJson(d))CHGK.add(d.kind);}for(const [k,o] of SNAP)if(!now.has(k)&&o.version)CHGK.add(k.split("|")[0]);let conflict=false,denied=false,n=0,why="",net=false;const isNet=e=>/fetch|network|timeout|load failed|offline|502|503|504/i.test(String((e&&(e.message||e.code))||e||""));
   try{
     for(const [k,d] of now){const old=SNAP.get(k);const j=docJson(d);if(old&&old.json===j)continue;
       if(!old){const empty=d.data&&Array.isArray(d.data.rows)&&!d.data.rows.length;if(empty&&d.kind!=="adw")continue;}
@@ -487,12 +487,17 @@ async function sync(){if(syncing){clearTimeout(syncT);syncT=setTimeout(sync,300)
       if(error){if(isNet(error))net=true;else denied=true;continue;}if(!data||!data.length){conflict=true;continue;}SNAP.delete(k);n++;}
   }catch(e){if(isNet(e))net=true;else denied=true;why=why||String(e&&e.message||e);}
   syncing=false;
+  if(n&&!CHG_SENT&&CHGK.size&&Date.now()-LAST_INPUT<15000){const L={hcg:["인원현황","hc"],to:["TO","to"],join:["입사예정자","join"],quit:["퇴사자","quit"],cond:["채용조건","cond"],post:["특이사항","notes"],event:["타임트리","tt"],adw:["광고표","ad"],adbudget:["광고 예산","ad"],sale:["영업성과","sales"],pay:["주급·가불","pay"],docreq:["서류 요청","docs"],ar:["미수금","ar"],ct:["근로계약","ct"],iv:["지원 DB","iv"],bl:["블랙리스트","bl"],inv:["계산서","inv"],leave_req:["연차","leave"],leave_alloc:["연차","leave"],goal:["목표","goal"]};
+    const ks=[...CHGK].filter(k=>L[k]);if(ks.length){const t=(L[ks[0]]||[])[1]||S.tab;notifyCeoChange([...new Set(ks.map(k=>L[k][0]))].join("·")+" 수정",t);}}
+  CHG_SENT=false;CHGK.clear();
   if(net&&!denied&&!conflict){/* 인터넷이 잠깐 끊김: 화면 내용은 그대로 두고 5초 뒤 다시 저장 */dirty=true;setSyncState("연결 끊김 · 다시 저장 시도 중…");clearTimeout(syncT);syncT=setTimeout(sync,5000);return;}
   if(conflict){toast("다른 사람이 먼저 바꾼 내용이 있어 최신 내용으로 불러왔습니다. 방금 바꾼 부분을 다시 확인해 주세요.");await loadAll(true);}
   else if(denied){toast("권한이 없거나 연결이 끊겨 저장하지 못한 내용이 있습니다. 최신 내용으로 다시 불러옵니다."+(why?" ("+why.slice(0,80)+")":""));console.warn("sync denied",why);await loadAll(true);}
   else if(MERGED){MERGED=false;if(dirty){clearTimeout(syncT);syncT=setTimeout(sync,300);RELOAD_AFTER=true;}else await loadAll(true);setSyncState("저장됨 (다른 사람 수정과 합침)");}
   else{setSyncState(n?"저장됨":"");if(RELOAD_AFTER&&!dirty){RELOAD_AFTER=false;await loadAll(true);}}}
 let RELOAD_AFTER=false;
+const CHGK=new Set(); /* 이번 저장에서 바뀐 자료 종류 */
+let LAST_INPUT=0;["pointerdown","keydown","change","submit"].forEach(ev=>document.addEventListener(ev,()=>{LAST_INPUT=Date.now();},true)); /* 사람이 직접 고친 저장만 알림 */
 const CONDDEL=new Set(); /* 이름을 바꿔 옮긴 채용조건의 옛 칸만 지움 */
 function setSyncState(t){const e=document.getElementById("syncst");if(e)e.textContent=t;if(t==="저장됨")setTimeout(()=>{if(e&&e.textContent==="저장됨")e.textContent="";},1500);}
 async function fetchFull(){const out=[];for(let from=0;;from+=1000){const {data,error}=await sb.from("hub_data").select("kind,key,branch,data,version,created_at").order("kind").order("key").range(from,from+999);
@@ -521,7 +526,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1795170000";
+const HUB_BUILD="1795180000";
 /* 날짜가 바뀌었으면 (화면을 며칠 켜 둔 채 쓰는 경우) 새로고침해서 오늘 날짜로 맞춤 */
 function checkDay(){const n=new Date();n.setHours(0,0,0,0);if(n.getTime()===TODAY.getTime())return false;
   if(!document.querySelector(".overlay")&&!dirty&&!syncing&&!typing()){toast("날짜가 바뀌어 오늘 기준으로 다시 불러옵니다…");setTimeout(()=>location.reload(),600);}else setTimeout(checkDay,5000);return true;}
@@ -790,7 +795,11 @@ function mentions(txt){return allPeople().filter(n=>String(txt||"").includes("@"
 let CHG_DET=[];const chgNote=(...xs)=>{xs.filter(Boolean).forEach(x=>CHG_DET.push(String(x)));};
 function chgFind(id){if(!id)return "";const L=[[S.joins,j=>`${j.name}(${j.co})`],[S.quits,q=>`${q.name}(${q.co})`],[S.interviews,v=>`${v.name}(${v.co})`],[S.contracts,c=>`${c.name}(${c.co})`],[S.pays,p=>`${p.name}(${p.co})`],[S.blacklist,b=>b.name],[S.posts,p=>p.title],[S.sales,d=>d.co||d.name||""]];
   for(const [arr,f] of L){const x=(arr||[]).find(y=>y.id===id);if(x)return f(x);}return "";}
-function notifyCeoChange(what,tab){const det=CHG_DET.splice(0);if(me()===ceoName())return;notify([ceoName()],what+(det.length?" — "+det.join(", "):""),tab,{group:"chg|"+tab+"|"+what,det});}
+/* 대표 + 대표 권한(정태균·서영은 등) 모두 '대표'로 봄: 수정 알림을 모두 받고, 대표만 보는 것도 똑같이 봄 */
+const CEO_ALL=()=>{const P=(typeof PROFILES!=="undefined"&&Array.isArray(PROFILES))?PROFILES.filter(p=>p.active&&(p.role==="ceo"||p.ceo_level)).map(p=>p.name||p.login_id):[];return [...new Set([ceoName(),...P])].filter(Boolean);};
+const isCeoMe=()=>CEO_ALL().includes(me());
+let CHG_SENT=false;
+function notifyCeoChange(what,tab){const det=CHG_DET.splice(0);CHG_SENT=true;const to=CEO_ALL().filter(n=>n!==me());if(!to.length)return;notify(to,what+(det.length?" — "+det.join(", "):""),tab,{group:"chg|"+tab+"|"+what,det});}
 const myNotifs=()=>(S.notifs||[]).filter(x=>x.to===me());
 function notifModal(){const L=myNotifs();
   modal("알림",L.length?`<div class="nlist">${L.slice(0,80).map(x=>`<button type="button" class="nitem ${x.read?"":"unread"}" data-act="notifGo" data-id="${x.id}"><b>${esc(x.from)}</b> ${esc(x.text)}${x.n>1?` <span class="chip mute">${x.n}건</span>`:""}<span class="sub">${mdShort(x.at.slice(0,10))} ${x.at.slice(11,16)}</span></button>`).join("")}</div>`:'<div class="empty">알림이 없습니다.</div>',
@@ -1337,7 +1346,7 @@ const TT_MGR_ONLY=["서영은","공병규"];
 const hm=h=>h==null?"":`${pad(Math.floor(h))}:${(h%1)?"30":"00"}`;
 const TT_SLOTS=Array.from({length:29},(_,i)=>8+i/2); /* 08:00 ~ 22:00, 30분 단위 */
 const hourOpts=sel=>`<option value="">종일</option>${TT_SLOTS.map(h=>`<option value="${h}" ${sel===h?"selected":""}>${hm(h)}</option>`).join("")}`;
-const ttVis=e=>(e.staff!==PEOPLE()[0]||me()===PEOPLE()[0])&&(!TT_MGR_ONLY.includes(e.staff)||isBoss()||e.staff===me());
+const ttVis=e=>(e.staff!==PEOPLE()[0]||isCeoMe())&&(!TT_MGR_ONLY.includes(e.staff)||isBoss()||e.staff===me());
 /* 타임트리 칸 순서 (여기에 없는 새 직원은 이슬기 바로 뒤에 붙음) */
 const TT_ORDER=["박진호","이관영","양희창","전우성","김유균","이슬기","장민혁","추성운","김태경","공병규","정태균","정훈","서영은","우현경"];
 const ttRank=n=>{const i=TT_ORDER.indexOf(n);return i<0?TT_ORDER.indexOf("이슬기")+0.5:i;};
@@ -1531,13 +1540,13 @@ function vCond(){
 
 /* ---------- 특이사항 ---------- */
 /* 특이사항: '전체'로 올린 글은 모두, 사람을 지정한 글은 지정된 사람·글쓴이·대표만 봄 */
-const postVis=p=>p.to.includes("전체")||p.to.includes(me())||p.author===me()||me()===ceoName(); /* 대표 본인만 (대표 권한 받은 팀장 제외) */
+const postVis=p=>p.to.includes("전체")||p.to.includes(me())||p.author===me()||isCeoMe(); /* 대표 본인만 (대표 권한 받은 팀장 제외) */
 function vNotes(){
   const f=S.ui.noteF;let ps=[...S.posts].filter(postVis).sort((a,b)=>b.date.localeCompare(a.date));
   const forMe=p=>p.to.includes(me())||p.to.includes("전체");
   if(f==="mine")ps=ps.filter(forMe);if(f==="unread")ps=ps.filter(p=>forMe(p)&&!p.reads.includes(me()));
   const recips=p=>p.to.includes("전체")?PEOPLE().filter(n=>n!==p.author):p.to;
-  return ph("현장·거래처 특이사항 공유","누구나 글을 올리고, 꼭 봐야 할 사람을 지정합니다. 사람을 지정한 글은 지정된 사람·글쓴이·대표 본인만 볼 수 있고, '전체'로 올린 글은 모두 봅니다. 지정된 사람이 '확인'을 누르면 확인 현황이 채워집니다.",`<button class="btn primary" data-act="postNew">+ 글쓰기</button>`)+
+  return ph("현장·거래처 특이사항 공유","누구나 글을 올리고, 꼭 봐야 할 사람을 지정합니다. 사람을 지정한 글은 지정된 사람·글쓴이·대표(대표 권한 포함)만 볼 수 있고, '전체'로 올린 글은 모두 봅니다. 지정된 사람이 '확인'을 누르면 확인 현황이 채워집니다.",`<button class="btn primary" data-act="postNew">+ 글쓰기</button>`)+
   `<div class="subtabs">${[["all","전체"],["mine","나에게 온 글"],["unread","내가 확인 안 한 글"]].map(([k,l])=>`<button data-act="noteF" data-v="${k}" aria-pressed="${f===k}">${l}</button>`).join("")}</div>
   <div class="grid">${ps.map(p=>{const rc=recips(p);const rd=rc.filter(n=>p.reads.includes(n)).length;const need=forMe(p)&&!p.reads.includes(me())&&p.author!==me();
    return `<article class="post ${p.level}"><h4>${p.level==="urgent"?'<span class="chip late">긴급</span>':p.level==="imp"?'<span class="chip vis">중요</span>':""}${esc(p.title)}${p.co?`<span class="chip mute">${esc(p.co)}</span>`:""}</h4>
@@ -2341,7 +2350,7 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
       {onSubmit:fd=>{S.inv.push({id:uid(),co:fd.get("co"),branch:fd.get("branch"),kind:fd.get("kind"),due:+fd.get("due")||10,status:{}});}}),
   };
   const CHG={blDel:"블랙리스트 삭제",docUndo:"서류 전달 되돌리기",docDel:"서류 요청 취소",docFileDel:"서류 파일 빼기",hcAdd:"인원현황 줄 추가",hcDel:"인원현황 줄 삭제",hcBase:"기준 인원 저장",toAdd:"TO 줄 추가",toDel:"TO 줄 삭제",jSet:"입사예정자 결과 처리",jCt:"입사예정자 근로계약서 체크",jRec:"입사예정자 채용 담당 지정",jDel:"입사예정자 삭제",qDel:"퇴사자 삭제",postRead:"특이사항 확인",postDel:"특이사항 삭제",evDel:"일정 삭제",lvOk:"연차 승인",lvNo:"연차 반려",lvDel:"연차 신청 취소",ctDel:"근로계약 삭제",ivDel:"지원 DB 삭제",ivGrade:"지원 DB 상태 변경",invSet:"계산서·명세표 O/X 표시",payDone:"주급·가불 지급완료",payUndo:"지급완료 취소",payBatch:"주급·가불 지급완료",paySheetDone:"주급·가불 지급완료",payDel:"주급·가불 신청 삭제",arMemoAdd:"미수금 메모",arMemoPaid:"미수금 입금 확인",arMemoMiss:"미수금 미입금 표시",arMemoUndo:"미수금 되돌리기",arDel:"미수금 삭제",dlDel:"영업 건 삭제",adNewWk:"광고표 새 주 시작",adAddCo:"광고표 업체 추가"};
-  if(H[a]){if(CHG[a]&&me()!==ceoName()){const t=S.tab;let d=chgFind(el.dataset.id);
+  if(H[a]){if(CHG[a]&&CEO_ALL().some(n=>n!==me())){const t=S.tab;let d=chgFind(el.dataset.id);
       if(!d&&el.dataset.g!=null&&el.dataset.i!=null&&a.startsWith("hc")){const r=((S.hc[S.ui.hcBr]||[])[+el.dataset.g]||{rows:[]}).rows[+el.dataset.i];d=r&&r.co;}
       if(!d&&el.dataset.i!=null&&a.startsWith("to")){const r=(S.to[S.ui.toBr]||[])[+el.dataset.i];d=r&&r.co;}
       if(d&&a==="jSet")d+=" → "+(v==="완료"?"입사":v);if(d&&a==="jCt")d+=" 계약서 "+v;if(d&&a==="ivGrade")d+=" → "+v;
