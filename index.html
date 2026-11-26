@@ -527,7 +527,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1795720000";
+const HUB_BUILD="1795730000";
 /* 날짜가 바뀌었으면 (화면을 며칠 켜 둔 채 쓰는 경우) 새로고침해서 오늘 날짜로 맞춤 */
 function checkDay(){const n=new Date();n.setHours(0,0,0,0);if(n.getTime()===TODAY.getTime())return false;
   if(!document.querySelector(".overlay")&&!dirty&&!syncing&&!typing()){toast("날짜가 바뀌어 오늘 기준으로 다시 불러옵니다…");setTimeout(()=>location.reload(),600);}else setTimeout(checkDay,5000);return true;}
@@ -669,7 +669,12 @@ const DOW=["일","월","화","수","목","금","토"];
 const AD_SEED_WEEK="2026-09-28";
 /* 연도 없이 쓴 날짜는 오늘에서 가장 가까운 해로 (12월에 쓴 1/4 = 내년, 1월에 쓴 12/28 = 작년) */
 const nearYear=(mo,d)=>{const y=TODAY.getFullYear();let best=y,bd=Infinity;[y-1,y,y+1].forEach(yy=>{const x=Math.abs(new Date(yy,mo-1,d)-TODAY);if(x<bd){bd=x;best=yy;}});return best;};
-const md=s=>{if(!s)return "";const m=String(s).match(/(\d{1,2})\s*[\/.월]\s*(\d{1,2})/);return m?nearYear(+m[1],+m[2])+"-"+pad(+m[1])+"-"+pad(+m[2]):"";};
+/* 연도를 같이 쓴 날짜: 2027-1-15 · 2027.1.15 · 2027/1/15 · 2027년 1월 15일 · 27.1.15 · 27/1/15 */
+const DATE_Y_RX=/(\d{4})\s*[-.\/년]\s*(\d{1,2})\s*[-.\/월]\s*(\d{1,2})|(?:^|[^\d.\/])(\d{2})\s*[.\/년]\s*(\d{1,2})\s*[.\/월]\s*(\d{1,2})(?![.\/]?\d)/;
+const DATE_ANY_G=()=>/(?:\d{4}\s*[-.\/년]\s*\d{1,2}\s*[-.\/월]\s*\d{1,2}|(?:\d{2}\s*[.\/년]\s*)?\d{1,2}\s*[\/.월]\s*\d{1,2})\s*일?/g;
+function ymdOf(s){const m=String(s||"").match(DATE_Y_RX);if(!m)return "";const y=m[1]?+m[1]:2000+(+m[4]),mo=+(m[1]?m[2]:m[5]),d=+(m[1]?m[3]:m[6]);if(mo<1||mo>12||d<1||d>31||y<2000||y>2099)return "";return y+"-"+pad(mo)+"-"+pad(d);}
+const md=s=>{if(!s)return "";const y=ymdOf(s);if(y)return y;const m=String(s).match(/(\d{1,2})\s*[\/.월]\s*(\d{1,2})/);return m?nearYear(+m[1],+m[2])+"-"+pad(+m[1])+"-"+pad(+m[2]):"";};
+const ymdKo=d=>d?`${+d.slice(0,4)}년 ${+d.slice(5,7)}월 ${+d.slice(8,10)}일`:"";
 const norm=s=>String(s||"").replace(/\(.*?\)|\s|주식회사|\(주\)/g,"").toLowerCase();
 function mgrOfCo(co,st){st=st||(typeof S!=="undefined"&&S)||{};const n=norm(co);if(!n)return "";
   for(const t of Object.keys(st.hc||{}))for(const g of (st.hc||{})[t])for(const r of g.rows){const k=norm(r.co);if(k&&(k.includes(n)||n.includes(k)))return r.mgr;}
@@ -1581,8 +1586,9 @@ function postForm(){
 const STAGES=["청구","독촉","회수 약속","회수 완료"];
 /* 메모 한 줄에서 날짜·금액·거래처를 읽어냄: "A거래처 15일 100만원 상환예정" */
 function parseArMemo(t){const o={due:"",amt:0,coId:""};const s=String(t||"");
-  let m=s.match(/(\d{1,2})\s*[\/.월]\s*(\d{1,2})\s*일?/);
-  if(m){/* 상환 예정일은 앞으로 올 가장 빠른 날짜 (오늘보다 앞이면 내년) */let d=new Date(TODAY.getFullYear(),+m[1]-1,+m[2]);if(d<TODAY)d=new Date(TODAY.getFullYear()+1,+m[1]-1,+m[2]);o.due=iso(d);}
+  let m=null;const yd=ymdOf(s);
+  if(yd)o.due=yd; /* 연도를 같이 쓰면 그 날짜 그대로 */
+  else if((m=s.match(/(\d{1,2})\s*[\/.월]\s*(\d{1,2})\s*일?/))){/* 상환 예정일은 앞으로 올 가장 빠른 날짜 (오늘보다 앞이면 내년) */let d=new Date(TODAY.getFullYear(),+m[1]-1,+m[2]);if(d<TODAY)d=new Date(TODAY.getFullYear()+1,+m[1]-1,+m[2]);o.due=iso(d);}
   else if((m=s.match(/(\d{1,2})\s*일/))){let d=new Date(TODAY.getFullYear(),TODAY.getMonth(),+m[1]);if(d<TODAY)d=new Date(TODAY.getFullYear(),TODAY.getMonth()+1,+m[1]);o.due=iso(d);}
   else if(/내일/.test(s))o.due=iso(addDays(TODAY,1));else if(/오늘/.test(s))o.due=iso(TODAY);
   const U={"억":1e8,"천만":1e7,"백만":1e6,"만":1e4,"천":1e3};
@@ -1607,7 +1613,7 @@ function vAR(){
   <div class="card armemo-in" style="margin-bottom:14px"><h3>메모 남기기 <span class="sub">예: A거래처 15일 100만원 상환예정</span></h3>
    <div class="arin"><select id="arCoSel" aria-label="거래처"><option value="">거래처 선택</option>${L.map(r=>`<option value="${r.id}" ${r.id===selId?"selected":""}>${esc(r.co)}</option>`).join("")}</select>
    <input id="arMemoIn" value="${esc(draft)}" placeholder="날짜·금액을 같이 쓰면 상환 예정으로 잡힙니다 (15일, 10/20, 100만원 …)" aria-label="메모 내용"><button class="btn primary" data-act="arMemoAdd">추가</button></div>
-   <div class="sub" id="arPv">${draft?`읽은 내용: ${pv.coId?`<b>${esc((L.find(r=>r.id===pv.coId)||{}).co)}</b>`:'<span class="up">거래처를 골라 주세요</span>'} · ${pv.due?`상환 예정일 <b>${mdShort(pv.due)}</b>`:"날짜 없음(일반 메모)"} · ${pv.amt?`<b>${won(pv.amt)}원</b>`:"금액 없음"}`:(L.length?"거래처 이름을 쓰면 자동으로 골라집니다. 날짜가 있으면 아래 ‘상환 예정’에 올라갑니다.":'<span class="up">아직 등록된 거래처가 없습니다. 오른쪽 위 ‘+ 미수금 등록’으로 거래처를 먼저 등록하면 메모를 남길 수 있습니다.</span>')}</div></div>
+   <div class="sub" id="arPv">${draft?`읽은 내용: ${pv.coId?`<b>${esc((L.find(r=>r.id===pv.coId)||{}).co)}</b>`:'<span class="up">거래처를 골라 주세요</span>'} · ${pv.due?`상환 예정일 <b>${ymdKo(pv.due)}</b>`:"날짜 없음(일반 메모)"} · ${pv.amt?`<b>${won(pv.amt)}원</b>`:"금액 없음"}`:(L.length?"거래처 이름을 쓰면 자동으로 골라집니다. 날짜가 있으면 아래 ‘상환 예정’에 올라갑니다.":'<span class="up">아직 등록된 거래처가 없습니다. 오른쪽 위 ‘+ 미수금 등록’으로 거래처를 먼저 등록하면 메모를 남길 수 있습니다.</span>')}</div></div>
   <div class="grid g4" style="margin-bottom:14px"><div class="card kpi">${ring(pct(s.p,s.b),80)}<div><span>전체 회수율</span><b>${won(s.p)}원</b><span>청구 ${won(s.b)}원</span></div></div>
    <div class="card"><span class="sub">남은 미수금</span><div class="big up">${won(s.left)}원</div><span class="sub">${L.filter(r=>r.billed>r.paid).length}개 거래처</span></div>
    <div class="card"><span class="sub">${TODAY.getMonth()+1}월 상환 예정</span><div class="big">${won(monSum)}원</div><span class="sub">${open.length}건 대기${lateN?` · <span class="up">약속일 지남 ${lateN}건</span>`:""}</span></div>
@@ -1979,13 +1985,13 @@ function parseBoard(text,mode){ // mode join|quit
   const out=[];let co="",date="";
   text.split(/\n/).forEach(raw=>{let l=raw.trim();if(!l)return;
     const c=l.match(/^[<〈《\[]\s*(.+?)\s*[>〉》\]]\s*(.*)$/);if(c){co=c[1];date="";l=c[2].trim();if(!l)return;}
-    const dates=[...l.matchAll(/(\d{1,2})\s*[\/.]\s*(\d{1,2})/g)].map(m=>md(m[0]));
+    const dates=[...l.matchAll(DATE_ANY_G())].map(m=>md(m[0]));
     if(mode==="join"){if(dates[0])date=dates[0];
-      const rest=l.replace(/(\d{1,2})\s*[\/.]\s*(\d{1,2})/,"").trim();
+      const rest=l.replace(new RegExp(DATE_ANY_G().source),"").trim();
       const name=(rest.match(/[가-힣]{2,4}/)||[""])[0];if(!name)return;
       const digits=(rest.match(/\d{3,4}/g)||[]);const phone=digits.length>=2?"010-"+digits[digits.length-2]+"-"+digits[digits.length-1]:(digits[0]||"");
       out.push({date,co,name,phone,ck:/[vV✓✔]/.test(rest.replace(/[가-힣]/g,""))});}
-    else{const rest=l.replace(/(\d{1,2})\s*[\/.]\s*(\d{1,2})/g,"").replace(/입사|퇴사|→|~|-/g," ").trim();
+    else{const rest=l.replace(DATE_ANY_G(),"").replace(/입사|퇴사|→|~|-/g," ").trim();
       const name=(rest.match(/[가-힣○]{2,4}/)||[""])[0];if(!name)return;
       out.push({co,name,inDate:dates[0]||"",outDate:dates[1]||dates[0]||"",reason:rest.replace(name,"").trim()});}
   });return out;}
@@ -2074,8 +2080,8 @@ function hcUnmove(path,d,src){const r=rowOf(path);if(!hasRoster(r)){bumpPath(pat
 function rosterBadge(r){if(!hasRoster(r))return "";const n=r.people.filter(isNewP).length,o=r.people.filter(isOutP).length;
   return `${n?` <span class="rb rn" title="이번 주(화요일~월요일) 입사한 사람 (명단 기준)">이번 주 신규 +${n}</span>`:""}${o?` <span class="rb ro" title="이번 주(화요일~월요일) 퇴사한 사람">이번 주 퇴사 −${o}</span>`:""}`;}
 const fmtPhone=v=>{const d=String(v||"").replace(/\D/g,"");return d.length===11?d.replace(/(\d{3})(\d{4})(\d{4})/,"$1-$2-$3"):d.length===10?d.replace(/(\d{3})(\d{3,4})(\d{4})/,"$1-$2-$3"):String(v||"").trim();};
-function parseRosterLines(t,asNew){return String(t||"").split(/\n|,/).map(l=>l.trim()).filter(Boolean).map(l=>{let d="",ph="";const pm=l.match(/01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/);if(pm){ph=fmtPhone(pm[0]);l=l.replace(pm[0],"").trim();}const m=l.match(/(\d{4}-\d{1,2}-\d{1,2})|(\d{1,2})[\/.](\d{1,2})/);
-  if(m){if(m[1])d=iso(new Date(m[1]));else{const y=nearYear(+m[2],+m[3]);d=iso(new Date(y,+m[2]-1,+m[3]));}l=l.replace(m[0],"").trim();}
+function parseRosterLines(t,asNew){return String(t||"").split(/\n|,/).map(l=>l.trim()).filter(Boolean).map(l=>{let d="",ph="";const pm=l.match(/01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/);if(pm){ph=fmtPhone(pm[0]);l=l.replace(pm[0],"").trim();}const m=l.match(DATE_ANY_G());
+  if(m){d=md(m[0]);l=l.replace(m[0],"").trim();}
   return {id:uid(),name:l.replace(/\s+/g," "),in:d||(asNew?iso(TODAY):""),phone:ph};}).filter(x=>x.name);}
 function hcRecTable(rp,r,act){const ms=mgrs(r);const multi=ms.length>1;const opts=[...new Set([...ms,...REC_NAMES(),...STAFF])];const un=multi?act.filter(x=>!recOf(x,r)).length:0;
   return `<details style="margin-top:10px" ${un||(isBoss()&&S.ui.recOpen)?"open":""} ontoggle="S.ui.recOpen=this.open"><summary><b>${multi?"담당 나누기":"채용 담당 바꾸기"}</b> <span class="sub">${multi?`관리담당이 ${ms.length}명인 업체 — `:"팀장급 이상 — "}사람마다 누가 넣은 인원인지 고르면 관리담당자별 합계에 그 사람 몫으로 셉니다${un?` · <span class="up">미지정 ${un}명</span>`:""}</span></summary>
@@ -2268,7 +2274,7 @@ if(el.dataset.jrec){const j=S.joins.find(x=>x.id===el.dataset.jrec);if(j&&el.val
     setTimeout(()=>{const a=document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.set;const y=scrollY;render();scrollTo(0,y);if(a){const n=document.querySelector(`[data-set="${CSS.escape(a)}"]`);if(n)n.focus();}},0);}
   if(el.dataset.ui==="ttDate"){S.ui.ttDate=el.value;save();render();}if(el.dataset.ui==="attDate"){S.ui.attDate=el.value||iso(TODAY);save();render();}
 });
-document.addEventListener("input",e=>{if(/^[ok]amt_/.test(e.target.name||"")){const c=e.target.form&&e.target.form.querySelector(`input[name="${e.target.name[0]}"][value="${CSS.escape(e.target.name.slice(5))}"]`);if(c)c.checked=!!e.target.value;return;}if(e.target.id==="payT"){payPreview(e.target);return;}if(e.target.id==="arMemoIn"){S.ui.arDraft=e.target.value;const pv=parseArMemo(e.target.value);const sel=document.getElementById("arCoSel");if(pv.coId&&sel&&!S.ui.arCo)sel.value=pv.coId;const L=arList();const v=e.target.value;document.getElementById("arPv").innerHTML=v?`읽은 내용: ${(pv.coId||sel.value)?`<b>${esc((L.find(r=>r.id===(pv.coId||sel.value))||{}).co)}</b>`:'<span class="up">거래처를 골라 주세요</span>'} · ${pv.due?`상환 예정일 <b>${mdShort(pv.due)}</b>`:"날짜 없음(일반 메모)"} · ${pv.amt?`<b>${won(pv.amt)}원</b>`:"금액 없음"}`:"";return;}if(e.target.name==="co"&&document.getElementById("qHcWrap")){document.getElementById("qHcWrap").innerHTML=candSel("hc",hcCands(e.target.value),"인원현황에는 반영 안 함");return;}if(e.target.id==="pasteT"){pastePreview(e.target);return;}if(e.target.dataset.ui==="ctQ"||e.target.dataset.ui==="ivQ"||e.target.dataset.ui==="blQ"||e.target.dataset.ui==="hcQ"){const k=e.target.dataset.ui;S.ui[k]=e.target.value;const q=e.target.value.trim();document.querySelectorAll((k==="hcQ"?".hcalltbl tbody tr:not(.gh):not(.tot), .hcallm .mi":{ctQ:".cttbl",ivQ:".ivtbl",blQ:".bltbl"}[k]+" tbody tr")).forEach(tr=>{tr.style.display=!q||tr.textContent.includes(q)?"":"none";});return;}if(e.target.dataset.ui==="condQ"){S.ui.condQ=e.target.value;condFilter(e.target.value);return;}});
+document.addEventListener("input",e=>{if(/^[ok]amt_/.test(e.target.name||"")){const c=e.target.form&&e.target.form.querySelector(`input[name="${e.target.name[0]}"][value="${CSS.escape(e.target.name.slice(5))}"]`);if(c)c.checked=!!e.target.value;return;}if(e.target.id==="payT"){payPreview(e.target);return;}if(e.target.id==="arMemoIn"){S.ui.arDraft=e.target.value;const pv=parseArMemo(e.target.value);const sel=document.getElementById("arCoSel");if(pv.coId&&sel&&!S.ui.arCo)sel.value=pv.coId;const L=arList();const v=e.target.value;document.getElementById("arPv").innerHTML=v?`읽은 내용: ${(pv.coId||sel.value)?`<b>${esc((L.find(r=>r.id===(pv.coId||sel.value))||{}).co)}</b>`:'<span class="up">거래처를 골라 주세요</span>'} · ${pv.due?`상환 예정일 <b>${ymdKo(pv.due)}</b>`:"날짜 없음(일반 메모)"} · ${pv.amt?`<b>${won(pv.amt)}원</b>`:"금액 없음"}`:"";return;}if(e.target.name==="co"&&document.getElementById("qHcWrap")){document.getElementById("qHcWrap").innerHTML=candSel("hc",hcCands(e.target.value),"인원현황에는 반영 안 함");return;}if(e.target.id==="pasteT"){pastePreview(e.target);return;}if(e.target.dataset.ui==="ctQ"||e.target.dataset.ui==="ivQ"||e.target.dataset.ui==="blQ"||e.target.dataset.ui==="hcQ"){const k=e.target.dataset.ui;S.ui[k]=e.target.value;const q=e.target.value.trim();document.querySelectorAll((k==="hcQ"?".hcalltbl tbody tr:not(.gh):not(.tot), .hcallm .mi":{ctQ:".cttbl",ivQ:".ivtbl",blQ:".bltbl"}[k]+" tbody tr")).forEach(tr=>{tr.style.display=!q||tr.textContent.includes(q)?"":"none";});return;}if(e.target.dataset.ui==="condQ"){S.ui.condQ=e.target.value;condFilter(e.target.value);return;}});
 document.addEventListener("submit",e=>{if(e.target.id!=="mform")return;e.preventDefault();const fn=modalSubmit;const ttl=(e.target.querySelector("h2")||{}).textContent||"";const tab=S.tab;closeModal();if(fn)fn(new FormData(e.target));notifyCeoChange(ttl.replace(/\s+/g," ").trim(),tab);save();render();});
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="arMemoIn"){e.preventDefault();document.querySelector('[data-act="arMemoAdd"]').click();return;}if(e.key==="Escape"&&modalSubmit!==undefined&&document.querySelector(".overlay"))guardClose();});
 document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(df){e.preventDefault();openDocFile(df.dataset.id,+df.dataset.i);return;}}
