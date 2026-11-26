@@ -527,7 +527,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1795750000";
+const HUB_BUILD="1795760000";
 /* 날짜가 바뀌었으면 (화면을 며칠 켜 둔 채 쓰는 경우) 새로고침해서 오늘 날짜로 맞춤 */
 function checkDay(){const n=new Date();n.setHours(0,0,0,0);if(n.getTime()===TODAY.getTime())return false;
   if(!document.querySelector(".overlay")&&!dirty&&!syncing&&!typing()){toast("날짜가 바뀌어 오늘 기준으로 다시 불러옵니다…");setTimeout(()=>location.reload(),600);}else setTimeout(checkDay,5000);return true;}
@@ -1095,6 +1095,12 @@ function coMatch(a,b){const x=CO_ALIAS[norm(a)]||norm(a),y=CO_ALIAS[norm(b)]||no
 function adCands(br){const L=[];(S.to[br]||[]).forEach(t=>L.push(t.co));
   HC_TABS.forEach(t=>(S.hc[t]||[]).forEach(g=>{if(g.branch===br)return;g.rows.forEach(r=>{if(r.excluded||!r.co)return;const ps=[...mgrs(r),...String(r.sales||"").split("/").map(x=>x.trim())].filter(Boolean);if(ps.some(n=>brOf(n)===br))L.push(r.co);});}));
   (S.sales||[]).forEach(d=>{if(d.branch===br&&DEAL_TYPES.includes(d.result)&&d.co)L.push(d.co);});return L;}
+/* TO가 있는데 이번 주 광고가 하나도 없는 업체 전체 목록 */
+function adNoAdModal(){const [weeks,w,brs,br]=adWeekPick();const B=br==="전체"?brs:[br];
+  const L=B.flatMap(b=>((S.adw[w]||{})[b]||[]).map(r=>({r,b,c:rowCost(r,w,b),t:toFor(b,r.co)}))).filter(x=>(x.t.to>0||x.t.always)&&x.c.days===0);
+  const mgrOf=(b,co)=>[...new Set((S.to[b]||[]).filter(t=>coMatch(t.co,co)).map(t=>t.mgr).filter(Boolean))].join(", ");
+  modal(`TO 있는데 이번 주 광고 없음 — ${L.length}곳`,`<p class="sub" style="margin-top:0">${wkLabel(w)} · ${br==="전체"?"전체 지사":br} · 광고표에 있는 업체 중 TO가 있는데 이번 주에 올린 광고가 없는 곳입니다.</p>
+   ${L.length?`<div class="tw"><table class="x"><thead><tr><th>지사</th><th style="text-align:left">업체</th><th>TO</th><th>TO 담당</th></tr></thead><tbody>${L.map(x=>`<tr><td>${x.b}</td><td class="l"><b>${esc(x.r.co)}</b></td><td class="num">${x.t.to?num(x.t.to)+"명":""}${x.t.always?(x.t.to?" + ":"")+"상시":""}</td><td>${esc(mgrOf(x.b,x.r.co))}</td></tr>`).join("")}</tbody></table></div>`:'<div class="empty">TO가 있는 업체는 이번 주에 모두 광고가 올라갔습니다.</div>'}`,{wide:true});}
 function toFor(br,co){const rs=(S.to[br]||[]).filter(r=>coMatch(r.co,co));return {n:rs.length,to:rs.reduce((s,r)=>s+(+r.to||0),0),always:rs.some(r=>!r.to)};}
 function wkLabel(w){const d=new Date(w);return `${d.getMonth()+1}/${d.getDate()} ~ ${mdShort(iso(addDays(d,6)))}`;}
 /* 한 업체·한 주의 광고 건수와 비용.
@@ -1190,7 +1196,7 @@ function vADweek(){const [weeks,w,brs,br]=adWeekPick();
   `<div class="grid g3" style="margin-bottom:14px">
    <div class="card"><span class="sub">${P?esc(P)+" ":""}이번 주 광고비 (자동 계산)</span><div class="big">${won(tot.total)}원${P&&pBud?`<span class="sub"> / 주 예산 ${manwon(weekBudget(pBud,w))}원</span>`:""}</div>${P&&pBud?`<div class="pbar ${pct(pMon,pBud)>100?"bad":pct(pMon,pBud)>=80?"warn":"ok"}" style="margin:6px 0 4px"><i style="width:${Math.min(100,pct(pMon,pBud))}%"></i></div><div class="sub">월 예산 <b>${won(pBud)}원</b> · ${+w.slice(5,7)}월 누적 ${won(pMon)}원 (<b class="${pct(pMon,pBud)>100?"up":""}">${pct(pMon,pBud)}%</b>) · 남은 예산 ${won(Math.max(0,pBud-pMon))}원</div>`:""}<span class="sub">M점프 ${won(tot.cost.j)} · M지역 ${won(tot.cost.r)} · 114114 ${won(tot.cost.o)} · 당근 ${won(tot.cost.k)}</span>${tot.missing?`<div class="up sub">당근 금액 빠진 곳 ${tot.missing}건</div>`:""}</div>
    <div class="card"><span class="sub">광고 올린 횟수</span><div class="big">${tot.cnt}회</div><span class="sub"><span class="mtag mj">M점프</span> ${tot.j} · <span class="mtag mr">M지역</span> ${tot.r} · <span class="mtag mo">114114</span> ${tot.o} · <span class="mtag mk">당근</span> ${tot.k}${tot.u?` · 미구분 ${tot.u}`:""}</span></div>
-   ${P?`<div class="card"><span class="sub">${esc(P)}이(가) 올린 업체</span><div class="big">${cs.filter(c=>c.cnt>0).length}곳</div><span class="sub">${rows.filter((r,i)=>cs[i].cnt>0).slice(0,3).map(r=>esc(r.co)).join(", ")}</span></div>`:`<div class="card"><span class="sub">TO 있는데 이번 주 광고 없음</span><div class="big ${noAd.length?"up":""}">${noAd.length}곳</div><span class="sub">${noAd.slice(0,3).map(x=>esc(x.r.co)).join(", ")}${noAd.length>3?" 외":""}</span></div>`}
+   ${P?`<div class="card"><span class="sub">${esc(P)}이(가) 올린 업체</span><div class="big">${cs.filter(c=>c.cnt>0).length}곳</div><span class="sub">${rows.filter((r,i)=>cs[i].cnt>0).slice(0,3).map(r=>esc(r.co)).join(", ")}</span></div>`:`<button type="button" class="card cardlink" data-act="adNoAd" style="text-align:left" title="눌러서 전체 목록 보기"><span class="sub">TO 있는데 이번 주 광고 없음 <span class="go">전체 보기 →</span></span><div class="big ${noAd.length?"up":""}">${noAd.length}곳</div><span class="sub">${noAd.slice(0,3).map(x=>esc(x.r.co)).join(", ")}${noAd.length>3?` 외 ${noAd.length-3}곳`:""}</span></button>`}
    </div><div class="pchips adwp" role="group" aria-label="담당자별로 표 보기"><span class="sub" style="align-self:center">표 보기:</span><button class="pch2 ${!P?"on":""}" data-act="adWP" data-v="">전체</button>${Object.entries(AD_GROUPS).filter(([g,ns])=>ns.some(n=>adPpl.includes(n))).map(([g,ns])=>`<button class="pch2 grp ${g===P?"on":""}" data-act="adWP" data-v="${esc(g)}" title="${ns.join("+")}">👥 ${esc(g)} <small>${ns.join("·")}</small></button>`).join("")}${adPpl.map(n=>`<button class="pch2 ${n===P?"on":""}" data-act="adWP" data-v="${esc(n)}">${n===me()?"⭐ ":""}${esc(n)}</button>`).join("")}</div>
    ${P?`<div class="banner" style="margin:8px 0 0"><b>${esc(P)}</b>${AD_GROUPS[P]?`(${AD_GROUPS[P].join("·")})`:""}이(가) 올린 광고만 보는 중입니다. 다른 사람 체크는 숨겼고, 광고비도 ${esc(P)} 것만 계산했습니다.${nHide?` ${esc(P)} 기록이 없는 업체 ${nHide}곳${S.ui.adWAll?"도 같이 보는 중":"은 숨김"} · <button class="chip vis" style="border:0;cursor:pointer" data-act="adWAll">${S.ui.adWAll?"기록 있는 업체만":"업체 모두 보기"}</button>`:""}</div>`:""}
    <div style="margin-top:12px">${adPersonCard(w,brs)}</div>`;
@@ -2301,6 +2307,7 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
     adWk:()=>{const ws=Object.keys(S.adw).sort();const i=ws.indexOf(S.ui.adWk)+(+v);if(ws[i])S.ui.adWk=ws[i];},
     adUp:()=>adUploadForm(),adCell:()=>adCellForm(+el.dataset.r,+el.dataset.d,el.dataset.b),adAlias:()=>adAliasForm(),
     adAddCo:()=>{const name=v||prompt("업체 이름");if(!name)return;const w=S.ui.adWk,br=S.ui.adBr;S.adw[w]=S.adw[w]||{};(S.adw[w][br]=S.adw[w][br]||[]).push({co:name,d:Array.from({length:7},emptyDay)});toast(name+" 추가");},
+    adNoAd:()=>adNoAdModal(),
     adNewWk:()=>{const ws=Object.keys(S.adw).sort().filter(x=>!S.adwSample[x]);const last=ws[ws.length-1];const nw=iso(addDays(new Date(last),7));if(S.adw[nw]&&!S.adwSample[nw]){S.ui.adWk=nw;return;}delete S.adwSample[nw];S.adw[nw]={};Object.entries(S.adw[last]).forEach(([b,rs])=>S.adw[nw][b]=rs.map(r=>({co:r.co,d:Array.from({length:7},emptyDay)})));S.ui.adWk=nw;toast(wkLabel(nw)+" 주를 만들었습니다 (업체 목록 그대로)");},
     adNote:()=>toast("실제 허브의 엑셀 올리기 기능이 그대로 들어갑니다"),
     ttView:()=>S.ui.ttView=v,
@@ -2376,7 +2383,7 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
       if(!d&&el.dataset.g!=null&&el.dataset.i!=null&&a.startsWith("hc")){const r=((S.hc[S.ui.hcBr]||[])[+el.dataset.g]||{rows:[]}).rows[+el.dataset.i];d=r&&r.co;}
       if(!d&&el.dataset.i!=null&&a.startsWith("to")){const r=(S.to[S.ui.toBr]||[])[+el.dataset.i];d=r&&r.co;}
       if(d&&a==="jSet")d+=" → "+(v==="완료"?"입사":v);if(d&&a==="jCt")d+=" 계약서 "+v;if(d&&a==="ivGrade")d+=" → "+v;
-      const det=d?[d]:[];queueMicrotask(()=>{CHG_DET.push(...det);notifyCeoChange(CHG[a],t);save();renderHead();});}const opensModal=["pw","accounts","logout","budgetEdit","pushOn","rosterUp","payUp","att","ivBl","ctNew","ctEdit","ctRenew","ctPaste","ivNew","ivEdit","ivJoin","jToDb","blNew","blEdit","lvEdit","hcPpl","docNew","docDone","invEdit","notif","payNew","payEdit","adPB","dlNew","dlEdit","dlDone","dlResult","arMemoFor","arMemoEdit","adUp","adCell","adAlias","jPaste","qPaste","jEdit","qNew","qEdit","calDay","evNew","evEdit","condEdit","postNew","arNew","arEdit","lvNew","invNew"].includes(a);H[a]();save();
+      const det=d?[d]:[];queueMicrotask(()=>{CHG_DET.push(...det);notifyCeoChange(CHG[a],t);save();renderHead();});}const opensModal=["pw","accounts","logout","budgetEdit","pushOn","rosterUp","payUp","att","ivBl","ctNew","ctEdit","ctRenew","ctPaste","ivNew","ivEdit","ivJoin","jToDb","blNew","blEdit","lvEdit","hcPpl","docNew","docDone","invEdit","notif","payNew","payEdit","adPB","dlNew","dlEdit","dlDone","dlResult","arMemoFor","arMemoEdit","adNoAd","adUp","adCell","adAlias","jPaste","qPaste","jEdit","qNew","qEdit","calDay","evNew","evEdit","condEdit","postNew","arNew","arEdit","lvNew","invNew"].includes(a);H[a]();save();
     if(!opensModal&&a!=="close"&&!document.querySelector(".overlay")){const y=scrollY;render();if(a!=="tab")scrollTo(0,y);}
     void keepModal;}
 });
