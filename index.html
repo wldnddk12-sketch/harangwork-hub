@@ -379,7 +379,7 @@ function docsOf(s){const D=new Map();const put=(kind,key,branch,data)=>D.set(kin
   s.events.forEach(e=>put("event",e.id,(typeof TT_MGR_ONLY!=="undefined"&&TT_MGR_ONLY.includes(e.staff))?"팀장급":null,e));s.posts.forEach(p=>put("post",p.id,null,p));
   s.ar.forEach(r=>put("ar",r.id,r.branch,r));s.joins.forEach(j=>put("join",j.id,null,{...j,_ts:undefined}));s.quits.forEach(q=>put("quit",q.id,null,{...q,_ts:undefined}));
   s.inv.forEach(it=>put("inv",it.id,it.branch,it));Object.entries(s.conds).forEach(([k,v])=>put("cond",k,k.split("|")[0],v));
-  Object.entries(s.leave.alloc).forEach(([n,d])=>put("leave_alloc",n,brOf(n),{days:d}));s.leave.reqs.forEach(r=>put("leave_req",r.id,brOf(r.name),r));
+  {const AY=s.leave.allocY||{};const ns=new Set([...Object.keys(s.leave.alloc),...Object.values(AY).flatMap(o=>Object.keys(o||{}))]);ns.forEach(n=>{const y={};Object.entries(AY).forEach(([yy,o])=>{if(o&&o[n]!=null)y[yy]=+o[n]||0;});const has=s.leave.alloc[n]!=null;put("leave_alloc",n,brOf(n),Object.assign(has?{days:+s.leave.alloc[n]||0}:{},Object.keys(y).length?{y}:{}));});}s.leave.reqs.forEach(r=>put("leave_req",r.id,brOf(r.name),r));
   s.sales.forEach(d=>put("sale",d.id,d.branch,d));s.pays.forEach(p=>put("pay",p.id,p.branch,p));s.docreqs.forEach(d=>put("docreq",d.id,d.branch,d));(s.contracts||[]).forEach(c=>put("ct",c.id,c.branch,c));(s.interviews||[]).forEach(v=>put("iv",v.id,v.branch,{...v,_ts:undefined}));(s.blacklist||[]).forEach(x=>put("bl",x.id,null,x));
   const g=s.goal;put("goal","cur",null,{total:g.total,net:g.net,fill:g.fill,salesG:g.salesG,salesGB:g.salesGB||{}});put("goal_money","cur",null,{collect:g.collect});Object.entries(s.goalM||{}).forEach(([m,x])=>{const nv=v=>v==null||v===""?null:+v;put("goal","m:"+m,null,{ym:m,total:nv(x.total),net:nv(x.net),fill:nv(x.fill),br:x.br||{}});if(x.collect!=null&&x.collect!=="")put("goal_money","m:"+m,null,{ym:m,collect:+x.collect||0});});put("cfg","goalRes",null,{v:s.goalRes||{}});if(s.baseYm)put("cfg","baseYm",null,{v:s.baseYm});
   return D;}
@@ -394,7 +394,7 @@ function buildS(rows,ui){const s=emptyS();if(ui)s.ui={...s.ui,...ui};const gs=[]
     case "event":s.events.push(d);break;case "post":s.posts.push(d);break;case "ar":s.ar.push(d);break;
     case "join":s.joins.push(created_at&&!d.at?{...d,_ts:created_at}:d);break;case "quit":s.quits.push(created_at&&!d.at?{...d,_ts:created_at}:d);break;case "inv":s.inv.push(d);break;
     case "sale":s.sales.push(d);break;case "pay":s.pays.push(d);break;case "docreq":s.docreqs.push({files:[],...d});break;case "ct":s.contracts.push(d);break;case "iv":s.interviews.push(created_at&&!d.ts?{...d,_ts:created_at}:d);break;case "bl":s.blacklist.push(d);break;
-    case "cond":s.conds[key]=d;break;case "leave_alloc":s.leave.alloc[key]=+d.days||0;break;case "leave_req":s.leave.reqs.push(d);break;
+    case "cond":s.conds[key]=d;break;case "leave_alloc":if(d.days!=null)s.leave.alloc[key]=+d.days||0;if(d.y){s.leave.allocY=s.leave.allocY||{};Object.entries(d.y).forEach(([yy,v])=>{(s.leave.allocY[yy]=s.leave.allocY[yy]||{})[key]=+v||0;});}break;case "leave_req":s.leave.reqs.push(d);break;
     case "goal":if(String(key).startsWith("m:")){const m=d.ym||key.slice(2);s.goalM[m]={...(s.goalM[m]||{}),total:d.total,net:d.net,fill:d.fill,br:d.br||{}};break;}Object.assign(s.goal,d);if(!s.goal.salesG)s.goal.salesG={meet:0,to:0,deal:0,...monthRange()};break;case "goal_money":if(String(key).startsWith("m:")){const m=d.ym||key.slice(2);s.goalM[m]={...(s.goalM[m]||{}),collect:d.collect};break;}Object.assign(s.goal,d);break;}});
   gs.sort((a,b)=>HC_TABS.indexOf(a.tab)-HC_TABS.indexOf(b.tab)||(a.idx||0)-(b.idx||0)).forEach(g=>{const {tab,idx,...rest}=g;(s.hc[tab]=s.hc[tab]||[]).push(rest);});
   s.ad.rows.sort((a,b)=>BRANCHES.indexOf(a.branch)-BRANCHES.indexOf(b.branch)||(a.sort||0)-(b.sort||0));
@@ -527,7 +527,7 @@ let loadT=null;
 /* 업로드 직전 최신 내용 불러오기 (덮어쓰기 방지) */
 async function hubRefresh(){clearTimeout(syncT);if(dirty&&!syncing)await sync();while(syncing)await new Promise(r=>setTimeout(r,150));await loadAll(true);}
 /* 새 버전 자동 적용: GitHub에 새 index.html이 올라오면 열려 있는 화면도 스스로 새로고침 (입력 중일 때는 기다림) */
-const HUB_BUILD="1795700000";
+const HUB_BUILD="1795720000";
 /* 날짜가 바뀌었으면 (화면을 며칠 켜 둔 채 쓰는 경우) 새로고침해서 오늘 날짜로 맞춤 */
 function checkDay(){const n=new Date();n.setHours(0,0,0,0);if(n.getTime()===TODAY.getTime())return false;
   if(!document.querySelector(".overlay")&&!dirty&&!syncing&&!typing()){toast("날짜가 바뀌어 오늘 기준으로 다시 불러옵니다…");setTimeout(()=>location.reload(),600);}else setTimeout(checkDay,5000);return true;}
@@ -667,7 +667,9 @@ const DOW=["일","월","화","수","목","금","토"];
 
 /* ---------- 초기 데이터 ---------- */
 const AD_SEED_WEEK="2026-09-28";
-const md=s=>{if(!s)return "";const m=String(s).match(/(\d{1,2})\s*[\/.월]\s*(\d{1,2})/);return m?TODAY.getFullYear()+"-"+pad(+m[1])+"-"+pad(+m[2]):"";};
+/* 연도 없이 쓴 날짜는 오늘에서 가장 가까운 해로 (12월에 쓴 1/4 = 내년, 1월에 쓴 12/28 = 작년) */
+const nearYear=(mo,d)=>{const y=TODAY.getFullYear();let best=y,bd=Infinity;[y-1,y,y+1].forEach(yy=>{const x=Math.abs(new Date(yy,mo-1,d)-TODAY);if(x<bd){bd=x;best=yy;}});return best;};
+const md=s=>{if(!s)return "";const m=String(s).match(/(\d{1,2})\s*[\/.월]\s*(\d{1,2})/);return m?nearYear(+m[1],+m[2])+"-"+pad(+m[1])+"-"+pad(+m[2]):"";};
 const norm=s=>String(s||"").replace(/\(.*?\)|\s|주식회사|\(주\)/g,"").toLowerCase();
 function mgrOfCo(co,st){st=st||(typeof S!=="undefined"&&S)||{};const n=norm(co);if(!n)return "";
   for(const t of Object.keys(st.hc||{}))for(const g of (st.hc||{})[t])for(const r of g.rows){const k=norm(r.co);if(k&&(k.includes(n)||n.includes(k)))return r.mgr;}
@@ -778,7 +780,12 @@ function arStat(){const L=arList();const b=L.reduce((s,r)=>s+(+r.billed||0),0),p
 function invState(it,m){const s=(it.status||{})[m];const due=m+"-"+pad(it.due);
   if(s&&s.issued)return s.issued<=due?"O":"지연";
   return iso(TODAY)>due||m<ym(TODAY)?"X":"대기";}
-function leaveUsed(n){return S.leave.reqs.filter(r=>r.name===n&&r.status==="승인").reduce((s,r)=>s+(+r.days||0),0);}
+/* 연차는 해마다 따로: 2026년까지는 처음 넣은 부여 일수, 2027년부터는 그 해 부여 일수(allocY). 사용은 시작일의 해로 셈 */
+const LV_BASE=2026;const lvYr=()=>Math.max(LV_BASE,+(S.ui.lvY||TODAY.getFullYear()));const lvNowY=()=>Math.max(LV_BASE,TODAY.getFullYear());
+const lvYOf=r=>Math.max(LV_BASE,+String(r.from||"").slice(0,4)||LV_BASE);
+function lvAlloc(n,y){y=y||lvNowY();if(y<=LV_BASE)return S.leave.alloc[n];const v=((S.leave.allocY||{})[y]||{})[n];return v==null?undefined:+v;}
+const lvPath=(n,y)=>y<=LV_BASE?`leave.alloc.${n}`:`leave.allocY.${y}.${n}`;
+function leaveUsed(n,y){y=y||lvNowY();return S.leave.reqs.filter(r=>r.name===n&&r.status==="승인"&&lvYOf(r)===y).reduce((s,r)=>s+(+r.days||0),0);}
 
 
 /* ---------- 알림 ---------- */
@@ -822,7 +829,7 @@ function goalOfSc(m,sc){const G=goalOf(m);if(!sc||sc==="전체")return G;G.br=G.
 function hcAllFor(sc){if(!sc||sc==="전체")return hcAll();const d=iso(TODAY);let cur=0,base=0;
   HC_TABS.forEach(t=>(S.hc[t]||[]).filter(g=>g.branch===sc).forEach(g=>g.rows.filter(r=>!r.excluded).forEach(r=>{if(t==="일용직"){const n=attOf(r,d)||0;cur+=n;base+=n;}else{cur+=+r.cur||0;base+=+r.base||0;}})));return {cur,base};}
 const toStatFor=sc=>!sc||sc==="전체"?toStat():toStat(sc);
-const GK=["total","net","fill","collect"];const goalMaxYm=()=>ym(new Date(TODAY.getFullYear(),TODAY.getMonth()+12,1));
+const GK=["total","net","fill","collect"];const goalMaxYm=()=>{const a=ym(new Date(TODAY.getFullYear(),TODAY.getMonth()+12,1)),b=(TODAY.getFullYear()+1)+"-12";return a>b?a:b;}; /* 내년 12월까지 미리 */
 /* 비어 있는 칸은 바로 앞 달 목표를 이어받음 */
 function goalInherit(m,sc){const all=!sc||sc==="전체";const ks=Object.keys(S.goalM||{}).filter(k=>k<m).sort().reverse();const base=all?(S.goal||{}):{};const o={};
   GK.forEach(f=>{for(const k of ks){const x=all?S.goalM[k]:((S.goalM[k]||{}).br||{})[sc];if(x&&x[f]!=null&&x[f]!==""){o[f]=x[f];return;}}o[f]=base[f];});return o;}
@@ -888,7 +895,7 @@ function vHome(){
    ${(()=>{const A=ivList();const top=A.filter(v=>v.grade==="최상"||v.grade==="상");return `<button class="card cardlink" data-act="tab" data-v="iv"><h3>지원 DB <span class="go">지원 DB →</span></h3><div class="big">${A.length}<span class="sub"> 명 · 최상·상 ${top.length}명</span></div><p class="sub">${top.slice(0,3).map(v=>`${esc(v.name)}(${v.grade})`).join(" · ")||"상태 '상' 이상인 지원자 없음"}</p></button>`})()}
    <button class="card cardlink" data-act="tab" data-v="docs"><h3>서류요청 <span class="go">서류요청 →</span></h3>${(()=>{const w=S.docreqs.filter(d=>d.status!=="전달완료"&&docVisBR().includes(d.branch));const mine=S.docreqs.filter(d=>d.by===me()&&d.status==="전달완료"&&(d.doneAt||"")>=iso(addDays(TODAY,-3)));return `<div class="big ${w.length?"up":""}">${w.length}<span class="sub"> 건 처리 대기</span></div><p class="sub">${canPay()?"경영지원팀 처리 필요":`내 요청 중 최근 전달완료 ${mine.length}건`}</p>`})()}</button>
    <button class="card cardlink" data-act="tab" data-v="pay"><h3>주급·가불 <span class="go">신청 현황 →</span></h3><div class="big ${payWait.length?"up":""}">${payWait.length}<span class="sub"> 명 지급 대기</span></div><p class="sub">주급 ${payWait.filter(p=>p.type==="주급").length} · 가불 ${payWait.filter(p=>p.type==="가불").length}</p></button>
-   <button class="card cardlink" data-act="tab" data-v="leave"><h3>연차 <span class="go">연차 현황 →</span></h3><div class="big">${lvBoss()?pend.length:pend.filter(r=>r.name===me()).length}<span class="sub"> 건 ${lvBoss()?"승인 대기":"내 신청 대기"}</span></div><p class="sub">${esc(me())}님 잔여 ${S.leave.alloc[me()]!=null?(S.leave.alloc[me()]-leaveUsed(me()))+"일":"대상 아님"}</p></button>
+   <button class="card cardlink" data-act="tab" data-v="leave"><h3>연차 <span class="go">연차 현황 →</span></h3><div class="big">${lvBoss()?pend.length:pend.filter(r=>r.name===me()).length}<span class="sub"> 건 ${lvBoss()?"승인 대기":"내 신청 대기"}</span></div><p class="sub">${esc(me())}님 ${lvNowY()}년 잔여 ${lvAlloc(me())!=null?(lvAlloc(me())-leaveUsed(me()))+"일":"대상 아님"}</p></button>
    <button class="card cardlink" data-act="tab" data-v="cond"><h3>업체별 채용조건 <span class="go">채용조건 →</span></h3><div class="kpi">${ring(pct(condDone,conds.length),64)}<div><b>${condDone} / ${conds.length}곳 작성 완료</b><span>교육·지사 지원용 자료</span></div></div></button>
    ${isBoss()?`<button class="card cardlink" data-act="tab" data-v="ar"><h3>미수금 🔒 <span class="go">미수금 →</span></h3><div class="kpi">${ring(pct(ar.p,ar.b),64)}<div><b>잔액 ${won(ar.left)}원</b><span>회수 ${won(ar.p)} / 청구 ${won(ar.b)}</span></div></div></button>`:""}
   </div>`;
@@ -1436,7 +1443,7 @@ function ctRenew(id){const o=S.contracts.find(x=>x.id===id);if(!o)return;const s
   ctForm({branch:o.branch,co:o.co,name:o.name,start:st,end:iso(new Date(sd.getFullYear(),sd.getMonth()+len,sd.getDate()-1)),mgr:o.mgr||me(),memo:""},o);}
 function ctPasteForm(){modal("근로계약 여러 명 붙여넣기",`<p class="sub" style="margin-top:0">한 줄에 한 명: <b>업체 이름 시작일 종료일</b> (예: 삼화 홍길동 2026-10-01 2026-12-31 · 10/1 12/31 처럼 써도 됩니다). 엑셀에서 4칸을 복사해 붙여 넣어도 됩니다.</p>
   <div class="row2">${F("지사",sel("branch",ctVisBR(),myBr()==="본사"?"본사":myBr()))}${F("담당",sel("mgr",PEOPLE(),me()))}</div>${F("내용",'<textarea name="t" rows="8" placeholder="삼화 홍길동 2026-10-01 2026-12-31"></textarea>')}`,
-  {wide:true,submit:"등록",onSubmit:fd=>{const y=TODAY.getFullYear();const dt=v=>{let m=v.match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})$/);if(m)return iso(new Date(+m[1],+m[2]-1,+m[3]));m=v.match(/^(\d{1,2})[-./](\d{1,2})$/);if(m)return iso(new Date(y,+m[1]-1,+m[2]));return "";};
+  {wide:true,submit:"등록",onSubmit:fd=>{const y=TODAY.getFullYear();const dt=v=>{let m=v.match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})$/);if(m)return iso(new Date(+m[1],+m[2]-1,+m[3]));m=v.match(/^(\d{1,2})[-./](\d{1,2})$/);if(m)return iso(new Date(nearYear(+m[1],+m[2]),+m[1]-1,+m[2]));return "";};
     const L=String(fd.get("t")||"").split("\n").map(l=>l.trim()).filter(Boolean).map(l=>{const p=l.split(/[\t ]+/);const ds=p.filter(x=>dt(x));const w=p.filter(x=>!dt(x));if(w.length<2||ds.length<2)return null;
       let end=dt(ds[1]);const st=dt(ds[0]);if(end<st&&/^\d{1,2}[-./]\d{1,2}$/.test(ds[1]))end=iso(new Date(new Date(end).getFullYear()+1,new Date(end).getMonth(),new Date(end).getDate()));return {co:w.slice(0,-1).join(" "),name:w[w.length-1],start:st,end};}).filter(Boolean);
     if(!L.length){toast("읽을 수 있는 줄이 없습니다 (업체 이름 시작일 종료일)");return;}S.contracts=S.contracts||[];L.forEach(o=>S.contracts.push({id:uid(),branch:fd.get("branch"),mgr:fd.get("mgr"),memo:"",at:iso(TODAY),by:me(),...o}));toast(`${L.length}명 등록했습니다`);}});}
@@ -1575,7 +1582,7 @@ const STAGES=["청구","독촉","회수 약속","회수 완료"];
 /* 메모 한 줄에서 날짜·금액·거래처를 읽어냄: "A거래처 15일 100만원 상환예정" */
 function parseArMemo(t){const o={due:"",amt:0,coId:""};const s=String(t||"");
   let m=s.match(/(\d{1,2})\s*[\/.월]\s*(\d{1,2})\s*일?/);
-  if(m)o.due=TODAY.getFullYear()+"-"+pad(+m[1])+"-"+pad(+m[2]);
+  if(m){/* 상환 예정일은 앞으로 올 가장 빠른 날짜 (오늘보다 앞이면 내년) */let d=new Date(TODAY.getFullYear(),+m[1]-1,+m[2]);if(d<TODAY)d=new Date(TODAY.getFullYear()+1,+m[1]-1,+m[2]);o.due=iso(d);}
   else if((m=s.match(/(\d{1,2})\s*일/))){let d=new Date(TODAY.getFullYear(),TODAY.getMonth(),+m[1]);if(d<TODAY)d=new Date(TODAY.getFullYear(),TODAY.getMonth()+1,+m[1]);o.due=iso(d);}
   else if(/내일/.test(s))o.due=iso(addDays(TODAY,1));else if(/오늘/.test(s))o.due=iso(TODAY);
   const U={"억":1e8,"천만":1e7,"백만":1e6,"만":1e4,"천":1e3};
@@ -1637,12 +1644,13 @@ function arForm(r){r=r||{co:"",branch:"본사",billed:0,paid:0,billDate:iso(TODA
 const lvBoss=()=>!!ceoName()&&me()===ceoName();
 function vLeave(){
   const ceo=lvBoss(),alc=S.role==="ceo";const pend=S.leave.reqs.filter(r=>r.status==="대기"&&ceo);
-  const myAl=S.leave.alloc[me()];
+  const Y=lvYr();const myAl=lvAlloc(me(),Y);
   let html=ph("본사 및 지사 인원 연차현황","대표가 직원별 부여 일수를 입력하고, 직원이 신청 → 대표가 승인하면 잔여 일수가 자동 차감됩니다. (부여는 대표 권한자, 승인·반려는 대표만 합니다)",`<button class="btn primary" data-act="lvNew">+ 연차 신청</button>`)+
    ``;
-  if(myAl!=null){const u=leaveUsed(me());html+=`<div class="card kpi" style="margin-bottom:14px">${ring(pct(myAl-u,myAl))}<div><span>${me()}님 잔여 연차</span><b>${myAl-u}일 / ${myAl}일</b><span>사용 ${u}일 · 대기 ${S.leave.reqs.filter(r=>r.name===me()&&r.status==="대기").reduce((s,r)=>s+r.days,0)}일</span></div></div>`;}
+  html+=`<div class="tools" style="margin-bottom:10px"><button class="btn sm" data-act="lvY" data-v="-1" aria-label="이전 해" ${Y<=LV_BASE?"disabled":""}>◀</button><b>${Y}년 연차</b><button class="btn sm" data-act="lvY" data-v="1" aria-label="다음 해" ${Y>=lvNowY()+1?"disabled":""}>▶</button>${Y===lvNowY()?'<span class="chip ok">올해</span>':Y>lvNowY()?'<span class="chip vis">미리 입력 · 그 해 연차 신청부터 적용</span>':'<span class="chip mute">지난 해</span>'}${Y!==lvNowY()?'<button class="btn sm" data-act="lvY" data-v="0">올해로</button>':""}</div>`;
+  if(myAl!=null){const u=leaveUsed(me(),Y);html+=`<div class="card kpi" style="margin-bottom:14px">${ring(pct(myAl-u,myAl))}<div><span>${me()}님 ${Y}년 잔여 연차</span><b>${myAl-u}일 / ${myAl}일</b><span>사용 ${u}일 · 대기 ${S.leave.reqs.filter(r=>r.name===me()&&r.status==="대기"&&lvYOf(r)===Y).reduce((s,r)=>s+r.days,0)}일</span></div></div>`;}
   if(ceo&&pend.length)html+=`<div class="card" style="margin-bottom:14px"><h3>승인 대기 ${pend.length}건</h3><div class="tw" style="border:0"><table class="x resp"><thead><tr><th>이름</th><th>종류</th><th>기간</th><th>일수</th><th>사유</th><th></th></tr></thead><tbody>${pend.map(r=>`<tr><td>${r.name}</td><td>${r.type}</td><td>${r.from}${r.to!==r.from?" ~ "+r.to:""}</td><td>${r.days}</td><td class="l">${esc(r.reason)}</td><td><button class="btn sm primary" data-act="lvOk" data-id="${r.id}">승인</button> <button class="btn sm danger" data-act="lvNo" data-id="${r.id}">반려</button></td></tr>`).join("")}</tbody></table></div></div>`;
-  html+=`<div class="grid g2">${BRANCHES.filter(b=>STAFF.some(n=>brOf(n)===b)).map(b=>`<div class="card"><h3>${b}</h3><div class="mlist only-m">${STAFF.filter(n=>brOf(n)===b).map(n=>{const al=S.leave.alloc[n]||0,u=leaveUsed(n);return `<div class="mi"><div class="mt"><b>${n}</b> <span class="chip mute">${titleOf(n)}</span><div class="sub">부여 ${alc?`<input type="number" step="0.5" data-set="leave.alloc.${n}" data-type="num" value="${al}" style="width:54px;border:1px solid var(--line);border-radius:4px;padding:1px 4px;background:var(--paper)" aria-label="${n} 부여 일수">`:al}일 · 사용 ${u}일</div></div><div class="mv"><b>${al-u}일</b><span class="sub">잔여</span>${bar(pct(al-u,al),pct(al-u,al)<30?"bad":"")}</div></div>`}).join("")}</div><div class="tw only-d" style="border:0"><table class="x"><thead><tr><th>이름</th><th>부여</th><th>사용</th><th>잔여</th><th style="min-width:120px">잔여율</th></tr></thead><tbody>${STAFF.filter(n=>brOf(n)===b).map(n=>{const a=S.leave.alloc[n]||0,u=leaveUsed(n);return `<tr><td class="l">${n} <span class="chip mute">${titleOf(n)}</span></td><td>${alc?`<input type="number" step="0.5" data-set="leave.alloc.${n}" data-type="num" value="${a}" aria-label="${n} 부여 일수">`:a}</td><td>${u}</td><td class="cur">${a-u}</td><td>${bar(pct(a-u,a),pct(a-u,a)<30?"bad":"")}</td></tr>`}).join("")}</tbody></table></div></div>`).join("")}</div>
+  html+=`<div class="grid g2">${BRANCHES.filter(b=>STAFF.some(n=>brOf(n)===b)).map(b=>`<div class="card"><h3>${b}</h3><div class="mlist only-m">${STAFF.filter(n=>brOf(n)===b).map(n=>{const al=lvAlloc(n,Y)||0,u=leaveUsed(n,Y);return `<div class="mi"><div class="mt"><b>${n}</b> <span class="chip mute">${titleOf(n)}</span><div class="sub">부여 ${alc?`<input type="number" step="0.5" data-set="${lvPath(n,Y)}" data-type="num" value="${al}" style="width:54px;border:1px solid var(--line);border-radius:4px;padding:1px 4px;background:var(--paper)" aria-label="${n} 부여 일수">`:al}일 · 사용 ${u}일</div></div><div class="mv"><b>${al-u}일</b><span class="sub">잔여</span>${bar(pct(al-u,al),pct(al-u,al)<30?"bad":"")}</div></div>`}).join("")}</div><div class="tw only-d" style="border:0"><table class="x"><thead><tr><th>이름</th><th>부여</th><th>사용</th><th>잔여</th><th style="min-width:120px">잔여율</th></tr></thead><tbody>${STAFF.filter(n=>brOf(n)===b).map(n=>{const a=lvAlloc(n,Y)||0,u=leaveUsed(n,Y);return `<tr><td class="l">${n} <span class="chip mute">${titleOf(n)}</span></td><td>${alc?`<input type="number" step="0.5" data-set="${lvPath(n,Y)}" data-type="num" value="${a}" aria-label="${n} 부여 일수">`:a}</td><td>${u}</td><td class="cur">${a-u}</td><td>${bar(pct(a-u,a),pct(a-u,a)<30?"bad":"")}</td></tr>`}).join("")}</tbody></table></div></div>`).join("")}</div>
   <div class="card" style="margin-top:14px"><h3>신청 내역</h3><div class="tw" style="border:0"><table class="x resp"><thead><tr><th>이름</th><th>종류</th><th>기간</th><th>일수</th><th>사유</th><th>상태</th></tr></thead><tbody>${[...S.leave.reqs].filter(r=>isBoss()||r.name===me()||r.status==="승인"||(isBr()&&brOf(r.name)===myBr())).sort((a,b)=>b.from.localeCompare(a.from)).map(r=>`<tr><td>${r.name}</td><td>${r.type}</td><td>${r.from}${r.to!==r.from?" ~ "+r.to:""}</td><td>${r.days}</td><td class="l">${isBoss()||r.name===me()?esc(r.reason):""}</td><td class="nowrap"><span class="chip ${r.status==="승인"?"ok":r.status==="반려"?"late":"vis"}">${r.status}</span>${(r.status==="대기"&&r.name===me())||ceo?` <button class="btn sm" data-act="lvEdit" data-id="${r.id}">수정</button>`:""}</td></tr>`).join("")}</tbody></table></div></div>`;
   return html;
 }
@@ -2067,7 +2075,7 @@ function rosterBadge(r){if(!hasRoster(r))return "";const n=r.people.filter(isNew
   return `${n?` <span class="rb rn" title="이번 주(화요일~월요일) 입사한 사람 (명단 기준)">이번 주 신규 +${n}</span>`:""}${o?` <span class="rb ro" title="이번 주(화요일~월요일) 퇴사한 사람">이번 주 퇴사 −${o}</span>`:""}`;}
 const fmtPhone=v=>{const d=String(v||"").replace(/\D/g,"");return d.length===11?d.replace(/(\d{3})(\d{4})(\d{4})/,"$1-$2-$3"):d.length===10?d.replace(/(\d{3})(\d{3,4})(\d{4})/,"$1-$2-$3"):String(v||"").trim();};
 function parseRosterLines(t,asNew){return String(t||"").split(/\n|,/).map(l=>l.trim()).filter(Boolean).map(l=>{let d="",ph="";const pm=l.match(/01[016789][-\s.]?\d{3,4}[-\s.]?\d{4}/);if(pm){ph=fmtPhone(pm[0]);l=l.replace(pm[0],"").trim();}const m=l.match(/(\d{4}-\d{1,2}-\d{1,2})|(\d{1,2})[\/.](\d{1,2})/);
-  if(m){if(m[1])d=iso(new Date(m[1]));else{const y=TODAY.getFullYear();d=iso(new Date(y,+m[2]-1,+m[3]));}l=l.replace(m[0],"").trim();}
+  if(m){if(m[1])d=iso(new Date(m[1]));else{const y=nearYear(+m[2],+m[3]);d=iso(new Date(y,+m[2]-1,+m[3]));}l=l.replace(m[0],"").trim();}
   return {id:uid(),name:l.replace(/\s+/g," "),in:d||(asNew?iso(TODAY):""),phone:ph};}).filter(x=>x.name);}
 function hcRecTable(rp,r,act){const ms=mgrs(r);const multi=ms.length>1;const opts=[...new Set([...ms,...REC_NAMES(),...STAFF])];const un=multi?act.filter(x=>!recOf(x,r)).length:0;
   return `<details style="margin-top:10px" ${un||(isBoss()&&S.ui.recOpen)?"open":""} ontoggle="S.ui.recOpen=this.open"><summary><b>${multi?"담당 나누기":"채용 담당 바꾸기"}</b> <span class="sub">${multi?`관리담당이 ${ms.length}명인 업체 — `:"팀장급 이상 — "}사람마다 누가 넣은 인원인지 고르면 관리담당자별 합계에 그 사람 몫으로 셉니다${un?` · <span class="up">미지정 ${un}명</span>`:""}</span></summary>
@@ -2321,7 +2329,7 @@ document.addEventListener("click",e=>{{const df=e.target.closest("a.dfile");if(d
     arMemoMiss:()=>{const r=S.ar.find(x=>x.id===el.dataset.r),m=r.memos.find(x=>x.id===el.dataset.m);m.done="미입금";if(r.stage<1)r.stage=1;toast(`${r.co} 미입금으로 표시했습니다`);},
     arMemoUndo:()=>{const r=S.ar.find(x=>x.id===el.dataset.r),m=r.memos.find(x=>x.id===el.dataset.m);if(m.done==="입금"&&m.added){const b4=r.paid;r.paid=Math.max(0,r.paid-m.added);arPaidLog(r,r.paid-b4);if(r.stage===3&&r.paid<r.billed)r.stage=2;}m.done=null;m.added=0;toast("되돌렸습니다");},arEdit:()=>arForm(S.ar.find(x=>x.id===el.dataset.id)),
     arDel:()=>{if(confirm("삭제할까요?")){S.ar=S.ar.filter(x=>x.id!==el.dataset.id);closeModal();}},
-    lvNew:()=>leaveForm(),
+    lvNew:()=>leaveForm(),lvY:()=>{S.ui.lvY=+v===0?lvNowY():Math.min(lvNowY()+1,Math.max(LV_BASE,lvYr()+(+v)));},
     ctNew:()=>ctForm(),ctEdit:()=>{const c=S.contracts.find(x=>x.id===el.dataset.id);if(!ctCan(c)){toast("이 계약은 담당자·팀장만 수정할 수 있습니다");return;}ctForm(c);},ctRenew:()=>{const c=S.contracts.find(x=>x.id===el.dataset.id);if(!ctCan(c)){toast("이 계약은 담당자·팀장만 재계약할 수 있습니다");return;}ctRenew(el.dataset.id);},ctPaste:()=>ctPasteForm(),ctF:()=>S.ui.ctF=v,
     ctDel:()=>{const c=S.contracts.find(x=>x.id===el.dataset.id);if(!c||!ctCan(c)||!confirm(`${c.co} ${c.name} 계약을 삭제할까요?`))return;S.contracts=S.contracts.filter(x=>x!==c);S.contracts.forEach(x=>{if(x.renewedTo===c.id)delete x.renewedTo;});closeModal();toast("삭제했습니다");},
     ivNew:()=>ivForm(),ivBl:()=>{const v=S.interviews.find(y=>y.id===el.dataset.id);if(!v)return;const del=ivCanDel(v);
